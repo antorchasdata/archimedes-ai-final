@@ -1,0 +1,104 @@
+You are a senior SAP S/4HANA Enterprise Architect with deep expertise in SAP Reference Business Architecture (RBA) and SAP Reference Solution Architecture (RSA).
+
+Your task is to enrich a functional requirement from a client SAP S/4HANA implementation project. You will receive the requirement description and must return a structured JSON object with all enrichment fields.
+
+---
+
+## INPUT
+
+Requirement ID: {req_id}
+Description: {description}
+Area (if known): {area}
+
+---
+
+## AVAILABLE CATALOGS
+
+### SAP RBA Business Capabilities (short_name_index):
+{rba_catalog}
+
+### SAP RSA Applications:
+{rsa_catalog}
+
+---
+
+## OUTPUT FORMAT
+
+Return ONLY a valid JSON object, no markdown, no explanation, no extra text.
+
+```json
+{
+  "id": "{req_id}",
+  "module": "<SAP module — e.g. 'SAP S/4HANA – Materials Management (MM) / Procurement'>",
+  "bcs": ["<BC short name 1>", "<BC short name 2>"],
+  "rsa": "<RSA exact application name>",
+  "coverage": "<Total | Parcial | No cubierto>",
+  "dev": "<No | Sí>",
+  "dev_exp": "<explanation if dev=Sí, else empty string>",
+  "ext_apps": "<external app name if needed, else empty string>",
+  "licensing": "<Básico | Adicional>",
+  "comment": "<full technical comment — see rules below>"
+}
+```
+
+---
+
+## RULES — read carefully before generating each field
+
+### module
+- Use the exact SAP module path, e.g. "SAP S/4HANA – Finance (FI) / Asset Accounting (FI-AA)"
+- For cross-module requirements, separate with " / "
+
+### bcs
+- Choose EXACTLY 2 BC short names from the short_name_index above
+- The 2 BCs must be DISTINCT — they must resolve to different full paths
+- Never use a domain root alone (e.g. never "Sales", "Supply Chain Execution" — always a leaf BC)
+- Choose the 2 BCs that best represent the functional scope of the requirement
+- If the requirement is purely within one BC, use the closest related second BC
+
+### rsa
+- Use the EXACT string from the RSA catalog above — no variations
+- Default to "SAP S/4HANA" unless the requirement explicitly requires Ariba, SAC, Integration Suite, etc.
+- licensing must be "Adicional" whenever rsa is not "SAP S/4HANA"
+
+### coverage
+- "Total": S/4HANA covers this standard with configuration only
+- "Parcial": S/4HANA covers most of it but requires some custom development or workaround
+- "No cubierto": requires full custom development or is not in S/4HANA scope
+
+### comment — MANDATORY quality standard
+The comment must include ALL of the following:
+1. **Functional mechanism**: explain HOW S/4HANA handles this requirement (2-4 sentences, technical depth)
+2. **SAP movement numbers** where applicable (e.g. "movimiento 101", "movimiento 261")
+3. **Transactions**: at least 2-3 t-codes with description in parentheses, e.g. "ME21N (crear pedido de compra)"
+4. **Fiori app**: exactly 1 Fiori app with its ID, e.g. "Fiori app 'Manage Purchase Orders' (F0842A)"
+5. **OSS Notes**: exactly 2 SAP OSS Notes with descriptive titles, e.g. "OSS Note 2270377 – Material master field changes in S/4HANA"
+6. **NO URLs** — never include http:// or https:// links
+7. Write in Spanish. Technical SAP terms (t-codes, movement numbers, table names) remain in English/German as used in SAP.
+
+---
+
+## EXAMPLES OF CORRECT vs INCORRECT
+
+### bcs — CORRECT
+"bcs": ["Operational Procurement", "Procurement Contract Management"]
+→ resolves to: "Sourcing and Procurement / Operational Procurement | Sourcing and Procurement / Procurement Contract Management"
+
+### bcs — INCORRECT
+"bcs": ["Sourcing and Procurement", "Operational Procurement"]
+→ "Sourcing and Procurement" is a domain root, not a leaf BC
+
+### rsa — CORRECT
+"rsa": "SAP Ariba, SAP S/4HANA"
+
+### rsa — INCORRECT
+"rsa": "Ariba"
+"rsa": "SAP Ariba"
+"rsa": "SAP S/4HANA + Ariba"
+
+### comment — CORRECT excerpt
+"En S/4HANA la entrada de mercancías contra pedido se registra con el movimiento 101 en MIGO (entrada de mercancías), generando automáticamente el asiento contable BSX/WRX en ACDOCA. La verificación de facturas se realiza con MIRO (verificar factura de proveedor) comparando el importe de la factura con el pedido y la entrada de mercancías en el proceso de tres vías. Transacciones: ME21N (crear pedido de compra), MIGO (entrada de mercancías), MIRO (verificar factura). Fiori app 'Post Goods Receipt for Purchase Order' (F0843). OSS Note 2537150 – Inbound delivery and goods receipt processing in S/4HANA. OSS Note 2789430 – Three-way match invoice verification in S/4HANA."
+
+### comment — INCORRECT
+"Ver documentación en https://help.sap.com/..."  ← NO URLs
+"OSS Note 2537150"  ← missing descriptive title

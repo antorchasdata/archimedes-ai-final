@@ -1,0 +1,30 @@
+{
+  "version": "2024-11",
+  "description": "SAP Reference Solution Architecture (RSA) — exact application names as they appear in the SAP RSA catalog. Use these verbatim in the 'rsa' field.",
+  "applications": [
+    {
+      "name": "SAP S/4HANA",
+      "use_when": "Standard S/4HANA functionality with no additional licensed products required."
+    },
+    {
+      "name": "SAP Ariba, SAP S/4HANA",
+      "use_when": "Requirement explicitly involves SAP Ariba for sourcing, procurement, contracts, or supplier management. Not to be used for standard MM purchasing."
+    },
+    {
+      "name": "SAP Integration Suite, SAP S/4HANA",
+      "use_when": "Requirement involves middleware, API integration, EDI, or connectivity to external systems via SAP BTP Integration Suite."
+    },
+    {
+      "name": "SAP Analytics Cloud, SAP S/4HANA",
+      "use_when": "Requirement involves advanced analytics, dashboards, planning, or reporting beyond S/4HANA Embedded Analytics — using SAP Analytics Cloud (SAC)."
+    },
+    {
+      "name": "SAP SuccessFactors, SAP S/4HANA",
+      "use_when": "Requirement involves HR processes, workforce management, or people analytics integrated with S/4HANA."
+    },
+    {
+      "name": "SAP Fieldglass, SAP S/4HANA",
+      "use_when": "Requirement involves external workforce management, contingent labour, or services procurement via SAP Fieldglass."
+    }
+  ]
+}

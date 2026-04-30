@@ -1,0 +1,27 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Output (never commit client data)
+output/
+input_samples/*.xlsx
+input_samples/*.pdf
+input_samples/*.xls
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,81 @@
+{
+  "version": "2024-11",
+  "description": "SAP Reference Business Architecture (RBA) — Business Capability catalog. Keys are short names used in pipeline bcs lists; values are full 'Domain / BC' paths.",
+  "catalog": {
+    "Supply Chain Execution": {
+      "Inventory Management":              "Supply Chain Execution / Inventory Management",
+      "Delivery Management":               "Supply Chain Execution / Delivery Management",
+      "Transportation Management":         "Supply Chain Execution / Transportation Management"
+    },
+    "Supply Chain Planning": {
+      "Demand Planning":                   "Supply Chain Planning / Demand Planning",
+      "Sales and Operations Planning":     "Supply Chain Planning / Sales and Operations Planning"
+    },
+    "Supply Chain Enablement": {
+      "Quality Management":                "Supply Chain Enablement / Quality Management",
+      "Logistics Material Identification": "Supply Chain Enablement / Logistics Material Identification"
+    },
+    "Sourcing and Procurement": {
+      "Operational Procurement":           "Sourcing and Procurement / Operational Procurement",
+      "Procurement Contract Management":   "Sourcing and Procurement / Procurement Contract Management",
+      "Supplier Management":               "Sourcing and Procurement / Supplier Management"
+    },
+    "Sales": {
+      "Customer Order and Contract Management":  "Sales / Customer Order and Contract Management",
+      "Customer Billing and Invoice Management":  "Sales / Customer Billing and Invoice Management"
+    },
+    "Finance": {
+      "Accounting and Financial Close":    "Finance / Accounting and Financial Close",
+      "Payables and Receivables Management": "Finance / Payables and Receivables Management",
+      "Financial Planning and Analysis":   "Finance / Financial Planning and Analysis"
+    },
+    "Asset Management": {
+      "Asset Management Strategy and Planning": "Asset Management / Asset Management Strategy and Planning",
+      "Asset Lifecycle Delivery":          "Asset Management / Asset Lifecycle Delivery"
+    },
+    "R&D and Engineering": {
+      "Product and Service Design Management": "R&D and Engineering / Product and Service Design Management"
+    },
+    "Sustainability Management": {
+      "Sustainable Operations":            "Sustainability Management / Sustainable Operations"
+    }
+  },
+  "short_name_index": {
+    "Inventory Management":                "Supply Chain Execution / Inventory Management",
+    "Delivery Management":                 "Supply Chain Execution / Delivery Management",
+    "Transportation Management":           "Supply Chain Execution / Transportation Management",
+    "Demand Planning":                     "Supply Chain Planning / Demand Planning",
+    "Sales and Operations Planning":       "Supply Chain Planning / Sales and Operations Planning",
+    "Quality Management":                  "Supply Chain Enablement / Quality Management",
+    "Logistics Material Identification":   "Supply Chain Enablement / Logistics Material Identification",
+    "Operational Procurement":             "Sourcing and Procurement / Operational Procurement",
+    "Procurement Contract Management":     "Sourcing and Procurement / Procurement Contract Management",
+    "Supplier Management":                 "Sourcing and Procurement / Supplier Management",
+    "Customer Order and Contract Management":  "Sales / Customer Order and Contract Management",
+    "Customer Billing and Invoice Management": "Sales / Customer Billing and Invoice Management",
+    "Accounting and Financial Close":      "Finance / Accounting and Financial Close",
+    "Payables and Receivables Management": "Finance / Payables and Receivables Management",
+    "Financial Planning and Analysis":     "Finance / Financial Planning and Analysis",
+    "Asset Management Strategy and Planning": "Asset Management / Asset Management Strategy and Planning",
+    "Asset Lifecycle Delivery":            "Asset Management / Asset Lifecycle Delivery",
+    "Product and Service Design Management": "R&D and Engineering / Product and Service Design Management",
+    "Sustainable Operations":              "Sustainability Management / Sustainable Operations",
+    "Asset Accounting":                    "Finance / Accounting and Financial Close",
+    "Fixed Assets Management":             "Asset Management / Asset Lifecycle Delivery",
+    "Investment Management":               "Finance / Financial Planning and Analysis",
+    "Real Estate and Lease Management":    "Finance / Accounting and Financial Close",
+    "Cost Center Accounting":              "Finance / Accounting and Financial Close",
+    "Overhead Cost Controlling":           "Finance / Financial Planning and Analysis",
+    "Profit Center Accounting":            "Finance / Financial Planning and Analysis",
+    "Project Controlling":                 "Finance / Financial Planning and Analysis",
+    "Profitability Analysis":              "Finance / Financial Planning and Analysis",
+    "CO-PA":                               "Finance / Financial Planning and Analysis",
+    "Internal Orders":                     "Finance / Accounting and Financial Close",
+    "Invoice and Payables Management":     "Finance / Payables and Receivables Management",
+    "Tax Management":                      "Finance / Payables and Receivables Management",
+    "Revenue Accounting and Reporting":    "Finance / Financial Planning and Analysis",
+    "Receivables Management":              "Finance / Payables and Receivables Management",
+    "External Workforce Management":       "Sourcing and Procurement / Operational Procurement",
+    "Project Management":                  "R&D and Engineering / Product and Service Design Management"
+  }
+}
