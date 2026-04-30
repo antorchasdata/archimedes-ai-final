@@ -51,6 +51,7 @@ def main() -> None:
     parser.add_argument("input_file", help="Path to .xlsx, .xls, or .pdf input file")
     parser.add_argument("--no-validate", action="store_true", help="Skip validation step")
     parser.add_argument("--push-leanix", action="store_true", help="Push results to LeanIX API")
+    parser.add_argument("--client", default="unknown", help="Client name — used as tag in LeanIX (e.g. AcmeCorp)")
     parser.add_argument("--output-dir", default="output", help="Directory for output files")
     args = parser.parse_args()
 
@@ -99,6 +100,7 @@ def main() -> None:
         input_path,
         output_dir,
         push_leanix=args.push_leanix,
+        client_name=args.client,
     )
 
     logger.info("═" * 60)
