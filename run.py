@@ -1,18 +1,28 @@
 """
 run.py — Orchestrator for the Archimedes AI pipeline.
 
-Usage:
-  python run.py <input_file> [--no-validate] [--push-leanix] [--output-dir OUTPUT]
+Two commands:
 
-Steps:
-  1. extract  → output/reqs_raw.json
-  2. enrich   → output/reqs_enriched.json
-  3. validate → output/validation_report.json  (skipped with --no-validate)
-  4. write    → output/<name>_enriched.xlsx  + optional LeanIX push
+  1. Enrich — extract → enrich → validate → write (both Excel outputs)
+     python run.py enrich <input_file> --client <name> [options]
+
+     Outputs:
+       output/<stem>_enriched.xlsx        ← client deliverable (cols H–P)
+       output/<client>_leanix_import.xlsx ← staging file for LeanIX (review before push)
+
+  2. Push — read staging Excel → push to LeanIX
+     python run.py push <leanix_import.xlsx> --client <name>
+
+     Run after reviewing / editing the staging file.
+
+Options for enrich:
+  --no-validate         Skip validation step
+  --client NAME         Client name used as tag in LeanIX (default: unknown)
+  --output-dir OUTPUT   Directory for output files (default: output)
 
 Environment variables (see .env.example):
-  ANTHROPIC_API_KEY, LEANIX_API_TOKEN, LEANIX_WORKSPACE_ID, LEANIX_BASE_URL
-  ENRICH_MODEL, ENRICH_BATCH_SIZE, LEANIX_PUSH, LOG_LEVEL
+  ANTHROPIC_API_KEY, LEANIX_API_TOKEN, LEANIX_BASE_URL
+  ENRICH_MODEL, ENRICH_BATCH_SIZE, LOG_LEVEL
 """
 
 from __future__ import annotations
@@ -27,13 +37,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Add pipeline dir to path so modules can import each other
 sys.path.insert(0, str(Path(__file__).parent / "pipeline"))
 
-from pipeline.extract  import extract   # noqa: E402
-from pipeline.enrich   import enrich    # noqa: E402
-from pipeline.validate import validate  # noqa: E402
-from pipeline.write    import write     # noqa: E402
+from pipeline.extract  import extract     # noqa: E402
+from pipeline.enrich   import enrich      # noqa: E402
+from pipeline.validate import validate    # noqa: E402
+from pipeline.write    import write, push_leanix  # noqa: E402
 
 
 def _setup_logging(level: str) -> None:
@@ -44,18 +53,7 @@ def _setup_logging(level: str) -> None:
     )
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Archimedes AI — SAP requirements enrichment pipeline"
-    )
-    parser.add_argument("input_file", help="Path to .xlsx, .xls, or .pdf input file")
-    parser.add_argument("--no-validate", action="store_true", help="Skip validation step")
-    parser.add_argument("--push-leanix", action="store_true", help="Push results to LeanIX API")
-    parser.add_argument("--client", default="unknown", help="Client name — used as tag in LeanIX (e.g. AcmeCorp)")
-    parser.add_argument("--output-dir", default="output", help="Directory for output files")
-    args = parser.parse_args()
-
-    _setup_logging(os.getenv("LOG_LEVEL", "INFO"))
+def cmd_enrich(args: argparse.Namespace) -> None:
     logger = logging.getLogger("archimedes")
 
     input_path = Path(args.input_file)
@@ -66,8 +64,9 @@ def main() -> None:
         sys.exit(1)
 
     logger.info("═" * 60)
-    logger.info("Archimedes AI — starting pipeline")
+    logger.info("Archimedes AI — enrich")
     logger.info("Input:  %s", input_path)
+    logger.info("Client: %s", args.client)
     logger.info("Output: %s", output_dir)
     logger.info("═" * 60)
 
@@ -95,21 +94,73 @@ def main() -> None:
 
     # Step 4 — Write
     logger.info("Step 4/4 — Write")
-    out_excel = write(
+    out_excel, out_staging = write(
         enriched_path,
         input_path,
         output_dir,
-        push_leanix=args.push_leanix,
         client_name=args.client,
     )
 
     logger.info("═" * 60)
-    logger.info("Pipeline complete.")
-    logger.info("  Excel output : %s", out_excel)
-    logger.info("  Enriched JSON: %s", enriched_path)
+    logger.info("Done.")
+    logger.info("  Client Excel  : %s", out_excel)
+    logger.info("  LeanIX import : %s", out_staging)
+    logger.info("  Enriched JSON : %s", enriched_path)
     if not args.no_validate:
-        logger.info("  Validation   : %s/validation_report.json", output_dir)
+        logger.info("  Validation    : %s/validation_report.json", output_dir)
+    logger.info("─" * 60)
+    logger.info("Review %s, then run:", out_staging)
+    logger.info("  python run.py push %s --client %s", out_staging, args.client)
     logger.info("═" * 60)
+
+
+def cmd_push(args: argparse.Namespace) -> None:
+    logger = logging.getLogger("archimedes")
+    staging = Path(args.staging_file)
+
+    if not staging.exists():
+        logger.error("Staging file not found: %s", staging)
+        sys.exit(1)
+
+    logger.info("═" * 60)
+    logger.info("Archimedes AI — push to LeanIX")
+    logger.info("Staging: %s", staging)
+    logger.info("Client:  %s", args.client)
+    logger.info("═" * 60)
+
+    push_leanix(staging, client_name=args.client)
+
+    logger.info("═" * 60)
+    logger.info("LeanIX push complete.")
+    logger.info("═" * 60)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Archimedes AI — SAP requirements enrichment pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    # enrich sub-command
+    p_enrich = sub.add_parser("enrich", help="Extract → enrich → validate → write")
+    p_enrich.add_argument("input_file", help="Path to .xlsx, .xls, or .pdf")
+    p_enrich.add_argument("--no-validate", action="store_true", help="Skip validation")
+    p_enrich.add_argument("--client", default="unknown", help="Client name (used as LeanIX tag)")
+    p_enrich.add_argument("--output-dir", default="output", help="Output directory")
+
+    # push sub-command
+    p_push = sub.add_parser("push", help="Push staging Excel to LeanIX")
+    p_push.add_argument("staging_file", help="Path to <client>_leanix_import.xlsx")
+    p_push.add_argument("--client", default="unknown", help="Client name (used as LeanIX tag)")
+
+    args = parser.parse_args()
+    _setup_logging(os.getenv("LOG_LEVEL", "INFO"))
+
+    if args.command == "enrich":
+        cmd_enrich(args)
+    else:
+        cmd_push(args)
 
 
 if __name__ == "__main__":
