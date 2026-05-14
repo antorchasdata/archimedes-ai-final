@@ -1,30 +1,1633 @@
 {
-  "version": "2024-11",
-  "description": "SAP Reference Solution Architecture (RSA) — exact application names as they appear in the SAP RSA catalog. Use these verbatim in the 'rsa' field.",
+  "version": "2026-05",
+  "source": "SAP Value Experience Hub - Capability Model Export 2026-05-11",
+  "description": "SAP Reference Solution Architecture (RSA) — canonical SAP product names extracted from RBA Solution Capabilities. Use these verbatim in fact sheet names. Grouped by functional domain.",
+  "stats": {
+    "total_products": 324,
+    "domains": 19
+  },
   "applications": [
     {
+      "name": "SAP Analytics Cloud",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP BW/4HANA",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Business Information Warehouse",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Datasphere",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Lumira",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Profitability and Performance Management",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Profitability and Performance Management Cloud",
+      "domain": "Analytics & Data"
+    },
+    {
+      "name": "SAP Asset Performance Management",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Field Service Management",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Field Service Management mobile app",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Maintenance Assistant",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Maintenance Assistant for Android",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Maintenance Assistant for iOS",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Mobile Asset Management",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Mobile Asset Management for utilities",
+      "domain": "Asset Management"
+    },
+    {
+      "name": "SAP Build Process Automation",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Build Work Zone",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Cloud ALM",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Cloud Identity Access Governance",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Cloud Identity Services",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP GRC for SAP HANA",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP HANA",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Identity Management",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Integration Suite",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP NetWeaver",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP NetWeaver Application Server for ABAP innovation package",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP Single Sign-On",
+      "domain": "BTP & Platform"
+    },
+    {
+      "name": "SAP CPQ",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Cloud for Customer core applications",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Cloud for Customer mobile app",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Commerce",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Commerce Cloud",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Commerce Marketplace Management by Mirakl",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Activity Repository applications bundle",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Checkout",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Checkout manager",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Data Cloud",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Data Platform",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Identity",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Loyalty Management",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Customer Relationship Management",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Emarsys",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Marketing",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Recommerce",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Revenue Growth Management",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Sales Cloud Version 2",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Sales Cloud Version 2 for Android",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Sales Cloud Version 2 for iOS",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Sales Cloud mobile app",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Service Cloud",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Service Cloud Version 2",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP Territory and Quota",
+      "domain": "Customer Experience"
+    },
+    {
+      "name": "SAP 3D Visual Enterprise Author",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP 3D Visual Enterprise Generator",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP 3D Visual Enterprise Viewer",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP 3D Visual Enterprise Viewer for Android",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP 3D Visual Enterprise Viewer for iPad",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Archiving and Document Access by OpenText for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Business ByDesign",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Business One",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Dairy Management by msg for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP E-Recruiting for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP EHS Management for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP ERP",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP ERP HCM",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Engineering Control Center for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Enterprise Contract Assembly",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Enterprise Project Connection",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Enterprise Service Management",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Enterprise Threat Detection",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Event Management on SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Extended Enterprise Content Management by OpenText",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Extended Enterprise Content Management by OpenText for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Farm Management by Vistex for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Global Batch Traceability on SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Grower Management for Perishables by Vistex for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Incentive Administration and SAP Paybacks and Chargebacks by Vistex for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Invoice Management by OpenText for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Invoice Management foundation by OpenText for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Learning Solution for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Meat and Fish Management by msg for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Process Control for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Risk Management for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
       "name": "SAP S/4HANA",
-      "use_when": "Standard S/4HANA functionality with no additional licensed products required."
+      "domain": "ERP Core"
     },
     {
-      "name": "SAP Ariba, SAP S/4HANA",
-      "use_when": "Requirement explicitly involves SAP Ariba for sourcing, procurement, contracts, or supplier management. Not to be used for standard MM purchasing."
+      "name": "SAP S/4HANA Banking for payment centralization",
+      "domain": "ERP Core"
     },
     {
-      "name": "SAP Integration Suite, SAP S/4HANA",
-      "use_when": "Requirement involves middleware, API integration, EDI, or connectivity to external systems via SAP BTP Integration Suite."
+      "name": "SAP S/4HANA Cloud Private Edition",
+      "domain": "ERP Core"
     },
     {
-      "name": "SAP Analytics Cloud, SAP S/4HANA",
-      "use_when": "Requirement involves advanced analytics, dashboards, planning, or reporting beyond S/4HANA Embedded Analytics — using SAP Analytics Cloud (SAC)."
+      "name": "SAP S/4HANA Cloud Public Edition",
+      "domain": "ERP Core"
     },
     {
-      "name": "SAP SuccessFactors, SAP S/4HANA",
-      "use_when": "Requirement involves HR processes, workforce management, or people analytics integrated with S/4HANA."
+      "name": "SAP S/4HANA Cloud for credit integration",
+      "domain": "ERP Core"
     },
     {
-      "name": "SAP Fieldglass, SAP S/4HANA",
-      "use_when": "Requirement involves external workforce management, contingent labour, or services procurement via SAP Fieldglass."
+      "name": "SAP S/4HANA Cloud for intelligent accounting automation",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA Insurance for reinsurance management",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA Utilities extensions for meter-to-cash processes by PROLOGA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for accounting integration",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for asset retirement obligation",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for central procurement",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for financial products subledger",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for livestock procurement",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for manufacturing logistics",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for rights and royalty management by Vistex",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for subscription billing",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA for waste and recycling by PROLOGA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP S/4HANA integration with SAP Concur solutions",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Solution Sales Configuration for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP SuccessFactors Extended Enterprise Content Management by OpenText",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Transactional Banking for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Treasury G-Invoicing for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP Yard Logistics for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP assurance and compliance software for SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP product data management integration to SAP ERP",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP product data management integration to SAP S/4HANA",
+      "domain": "ERP Core"
+    },
+    {
+      "name": "SAP LeanIX Application Portfolio Management",
+      "domain": "Enterprise Architecture"
+    },
+    {
+      "name": "SAP LeanIX Architecture and Road Map Planning",
+      "domain": "Enterprise Architecture"
+    },
+    {
+      "name": "SAP LeanIX Technology Risk and Compliance",
+      "domain": "Enterprise Architecture"
+    },
+    {
+      "name": "SAP Advanced Financial Closing",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Disclosure Management",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Financial Closing cockpit",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Group Reporting Data Collection",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Liquidity Management for Banking",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Revenue Accounting and Reporting",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Treasury G-Invoicing",
+      "domain": "Finance & Treasury"
+    },
+    {
+      "name": "SAP Access Control",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Advanced Commodity Risk Analytics",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Document and Reporting Compliance",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Document and Reporting Compliance service",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Omnichannel Sales Transfer and Audit",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Privacy Governance",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Process Control",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Regulation Management by Pathlock",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Risk Management",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Risk and Assurance Management",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Watch List Screening",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP assurance and compliance software",
+      "domain": "GRC & Security"
+    },
+    {
+      "name": "SAP Learning Hub",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Career and Talent Development",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Compensation",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Employee Central",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Employee Central Payroll",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Employee Central Service Center",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Employee Central integration to SAP Business Suite",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors HCM Core",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Learning",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Mobile",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Onboarding",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Opportunity Marketplace",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Payroll",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Performance & Goals",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Platform",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Recruiting",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Shift Scheduling",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Succession & Development",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Time Tracking",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Work Zone",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP SuccessFactors Workforce Analytics",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP Time and Attendance Management by WorkForce Software",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP U.S. Payroll Tax Calculation by BSI",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP Workforce Forecasting and Scheduling by WorkForce Software",
+      "domain": "Human Capital Management"
+    },
+    {
+      "name": "SAP Ariba Category Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Central Procurement",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Contracts",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Intake Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Invoicing",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Procurement",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Procurement Planning",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Sourcing",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Supplier Lifecycle and Performance",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Supplier Quotation Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba Supplier Risk",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Ariba contract price renegotiation add-on",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Business Network for Procurement and SAP Business Network for Supply Chain",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Concur mobile app for Android",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Concur mobile app for iOS",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Customer Order Sourcing",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Fieldglass Vendor Management System",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Order Management for sourcing and availability",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Rural Sourcing Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Sourcing OnDemand",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Sourcing and SAP Contract Lifecycle Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Spend Control Tower",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Supplier Lifecycle Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Supplier Relationship Management",
+      "domain": "Intelligent Spend & Business Network"
+    },
+    {
+      "name": "SAP Digital Manufacturing",
+      "domain": "Manufacturing"
+    },
+    {
+      "name": "SAP Manufacturing Execution",
+      "domain": "Manufacturing"
+    },
+    {
+      "name": "SAP Manufacturing Integration and Intelligence",
+      "domain": "Manufacturing"
+    },
+    {
+      "name": "SAP Account Substantiation and Automation by BlackLine",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Advanced Solution Bundling",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Agent Connection",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Agent Lifecycle Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Agent Performance Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Agricultural Contract Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Agricultural Origination Portal",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Analysis for Microsoft Office",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Application Interface Framework",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Archiving and Document Access by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Auto-ID Infrastructure",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Broker Reconciliation for Commodity Derivatives",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Business Data Cloud",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Business Planning and Consolidation",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP BusinessObjects Business Intelligence platform",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP BusinessObjects Dashboards",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Cash Application",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Cell and Gene Therapy Orchestration",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Commodity Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Complaint Handling",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Content Management Core by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Content Stream by Skillsoft",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Convergent Charging",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Convergent Mediation by DigitalRoute",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Data Mapping and Protection by BigID",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Digital Asset Management Cloud by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Digital Asset Management by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Digital Currency Hub",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Digital Vehicle Operations",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Distributed Energy Resources",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Document Presentment by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP E-Mobility",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Enable Now",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Engagement Cloud",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Entitlement Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Event Ticketing",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Excise Tax Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Flexible Solution Billing",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Fortify by Micro Focus",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Incentive Administration by Vistex and SAP Paybacks and Chargebacks by Vistex",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Incentive Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Information Capture by OpenText",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Integrated Product Development",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Intelligent Agriculture",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Intelligent Clinical Supply Management for operations",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Intelligent Clinical Supply Management for planning",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Intelligent Returns Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Intelligent Robotic Process Automation",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Knowledge Central by NICE",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Management of Change",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Market Communication for Utilities",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Market Rates Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Multi-Bank Connectivity",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Multichannel Foundation for Utilities and Public Sector",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Multiresource Scheduling",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Multiresource Scheduling with optimizer",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Omnichannel Point-of-Sale by GK",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Omnichannel Promotion Pricing",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Order Management foundation",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Order and Delivery Scheduling",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP PowerDesigner",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Predictive Replenishment",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Process Automation",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Product",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Product Configuration",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Product Model Viewer for 1.0 visionOS",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Product Model Viewer for Android",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Product Model Viewer for iOS",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Project and Resource Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Real Estate and Facilities Management by Planon",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Regulatory Insights",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Retail Execution for Android",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Retail Execution for iOS",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Retail Execution integration with SAP CRM",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Returnable Packaging Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Secondary Distribution for Oil & Gas",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Self-Billing Cockpit",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Service and Asset Manager",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Signature Management by DocuSign",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Solution Sales Configuration",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Sports One",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Subscription Billing",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Supply Chain Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Taulia",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Trade Management",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Work Manager",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP digital payments add-on",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP employee experience management solutions by Qualtrics",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP product data management integration to 3DEXPERIENCE",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP product data management integration to PTC Windchill",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP trading platform integration",
+      "domain": "Other SAP Products"
+    },
+    {
+      "name": "SAP Commercial Project Management",
+      "domain": "Portfolio & Project Management"
+    },
+    {
+      "name": "SAP Portfolio and Project Management",
+      "domain": "Portfolio & Project Management"
+    },
+    {
+      "name": "SAP Signavio Journey Modeler",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Collaboration Hub",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Governance",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Insights",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Intelligence",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Manager",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Process Modeler",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Signavio Transformation Manager",
+      "domain": "Process Management"
+    },
+    {
+      "name": "SAP Data Custodian",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Data Quality Management",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to AutoCAD",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to CATIA V5",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to ECAD",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to EPLAN",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to Inventor",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to NX",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to PTC Creo",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to SolidEdge",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to SolidWorks",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Engineering Control Center interface to Zuken",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Master Data Governance",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Product Lifecycle Costing",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Variant Configuration and Pricing",
+      "domain": "R&D, Engineering & MDG"
+    },
+    {
+      "name": "SAP Business Network Asset Collaboration",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Business Network Material Traceability",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Business Network Supply Chain Collaboration",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Business Network for Logistics",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Event Management",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Extended Warehouse Management",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Global Trade Services",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Logistics Management",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Supply Network Collaboration",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Transportation Management",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Transportation Resource Planning",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Yard Logistics",
+      "domain": "Supply Chain & Logistics"
+    },
+    {
+      "name": "SAP Demand and Inventory Planning",
+      "domain": "Supply Chain Planning"
+    },
+    {
+      "name": "SAP Integrated Business Planning",
+      "domain": "Supply Chain Planning"
+    },
+    {
+      "name": "SAP Green Ledger",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Green Token",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Responsible Design and Production",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Sustainability Control Tower",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Sustainability Data Exchange",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Sustainability Footprint Management",
+      "domain": "Sustainability"
+    },
+    {
+      "name": "SAP Advanced Track and Trace for Pharmaceuticals",
+      "domain": "Traceability & Serialization"
+    },
+    {
+      "name": "SAP Batch Release Hub for Life Sciences",
+      "domain": "Traceability & Serialization"
+    },
+    {
+      "name": "SAP Corporate Serialization",
+      "domain": "Traceability & Serialization"
+    },
+    {
+      "name": "SAP Global Batch Traceability",
+      "domain": "Traceability & Serialization"
+    },
+    {
+      "name": "SAP Traceability Hub",
+      "domain": "Traceability & Serialization"
     }
-  ]
+  ],
+  "name_index": {
+    "sap analytics cloud": "SAP Analytics Cloud",
+    "sap bw/4hana": "SAP BW/4HANA",
+    "sap business information warehouse": "SAP Business Information Warehouse",
+    "sap datasphere": "SAP Datasphere",
+    "sap lumira": "SAP Lumira",
+    "sap profitability and performance management": "SAP Profitability and Performance Management",
+    "sap profitability and performance management cloud": "SAP Profitability and Performance Management Cloud",
+    "sap asset performance management": "SAP Asset Performance Management",
+    "sap field service management": "SAP Field Service Management",
+    "sap field service management mobile app": "SAP Field Service Management mobile app",
+    "sap maintenance assistant": "SAP Maintenance Assistant",
+    "sap maintenance assistant for android": "SAP Maintenance Assistant for Android",
+    "sap maintenance assistant for ios": "SAP Maintenance Assistant for iOS",
+    "sap mobile asset management": "SAP Mobile Asset Management",
+    "sap mobile asset management for utilities": "SAP Mobile Asset Management for utilities",
+    "sap build process automation": "SAP Build Process Automation",
+    "sap build work zone": "SAP Build Work Zone",
+    "sap cloud alm": "SAP Cloud ALM",
+    "sap cloud identity access governance": "SAP Cloud Identity Access Governance",
+    "sap cloud identity services": "SAP Cloud Identity Services",
+    "sap grc for sap hana": "SAP GRC for SAP HANA",
+    "sap hana": "SAP HANA",
+    "sap identity management": "SAP Identity Management",
+    "sap integration suite": "SAP Integration Suite",
+    "sap netweaver": "SAP NetWeaver",
+    "sap netweaver application server for abap innovation package": "SAP NetWeaver Application Server for ABAP innovation package",
+    "sap single sign-on": "SAP Single Sign-On",
+    "sap cpq": "SAP CPQ",
+    "sap cloud for customer core applications": "SAP Cloud for Customer core applications",
+    "sap cloud for customer mobile app": "SAP Cloud for Customer mobile app",
+    "sap commerce": "SAP Commerce",
+    "sap commerce cloud": "SAP Commerce Cloud",
+    "sap commerce marketplace management by mirakl": "SAP Commerce Marketplace Management by Mirakl",
+    "sap customer activity repository applications bundle": "SAP Customer Activity Repository applications bundle",
+    "sap customer checkout": "SAP Customer Checkout",
+    "sap customer checkout manager": "SAP Customer Checkout manager",
+    "sap customer data cloud": "SAP Customer Data Cloud",
+    "sap customer data platform": "SAP Customer Data Platform",
+    "sap customer identity": "SAP Customer Identity",
+    "sap customer loyalty management": "SAP Customer Loyalty Management",
+    "sap customer relationship management": "SAP Customer Relationship Management",
+    "sap emarsys": "SAP Emarsys",
+    "sap marketing": "SAP Marketing",
+    "sap recommerce": "SAP Recommerce",
+    "sap revenue growth management": "SAP Revenue Growth Management",
+    "sap sales cloud version 2": "SAP Sales Cloud Version 2",
+    "sap sales cloud version 2 for android": "SAP Sales Cloud Version 2 for Android",
+    "sap sales cloud version 2 for ios": "SAP Sales Cloud Version 2 for iOS",
+    "sap sales cloud mobile app": "SAP Sales Cloud mobile app",
+    "sap service cloud": "SAP Service Cloud",
+    "sap service cloud version 2": "SAP Service Cloud Version 2",
+    "sap territory and quota": "SAP Territory and Quota",
+    "sap 3d visual enterprise author": "SAP 3D Visual Enterprise Author",
+    "sap 3d visual enterprise generator": "SAP 3D Visual Enterprise Generator",
+    "sap 3d visual enterprise viewer": "SAP 3D Visual Enterprise Viewer",
+    "sap 3d visual enterprise viewer for android": "SAP 3D Visual Enterprise Viewer for Android",
+    "sap 3d visual enterprise viewer for ipad": "SAP 3D Visual Enterprise Viewer for iPad",
+    "sap archiving and document access by opentext for sap s/4hana": "SAP Archiving and Document Access by OpenText for SAP S/4HANA",
+    "sap business bydesign": "SAP Business ByDesign",
+    "sap business one": "SAP Business One",
+    "sap dairy management by msg for sap s/4hana": "SAP Dairy Management by msg for SAP S/4HANA",
+    "sap e-recruiting for sap s/4hana": "SAP E-Recruiting for SAP S/4HANA",
+    "sap ehs management for sap s/4hana": "SAP EHS Management for SAP S/4HANA",
+    "sap erp": "SAP ERP",
+    "sap erp hcm": "SAP ERP HCM",
+    "sap engineering control center for sap s/4hana": "SAP Engineering Control Center for SAP S/4HANA",
+    "sap enterprise contract assembly": "SAP Enterprise Contract Assembly",
+    "sap enterprise project connection": "SAP Enterprise Project Connection",
+    "sap enterprise service management": "SAP Enterprise Service Management",
+    "sap enterprise threat detection": "SAP Enterprise Threat Detection",
+    "sap event management on sap s/4hana": "SAP Event Management on SAP S/4HANA",
+    "sap extended enterprise content management by opentext": "SAP Extended Enterprise Content Management by OpenText",
+    "sap extended enterprise content management by opentext for sap s/4hana": "SAP Extended Enterprise Content Management by OpenText for SAP S/4HANA",
+    "sap farm management by vistex for sap s/4hana": "SAP Farm Management by Vistex for SAP S/4HANA",
+    "sap global batch traceability on sap s/4hana": "SAP Global Batch Traceability on SAP S/4HANA",
+    "sap grower management for perishables by vistex for sap s/4hana": "SAP Grower Management for Perishables by Vistex for SAP S/4HANA",
+    "sap incentive administration and sap paybacks and chargebacks by vistex for sap s/4hana": "SAP Incentive Administration and SAP Paybacks and Chargebacks by Vistex for SAP S/4HANA",
+    "sap invoice management by opentext for sap s/4hana": "SAP Invoice Management by OpenText for SAP S/4HANA",
+    "sap invoice management foundation by opentext for sap s/4hana": "SAP Invoice Management foundation by OpenText for SAP S/4HANA",
+    "sap learning solution for sap s/4hana": "SAP Learning Solution for SAP S/4HANA",
+    "sap meat and fish management by msg for sap s/4hana": "SAP Meat and Fish Management by msg for SAP S/4HANA",
+    "sap process control for sap s/4hana": "SAP Process Control for SAP S/4HANA",
+    "sap risk management for sap s/4hana": "SAP Risk Management for SAP S/4HANA",
+    "sap s/4hana": "SAP S/4HANA",
+    "sap s/4hana banking for payment centralization": "SAP S/4HANA Banking for payment centralization",
+    "sap s/4hana cloud private edition": "SAP S/4HANA Cloud Private Edition",
+    "sap s/4hana cloud public edition": "SAP S/4HANA Cloud Public Edition",
+    "sap s/4hana cloud for credit integration": "SAP S/4HANA Cloud for credit integration",
+    "sap s/4hana cloud for intelligent accounting automation": "SAP S/4HANA Cloud for intelligent accounting automation",
+    "sap s/4hana insurance for reinsurance management": "SAP S/4HANA Insurance for reinsurance management",
+    "sap s/4hana utilities extensions for meter-to-cash processes by prologa": "SAP S/4HANA Utilities extensions for meter-to-cash processes by PROLOGA",
+    "sap s/4hana for accounting integration": "SAP S/4HANA for accounting integration",
+    "sap s/4hana for asset retirement obligation": "SAP S/4HANA for asset retirement obligation",
+    "sap s/4hana for central procurement": "SAP S/4HANA for central procurement",
+    "sap s/4hana for financial products subledger": "SAP S/4HANA for financial products subledger",
+    "sap s/4hana for livestock procurement": "SAP S/4HANA for livestock procurement",
+    "sap s/4hana for manufacturing logistics": "SAP S/4HANA for manufacturing logistics",
+    "sap s/4hana for rights and royalty management by vistex": "SAP S/4HANA for rights and royalty management by Vistex",
+    "sap s/4hana for subscription billing": "SAP S/4HANA for subscription billing",
+    "sap s/4hana for waste and recycling by prologa": "SAP S/4HANA for waste and recycling by PROLOGA",
+    "sap s/4hana integration with sap concur solutions": "SAP S/4HANA integration with SAP Concur solutions",
+    "sap solution sales configuration for sap s/4hana": "SAP Solution Sales Configuration for SAP S/4HANA",
+    "sap successfactors extended enterprise content management by opentext": "SAP SuccessFactors Extended Enterprise Content Management by OpenText",
+    "sap transactional banking for sap s/4hana": "SAP Transactional Banking for SAP S/4HANA",
+    "sap treasury g-invoicing for sap s/4hana": "SAP Treasury G-Invoicing for SAP S/4HANA",
+    "sap yard logistics for sap s/4hana": "SAP Yard Logistics for SAP S/4HANA",
+    "sap assurance and compliance software for sap s/4hana": "SAP assurance and compliance software for SAP S/4HANA",
+    "sap product data management integration to sap erp": "SAP product data management integration to SAP ERP",
+    "sap product data management integration to sap s/4hana": "SAP product data management integration to SAP S/4HANA",
+    "sap leanix application portfolio management": "SAP LeanIX Application Portfolio Management",
+    "sap leanix architecture and road map planning": "SAP LeanIX Architecture and Road Map Planning",
+    "sap leanix technology risk and compliance": "SAP LeanIX Technology Risk and Compliance",
+    "sap advanced financial closing": "SAP Advanced Financial Closing",
+    "sap disclosure management": "SAP Disclosure Management",
+    "sap financial closing cockpit": "SAP Financial Closing cockpit",
+    "sap group reporting data collection": "SAP Group Reporting Data Collection",
+    "sap liquidity management for banking": "SAP Liquidity Management for Banking",
+    "sap revenue accounting and reporting": "SAP Revenue Accounting and Reporting",
+    "sap treasury g-invoicing": "SAP Treasury G-Invoicing",
+    "sap access control": "SAP Access Control",
+    "sap advanced commodity risk analytics": "SAP Advanced Commodity Risk Analytics",
+    "sap document and reporting compliance": "SAP Document and Reporting Compliance",
+    "sap document and reporting compliance service": "SAP Document and Reporting Compliance service",
+    "sap omnichannel sales transfer and audit": "SAP Omnichannel Sales Transfer and Audit",
+    "sap privacy governance": "SAP Privacy Governance",
+    "sap process control": "SAP Process Control",
+    "sap regulation management by pathlock": "SAP Regulation Management by Pathlock",
+    "sap risk management": "SAP Risk Management",
+    "sap risk and assurance management": "SAP Risk and Assurance Management",
+    "sap watch list screening": "SAP Watch List Screening",
+    "sap assurance and compliance software": "SAP assurance and compliance software",
+    "sap learning hub": "SAP Learning Hub",
+    "sap successfactors career and talent development": "SAP SuccessFactors Career and Talent Development",
+    "sap successfactors compensation": "SAP SuccessFactors Compensation",
+    "sap successfactors employee central": "SAP SuccessFactors Employee Central",
+    "sap successfactors employee central payroll": "SAP SuccessFactors Employee Central Payroll",
+    "sap successfactors employee central service center": "SAP SuccessFactors Employee Central Service Center",
+    "sap successfactors employee central integration to sap business suite": "SAP SuccessFactors Employee Central integration to SAP Business Suite",
+    "sap successfactors hcm core": "SAP SuccessFactors HCM Core",
+    "sap successfactors learning": "SAP SuccessFactors Learning",
+    "sap successfactors mobile": "SAP SuccessFactors Mobile",
+    "sap successfactors onboarding": "SAP SuccessFactors Onboarding",
+    "sap successfactors opportunity marketplace": "SAP SuccessFactors Opportunity Marketplace",
+    "sap successfactors payroll": "SAP SuccessFactors Payroll",
+    "sap successfactors performance & goals": "SAP SuccessFactors Performance & Goals",
+    "sap successfactors platform": "SAP SuccessFactors Platform",
+    "sap successfactors recruiting": "SAP SuccessFactors Recruiting",
+    "sap successfactors shift scheduling": "SAP SuccessFactors Shift Scheduling",
+    "sap successfactors succession & development": "SAP SuccessFactors Succession & Development",
+    "sap successfactors time tracking": "SAP SuccessFactors Time Tracking",
+    "sap successfactors work zone": "SAP SuccessFactors Work Zone",
+    "sap successfactors workforce analytics": "SAP SuccessFactors Workforce Analytics",
+    "sap time and attendance management by workforce software": "SAP Time and Attendance Management by WorkForce Software",
+    "sap u.s. payroll tax calculation by bsi": "SAP U.S. Payroll Tax Calculation by BSI",
+    "sap workforce forecasting and scheduling by workforce software": "SAP Workforce Forecasting and Scheduling by WorkForce Software",
+    "sap ariba category management": "SAP Ariba Category Management",
+    "sap ariba central procurement": "SAP Ariba Central Procurement",
+    "sap ariba contracts": "SAP Ariba Contracts",
+    "sap ariba intake management": "SAP Ariba Intake Management",
+    "sap ariba invoicing": "SAP Ariba Invoicing",
+    "sap ariba procurement": "SAP Ariba Procurement",
+    "sap ariba procurement planning": "SAP Ariba Procurement Planning",
+    "sap ariba sourcing": "SAP Ariba Sourcing",
+    "sap ariba supplier lifecycle and performance": "SAP Ariba Supplier Lifecycle and Performance",
+    "sap ariba supplier quotation management": "SAP Ariba Supplier Quotation Management",
+    "sap ariba supplier risk": "SAP Ariba Supplier Risk",
+    "sap ariba contract price renegotiation add-on": "SAP Ariba contract price renegotiation add-on",
+    "sap business network for procurement and sap business network for supply chain": "SAP Business Network for Procurement and SAP Business Network for Supply Chain",
+    "sap concur mobile app for android": "SAP Concur mobile app for Android",
+    "sap concur mobile app for ios": "SAP Concur mobile app for iOS",
+    "sap customer order sourcing": "SAP Customer Order Sourcing",
+    "sap fieldglass vendor management system": "SAP Fieldglass Vendor Management System",
+    "sap order management for sourcing and availability": "SAP Order Management for sourcing and availability",
+    "sap rural sourcing management": "SAP Rural Sourcing Management",
+    "sap sourcing ondemand": "SAP Sourcing OnDemand",
+    "sap sourcing and sap contract lifecycle management": "SAP Sourcing and SAP Contract Lifecycle Management",
+    "sap spend control tower": "SAP Spend Control Tower",
+    "sap supplier lifecycle management": "SAP Supplier Lifecycle Management",
+    "sap supplier relationship management": "SAP Supplier Relationship Management",
+    "sap digital manufacturing": "SAP Digital Manufacturing",
+    "sap manufacturing execution": "SAP Manufacturing Execution",
+    "sap manufacturing integration and intelligence": "SAP Manufacturing Integration and Intelligence",
+    "sap account substantiation and automation by blackline": "SAP Account Substantiation and Automation by BlackLine",
+    "sap advanced solution bundling": "SAP Advanced Solution Bundling",
+    "sap agent connection": "SAP Agent Connection",
+    "sap agent lifecycle management": "SAP Agent Lifecycle Management",
+    "sap agent performance management": "SAP Agent Performance Management",
+    "sap agricultural contract management": "SAP Agricultural Contract Management",
+    "sap agricultural origination portal": "SAP Agricultural Origination Portal",
+    "sap analysis for microsoft office": "SAP Analysis for Microsoft Office",
+    "sap application interface framework": "SAP Application Interface Framework",
+    "sap archiving and document access by opentext": "SAP Archiving and Document Access by OpenText",
+    "sap auto-id infrastructure": "SAP Auto-ID Infrastructure",
+    "sap broker reconciliation for commodity derivatives": "SAP Broker Reconciliation for Commodity Derivatives",
+    "sap business data cloud": "SAP Business Data Cloud",
+    "sap business planning and consolidation": "SAP Business Planning and Consolidation",
+    "sap businessobjects business intelligence platform": "SAP BusinessObjects Business Intelligence platform",
+    "sap businessobjects dashboards": "SAP BusinessObjects Dashboards",
+    "sap cash application": "SAP Cash Application",
+    "sap cell and gene therapy orchestration": "SAP Cell and Gene Therapy Orchestration",
+    "sap commodity management": "SAP Commodity Management",
+    "sap complaint handling": "SAP Complaint Handling",
+    "sap content management core by opentext": "SAP Content Management Core by OpenText",
+    "sap content stream by skillsoft": "SAP Content Stream by Skillsoft",
+    "sap convergent charging": "SAP Convergent Charging",
+    "sap convergent mediation by digitalroute": "SAP Convergent Mediation by DigitalRoute",
+    "sap data mapping and protection by bigid": "SAP Data Mapping and Protection by BigID",
+    "sap digital asset management cloud by opentext": "SAP Digital Asset Management Cloud by OpenText",
+    "sap digital asset management by opentext": "SAP Digital Asset Management by OpenText",
+    "sap digital currency hub": "SAP Digital Currency Hub",
+    "sap digital vehicle operations": "SAP Digital Vehicle Operations",
+    "sap distributed energy resources": "SAP Distributed Energy Resources",
+    "sap document presentment by opentext": "SAP Document Presentment by OpenText",
+    "sap e-mobility": "SAP E-Mobility",
+    "sap enable now": "SAP Enable Now",
+    "sap engagement cloud": "SAP Engagement Cloud",
+    "sap entitlement management": "SAP Entitlement Management",
+    "sap event ticketing": "SAP Event Ticketing",
+    "sap excise tax management": "SAP Excise Tax Management",
+    "sap flexible solution billing": "SAP Flexible Solution Billing",
+    "sap fortify by micro focus": "SAP Fortify by Micro Focus",
+    "sap incentive administration by vistex and sap paybacks and chargebacks by vistex": "SAP Incentive Administration by Vistex and SAP Paybacks and Chargebacks by Vistex",
+    "sap incentive management": "SAP Incentive Management",
+    "sap information capture by opentext": "SAP Information Capture by OpenText",
+    "sap integrated product development": "SAP Integrated Product Development",
+    "sap intelligent agriculture": "SAP Intelligent Agriculture",
+    "sap intelligent clinical supply management for operations": "SAP Intelligent Clinical Supply Management for operations",
+    "sap intelligent clinical supply management for planning": "SAP Intelligent Clinical Supply Management for planning",
+    "sap intelligent returns management": "SAP Intelligent Returns Management",
+    "sap intelligent robotic process automation": "SAP Intelligent Robotic Process Automation",
+    "sap knowledge central by nice": "SAP Knowledge Central by NICE",
+    "sap management of change": "SAP Management of Change",
+    "sap market communication for utilities": "SAP Market Communication for Utilities",
+    "sap market rates management": "SAP Market Rates Management",
+    "sap multi-bank connectivity": "SAP Multi-Bank Connectivity",
+    "sap multichannel foundation for utilities and public sector": "SAP Multichannel Foundation for Utilities and Public Sector",
+    "sap multiresource scheduling": "SAP Multiresource Scheduling",
+    "sap multiresource scheduling with optimizer": "SAP Multiresource Scheduling with optimizer",
+    "sap omnichannel point-of-sale by gk": "SAP Omnichannel Point-of-Sale by GK",
+    "sap omnichannel promotion pricing": "SAP Omnichannel Promotion Pricing",
+    "sap order management foundation": "SAP Order Management foundation",
+    "sap order and delivery scheduling": "SAP Order and Delivery Scheduling",
+    "sap powerdesigner": "SAP PowerDesigner",
+    "sap predictive replenishment": "SAP Predictive Replenishment",
+    "sap process automation": "SAP Process Automation",
+    "sap product": "SAP Product",
+    "sap product configuration": "SAP Product Configuration",
+    "sap product model viewer for 1.0 visionos": "SAP Product Model Viewer for 1.0 visionOS",
+    "sap product model viewer for android": "SAP Product Model Viewer for Android",
+    "sap product model viewer for ios": "SAP Product Model Viewer for iOS",
+    "sap project and resource management": "SAP Project and Resource Management",
+    "sap real estate and facilities management by planon": "SAP Real Estate and Facilities Management by Planon",
+    "sap regulatory insights": "SAP Regulatory Insights",
+    "sap retail execution for android": "SAP Retail Execution for Android",
+    "sap retail execution for ios": "SAP Retail Execution for iOS",
+    "sap retail execution integration with sap crm": "SAP Retail Execution integration with SAP CRM",
+    "sap returnable packaging management": "SAP Returnable Packaging Management",
+    "sap secondary distribution for oil & gas": "SAP Secondary Distribution for Oil & Gas",
+    "sap self-billing cockpit": "SAP Self-Billing Cockpit",
+    "sap service and asset manager": "SAP Service and Asset Manager",
+    "sap signature management by docusign": "SAP Signature Management by DocuSign",
+    "sap solution sales configuration": "SAP Solution Sales Configuration",
+    "sap sports one": "SAP Sports One",
+    "sap subscription billing": "SAP Subscription Billing",
+    "sap supply chain management": "SAP Supply Chain Management",
+    "sap taulia": "SAP Taulia",
+    "sap trade management": "SAP Trade Management",
+    "sap work manager": "SAP Work Manager",
+    "sap digital payments add-on": "SAP digital payments add-on",
+    "sap employee experience management solutions by qualtrics": "SAP employee experience management solutions by Qualtrics",
+    "sap product data management integration to 3dexperience": "SAP product data management integration to 3DEXPERIENCE",
+    "sap product data management integration to ptc windchill": "SAP product data management integration to PTC Windchill",
+    "sap trading platform integration": "SAP trading platform integration",
+    "sap commercial project management": "SAP Commercial Project Management",
+    "sap portfolio and project management": "SAP Portfolio and Project Management",
+    "sap signavio journey modeler": "SAP Signavio Journey Modeler",
+    "sap signavio process collaboration hub": "SAP Signavio Process Collaboration Hub",
+    "sap signavio process governance": "SAP Signavio Process Governance",
+    "sap signavio process insights": "SAP Signavio Process Insights",
+    "sap signavio process intelligence": "SAP Signavio Process Intelligence",
+    "sap signavio process manager": "SAP Signavio Process Manager",
+    "sap signavio process modeler": "SAP Signavio Process Modeler",
+    "sap signavio transformation manager": "SAP Signavio Transformation Manager",
+    "sap data custodian": "SAP Data Custodian",
+    "sap data quality management": "SAP Data Quality Management",
+    "sap engineering control center": "SAP Engineering Control Center",
+    "sap engineering control center interface to autocad": "SAP Engineering Control Center interface to AutoCAD",
+    "sap engineering control center interface to catia v5": "SAP Engineering Control Center interface to CATIA V5",
+    "sap engineering control center interface to ecad": "SAP Engineering Control Center interface to ECAD",
+    "sap engineering control center interface to eplan": "SAP Engineering Control Center interface to EPLAN",
+    "sap engineering control center interface to inventor": "SAP Engineering Control Center interface to Inventor",
+    "sap engineering control center interface to nx": "SAP Engineering Control Center interface to NX",
+    "sap engineering control center interface to ptc creo": "SAP Engineering Control Center interface to PTC Creo",
+    "sap engineering control center interface to solidedge": "SAP Engineering Control Center interface to SolidEdge",
+    "sap engineering control center interface to solidworks": "SAP Engineering Control Center interface to SolidWorks",
+    "sap engineering control center interface to zuken": "SAP Engineering Control Center interface to Zuken",
+    "sap master data governance": "SAP Master Data Governance",
+    "sap product lifecycle costing": "SAP Product Lifecycle Costing",
+    "sap variant configuration and pricing": "SAP Variant Configuration and Pricing",
+    "sap business network asset collaboration": "SAP Business Network Asset Collaboration",
+    "sap business network material traceability": "SAP Business Network Material Traceability",
+    "sap business network supply chain collaboration": "SAP Business Network Supply Chain Collaboration",
+    "sap business network for logistics": "SAP Business Network for Logistics",
+    "sap event management": "SAP Event Management",
+    "sap extended warehouse management": "SAP Extended Warehouse Management",
+    "sap global trade services": "SAP Global Trade Services",
+    "sap logistics management": "SAP Logistics Management",
+    "sap supply network collaboration": "SAP Supply Network Collaboration",
+    "sap transportation management": "SAP Transportation Management",
+    "sap transportation resource planning": "SAP Transportation Resource Planning",
+    "sap yard logistics": "SAP Yard Logistics",
+    "sap demand and inventory planning": "SAP Demand and Inventory Planning",
+    "sap integrated business planning": "SAP Integrated Business Planning",
+    "sap green ledger": "SAP Green Ledger",
+    "sap green token": "SAP Green Token",
+    "sap responsible design and production": "SAP Responsible Design and Production",
+    "sap sustainability control tower": "SAP Sustainability Control Tower",
+    "sap sustainability data exchange": "SAP Sustainability Data Exchange",
+    "sap sustainability footprint management": "SAP Sustainability Footprint Management",
+    "sap advanced track and trace for pharmaceuticals": "SAP Advanced Track and Trace for Pharmaceuticals",
+    "sap batch release hub for life sciences": "SAP Batch Release Hub for Life Sciences",
+    "sap corporate serialization": "SAP Corporate Serialization",
+    "sap global batch traceability": "SAP Global Batch Traceability",
+    "sap traceability hub": "SAP Traceability Hub"
+  }
 }

@@ -134,6 +134,199 @@ _LIFECYCLE_MAP = {
     "No cubierto":  "plan",
 }
 
+# SAP Application → IT Components (technology stack, well-known SAP standard mapping)
+# ITC name follows SAP LeanIX reference catalog conventions.
+# Each tuple: (itc_name, hosting_type)
+_APP_TO_ITCS: dict[str, list[tuple[str, str]]] = {
+    "SAP S/4HANA": [
+        ("SAP HANA Database", "onPremise"),
+        ("SAP ABAP Platform", "onPremise"),
+        ("SAP NetWeaver Application Server", "onPremise"),
+        ("SAP Fiori", "onPremise"),
+    ],
+    "SAP S/4HANA Cloud": [
+        ("SAP HANA Database", "saas"),
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP Fiori", "saas"),
+    ],
+    "SAP Analytics Cloud": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP HANA Database", "saas"),
+    ],
+    "SAP Integration Suite": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP Cloud Integration", "paas"),
+        ("SAP API Management", "paas"),
+    ],
+    "SAP Ariba Sourcing": [
+        ("SAP Ariba Network", "saas"),
+        ("SAP Business Technology Platform", "paas"),
+    ],
+    "SAP Ariba Procurement": [
+        ("SAP Ariba Network", "saas"),
+        ("SAP Business Technology Platform", "paas"),
+    ],
+    "SAP Integrated Business Planning": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP HANA Database", "saas"),
+    ],
+    "SAP Transportation Management": [
+        ("SAP HANA Database", "onPremise"),
+        ("SAP ABAP Platform", "onPremise"),
+        ("SAP NetWeaver Application Server", "onPremise"),
+    ],
+    "SAP Global Trade Services": [
+        ("SAP HANA Database", "onPremise"),
+        ("SAP ABAP Platform", "onPremise"),
+        ("SAP NetWeaver Application Server", "onPremise"),
+    ],
+    "SAP SuccessFactors": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP SuccessFactors Platform", "saas"),
+    ],
+    "SAP Concur": [
+        ("SAP Business Technology Platform", "paas"),
+    ],
+    "SAP Fieldglass": [
+        ("SAP Business Technology Platform", "paas"),
+    ],
+    "SAP Customer Experience": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP Commerce Cloud", "saas"),
+    ],
+    "SAP ERP": [
+        ("SAP HANA Database", "onPremise"),
+        ("SAP ABAP Platform", "onPremise"),
+        ("SAP NetWeaver Application Server", "onPremise"),
+    ],
+    "SAP Business One": [
+        ("SAP HANA Database", "onPremise"),
+    ],
+    "SAP Datasphere": [
+        ("SAP Business Technology Platform", "paas"),
+        ("SAP HANA Database", "saas"),
+    ],
+}
+
+def _itcs_for_apps(app_names: list[str]) -> list[tuple[str, str]]:
+    """Return deduplicated (itc_name, hosting_type) tuples for a list of app names."""
+    seen: set[str] = set()
+    result = []
+    for app in app_names:
+        for itc_name, hosting in _APP_TO_ITCS.get(app, []):
+            if itc_name not in seen:
+                seen.add(itc_name)
+                result.append((itc_name, hosting))
+    return result
+
+# ── Shared Excel formatting helpers ───────────────────────────────────────────
+
+_COLOR_MANDATORY = "002A86"
+_COLOR_OPTIONAL  = "0070F2"
+_COLOR_RELATION  = "107E3E"
+_COLOR_READONLY  = "A9B4BE"
+_COLOR_TRANS_ROW = "EAF4FF"
+_COLOR_DATA_ROW  = "F5F9FF"
+
+_HEADER_COLORS = {
+    "mandatory": _COLOR_MANDATORY,
+    "optional":  _COLOR_OPTIONAL,
+    "relation":  _COLOR_RELATION,
+    "readonly":  _COLOR_READONLY,
+}
+
+
+def _sheet_header(ws: Any, columns: list[tuple[str, str, str, int]]) -> None:
+    """
+    Write LeanIX-format header rows to a worksheet.
+    columns: list of (technical_key, translation, category, width)
+    """
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    for col_idx, (key, label, cat, width) in enumerate(columns, start=1):
+        c1 = ws.cell(row=1, column=col_idx, value=key)
+        c1.font  = Font(name="Calibri", bold=True, color="FFFFFF", size=10)
+        c1.fill  = PatternFill("solid", fgColor=_HEADER_COLORS.get(cat, _COLOR_OPTIONAL))
+        c1.alignment = Alignment(horizontal="left", vertical="center")
+
+        c2 = ws.cell(row=2, column=col_idx, value=label)
+        c2.font  = Font(name="Calibri", bold=True, color="223548", size=9)
+        c2.fill  = PatternFill("solid", fgColor=_COLOR_TRANS_ROW)
+        c2.alignment = Alignment(horizontal="left", vertical="center")
+
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[2].height = 18
+
+
+def _sheet_row(ws: Any, row_idx: int, values: list, bg: str = _COLOR_DATA_ROW) -> None:
+    from openpyxl.styles import Font, PatternFill, Alignment
+    for col_idx, val in enumerate(values, start=1):
+        c = ws.cell(row=row_idx, column=col_idx, value=val or "")
+        c.font  = Font(name="Calibri", size=9, color="223548")
+        c.fill  = PatternFill("solid", fgColor=bg)
+        c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    ws.row_dimensions[row_idx].height = 16
+
+
+# ── Column schemas per fact sheet type ────────────────────────────────────────
+
+# (technical_key, translation, category, width)
+_COLS_APPLICATION = [
+    ("id",                              "ID",                        "readonly",  36),
+    ("type",                            "Type",                      "mandatory", 14),
+    ("name",                            "Name",                      "mandatory", 40),
+    ("description",                     "Description",               "optional",  55),
+    ("alias",                           "Alias",                     "optional",  14),
+    ("externalId",                      "External ID",               "optional",  18),
+    ("lifecycle_phase",                 "Lifecycle Phase",           "optional",  16),
+    ("lifecycle_startDate",             "Lifecycle Start Date",      "optional",  20),
+    ("lifecycle_endDate",               "Lifecycle End Date",        "optional",  18),
+    ("businessCriticality",             "Business Criticality",      "optional",  22),
+    ("functionalSuitability",           "Functional Fit",            "optional",  20),
+    ("technicalSuitability",            "Technical Fit",             "optional",  20),
+    ("lxHostingType",                   "Hosting Type",              "optional",  18),
+    ("lxState",                         "Quality Seal",              "optional",  14),
+    ("tags",                            "Tags",                      "optional",  35),
+    ("relApplicationToBusinessCapability", "Business Capabilities",  "relation",  60),
+    ("relApplicationToITComponent",     "IT Components",             "relation",  45),
+    ("relToParent",                     "Parent Application",        "relation",  30),
+]
+
+_COLS_BC = [
+    ("id",          "ID",          "readonly",  36),
+    ("type",        "Type",        "mandatory", 14),
+    ("name",        "Name",        "mandatory", 55),
+    ("description", "Description", "optional",  60),
+    ("lxState",     "Quality Seal","optional",  14),
+    ("tags",        "Tags",        "optional",  35),
+    ("relToParent", "Parent BC",   "relation",  55),
+]
+
+_COLS_INITIATIVE = [
+    ("id",                                  "ID",                        "readonly",  36),
+    ("type",                                "Type",                      "mandatory", 14),
+    ("name",                                "Name",                      "mandatory", 45),
+    ("description",                         "Description",               "optional",  60),
+    ("lifecycle_phase",                     "Lifecycle Phase",           "optional",  16),
+    ("lxState",                             "Quality Seal",              "optional",  14),
+    ("tags",                                "Tags",                      "optional",  35),
+    ("relInitiativeToApplication",          "Applications",              "relation",  45),
+    ("relInitiativeToBusinessCapability",   "Business Capabilities",     "relation",  60),
+]
+
+_COLS_ITC = [
+    ("id",          "ID",          "readonly",  36),
+    ("type",        "Type",        "mandatory", 14),
+    ("name",        "Name",        "mandatory", 40),
+    ("description", "Description", "optional",  55),
+    ("lxHostingType","Hosting Type","optional",  18),
+    ("lxState",     "Quality Seal","optional",  14),
+    ("tags",        "Tags",        "optional",  35),
+]
+
 
 def write_leanix_excel(
     enriched: list[dict[str, Any]],
@@ -142,20 +335,24 @@ def write_leanix_excel(
     client_name: str,
 ) -> None:
     """
-    Write a three-sheet Excel staging file for LeanIX import:
+    Write a LeanIX-importable multi-sheet Excel with proper format:
 
-      Sheet "Initiatives"         — one row per requirement
-      Sheet "BusinessCapabilities"— deduplicated leaf BCs
-      Sheet "Applications"        — deduplicated RSA application names
+      Sheet "Application"         — deduplicated RSA apps (TO-BE)
+      Sheet "BusinessCapability"  — deduplicated leaf BCs from requirements
+      Sheet "Initiative"          — one row per requirement
+      Sheet "ITComponent"         — ITCs where derivable
+      Sheet "ReadMe"              — import instructions
 
-    The file can be reviewed and hand-edited before pushing to LeanIX with
-    `run.py --push-leanix <file> --client <name>`.
+    Row 1: technical keys (colored headers)
+    Row 2: human-readable translations
+    Row 3+: data rows
     """
-    import openpyxl  # local import — only needed for staging Excel
+    import openpyxl
 
-    rows_init: list[dict] = []
-    seen_bcs:  dict[str, str] = {}   # leaf_bc_name → full_path
-    seen_apps: set[str]       = set()
+    # ── Collect data from enriched requirements ────────────────────────────────
+    seen_apps: dict[str, dict] = {}   # app_name → {lifecycle, bcs, itcs}
+    seen_bcs:  dict[str, str]  = {}   # bc_leaf_name → full_path
+    _init_groups: dict[str, dict] = {}  # group_key → aggregated initiative data
 
     for req in enriched:
         if req.get("_error"):
@@ -164,57 +361,178 @@ def write_leanix_excel(
         # Resolve BCs
         bcs_resolved: list[str] = []
         for bc_short in req.get("bcs", []):
-            full_path  = bcs_index.get(bc_short, bc_short)
-            _, _, leaf = full_path.partition(" / ")
-            bc_name    = leaf or full_path
-            seen_bcs[bc_name] = full_path
-            bcs_resolved.append(bc_name)
+            full_path = bcs_index.get(bc_short, bc_short)
+            parts     = full_path.split(" / ")
+            bc_leaf   = parts[-1] if parts else full_path
+            seen_bcs[bc_leaf] = full_path
+            bcs_resolved.append(bc_leaf)
 
         rsa_name = req.get("rsa", "SAP S/4HANA")
-        seen_apps.add(rsa_name)
+        lifecycle = _LIFECYCLE_MAP.get(req.get("coverage", ""), "plan")
 
-        rows_init.append({
-            "id":          req["id"],
-            "name":        req["id"],
-            "description": req.get("comment", "")[:2000],
-            "module":      req.get("module", ""),
-            "coverage":    req.get("coverage", ""),
-            "dev":         req.get("dev", ""),
-            "licensing":   req.get("licensing", ""),
-            "lifecycle":   _LIFECYCLE_MAP.get(req.get("coverage", ""), "plan"),
-            "rsa":         rsa_name,
-            "bcs":         ", ".join(bcs_resolved),
-            "client":      client_name,
+        # Upsert application — collect ITCs from static mapping
+        app_itcs = {itc for itc, _ in _APP_TO_ITCS.get(rsa_name, [])}
+        if rsa_name not in seen_apps:
+            seen_apps[rsa_name] = {
+                "name":       rsa_name,
+                "lifecycle":  lifecycle,
+                "bcs":        set(bcs_resolved),
+                "itcs":       app_itcs,
+            }
+        else:
+            seen_apps[rsa_name]["bcs"].update(bcs_resolved)
+            # promote lifecycle: active > phaseIn > plan
+            order = {"active": 0, "phaseIn": 1, "plan": 2}
+            if order.get(lifecycle, 2) < order.get(seen_apps[rsa_name]["lifecycle"], 2):
+                seen_apps[rsa_name]["lifecycle"] = lifecycle
+
+        # Accumulate initiative data, grouped by _group when present
+        group_key = req.get("_group") or req["id"]
+        if group_key not in _init_groups:
+            _init_groups[group_key] = {
+                "name":      group_key,
+                "lifecycle": lifecycle,
+                "apps":      set(),
+                "bcs":       set(),
+                "n_reqs":    0,
+            }
+        g = _init_groups[group_key]
+        g["apps"].add(rsa_name)
+        g["bcs"].update(bcs_resolved)
+        g["n_reqs"] += 1
+        # promote lifecycle: active > phaseIn > plan
+        order = {"active": 0, "phaseIn": 1, "plan": 2}
+        if order.get(lifecycle, 2) < order.get(g["lifecycle"], 2):
+            g["lifecycle"] = lifecycle
+
+    # Build initiative list from grouped data
+    initiatives: list[dict] = []
+    for group_key, g in _init_groups.items():
+        initiatives.append({
+            "name":      g["name"],
+            "description": f"{g['n_reqs']} requirements — client: {client_name}",
+            "lifecycle": g["lifecycle"],
+            "app":       ";".join(sorted(g["apps"])),
+            "bcs":       ";".join(sorted(g["bcs"])),
         })
 
+    # Build deduplicated ITC list from all seen apps
+    seen_itcs: dict[str, str] = {}  # itc_name → hosting_type
+    for app_name in seen_apps:
+        for itc_name, hosting in _APP_TO_ITCS.get(app_name, []):
+            if itc_name not in seen_itcs:
+                seen_itcs[itc_name] = hosting
+
+    tags = f"Target;{client_name}"
     wb = openpyxl.Workbook()
 
-    # Sheet 1 — Initiatives
-    ws_init = wb.active
-    ws_init.title = "Initiatives"
-    init_cols = ["id", "name", "description", "module", "coverage", "dev",
-                 "licensing", "lifecycle", "rsa", "bcs", "client"]
-    ws_init.append(init_cols)
-    for row in rows_init:
-        ws_init.append([row[c] for c in init_cols])
+    # ── Sheet: Application ─────────────────────────────────────────────────────
+    ws_app = wb.active
+    ws_app.title = "Application"
+    ws_app.freeze_panes = "C3"
+    _sheet_header(ws_app, _COLS_APPLICATION)
+    keys_app = [c[0] for c in _COLS_APPLICATION]
 
-    # Sheet 2 — BusinessCapabilities
-    ws_bc = wb.create_sheet("BusinessCapabilities")
-    ws_bc.append(["name", "full_path", "client"])
-    for bc_name, full_path in sorted(seen_bcs.items()):
-        ws_bc.append([bc_name, full_path, client_name])
+    for row_idx, (app_name, app) in enumerate(sorted(seen_apps.items()), start=3):
+        bcs_str  = ";".join(sorted(app["bcs"]))
+        itcs_str = ";".join(sorted(app.get("itcs", set())))
+        vals = {
+            "id": "", "type": "Application", "name": app_name,
+            "description": f"TO-BE application derived from requirements analysis. Client: {client_name}.",
+            "alias": "", "externalId": "",
+            "lifecycle_phase": app["lifecycle"], "lifecycle_startDate": "", "lifecycle_endDate": "",
+            "businessCriticality": "businessCritical", "functionalSuitability": "",
+            "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
+            "tags": tags,
+            "relApplicationToBusinessCapability": bcs_str,
+            "relApplicationToITComponent": itcs_str, "relToParent": "",
+        }
+        _sheet_row(ws_app, row_idx, [vals.get(k, "") for k in keys_app])
 
-    # Sheet 3 — Applications
-    ws_app = wb.create_sheet("Applications")
-    ws_app.append(["name", "client"])
-    for app_name in sorted(seen_apps):
-        ws_app.append([app_name, client_name])
+    # ── Sheet: BusinessCapability ──────────────────────────────────────────────
+    ws_bc = wb.create_sheet("BusinessCapability")
+    ws_bc.freeze_panes = "C3"
+    _sheet_header(ws_bc, _COLS_BC)
+    keys_bc = [c[0] for c in _COLS_BC]
+
+    for row_idx, (bc_leaf, full_path) in enumerate(sorted(seen_bcs.items()), start=3):
+        parts  = full_path.split(" / ")
+        parent = " / ".join(parts[:-1]) if len(parts) > 1 else ""
+        vals = {
+            "id": "", "type": "BusinessCapability", "name": bc_leaf,
+            "description": full_path,
+            "lxState": "DRAFT", "tags": tags, "relToParent": parent,
+        }
+        _sheet_row(ws_bc, row_idx, [vals.get(k, "") for k in keys_bc])
+
+    # ── Sheet: Initiative ──────────────────────────────────────────────────────
+    ws_init = wb.create_sheet("Initiative")
+    ws_init.freeze_panes = "C3"
+    _sheet_header(ws_init, _COLS_INITIATIVE)
+    keys_init = [c[0] for c in _COLS_INITIATIVE]
+
+    for row_idx, init in enumerate(initiatives, start=3):
+        vals = {
+            "id": "", "type": "Initiative", "name": init["name"],
+            "description": init["description"],
+            "lifecycle_phase": init["lifecycle"],
+            "lxState": "DRAFT", "tags": tags,
+            "relInitiativeToApplication":        init["app"],
+            "relInitiativeToBusinessCapability": init["bcs"],
+        }
+        _sheet_row(ws_init, row_idx, [vals.get(k, "") for k in keys_init])
+
+    # ── Sheet: ITComponent ─────────────────────────────────────────────────────
+    ws_itc = wb.create_sheet("ITComponent")
+    ws_itc.freeze_panes = "C3"
+    _sheet_header(ws_itc, _COLS_ITC)
+    keys_itc = [c[0] for c in _COLS_ITC]
+
+    for row_idx, (itc_name, hosting) in enumerate(sorted(seen_itcs.items()), start=3):
+        vals = {
+            "id": "", "type": "ITComponent", "name": itc_name,
+            "description": f"SAP technology component supporting TO-BE applications. Client: {client_name}.",
+            "lxHostingType": hosting, "lxState": "DRAFT", "tags": tags,
+        }
+        _sheet_row(ws_itc, row_idx, [vals.get(k, "") for k in keys_itc])
+
+    # ── Sheet: ReadMe ──────────────────────────────────────────────────────────
+    readme = wb.create_sheet("ReadMe")
+    from openpyxl.styles import Font, Alignment
+    readme_rows = [
+        (f"LeanIX Import — Target TO-BE ({client_name})", True,  "002A86", 13),
+        ("Source: Requirements analysis via Archimedes AI + SAP RBA/RSA catalogs", False, "223548", 9),
+        ("", False, "223548", 9),
+        ("IMPORT ORDER", True, "002A86", 10),
+        ("1. BusinessCapability", False, "223548", 9),
+        ("2. ITComponent", False, "223548", 9),
+        ("3. Application", False, "223548", 9),
+        ("4. Initiative", False, "223548", 9),
+        ("", False, "223548", 9),
+        ("IMPORT RULES", True, "002A86", 10),
+        ("- Leave 'id' column EMPTY — new fact sheets will be created.", False, "223548", 9),
+        ("- Relations use EXACT display names of existing LeanIX fact sheets.", False, "223548", 9),
+        ("- Multiple relation values separated by semicolon (;) without spaces.", False, "223548", 9),
+        ("- 'lxState' = DRAFT — approve manually after review.", False, "223548", 9),
+        ("- Import via: Inventory > Inventory Tools > Import from Excel", False, "223548", 9),
+        ("", False, "223548", 9),
+        ("STATS", True, "002A86", 10),
+        (f"Applications: {len(seen_apps)}", False, "223548", 9),
+        (f"Business Capabilities: {len(seen_bcs)}", False, "223548", 9),
+        (f"IT Components: {len(seen_itcs)}", False, "223548", 9),
+        (f"Initiatives: {len(initiatives)}", False, "223548", 9),
+    ]
+    for r_idx, (text, bold, color, size) in enumerate(readme_rows, start=1):
+        c = readme.cell(row=r_idx, column=1, value=text)
+        c.font = Font(name="Calibri", size=size, bold=bold, color=color)
+        c.alignment = Alignment(horizontal="left", wrap_text=True)
+    readme.column_dimensions["A"].width = 80
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
     logger.info(
-        "LeanIX staging: %d initiatives, %d BCs, %d applications → %s",
-        len(rows_init), len(seen_bcs), len(seen_apps), output_path,
+        "LeanIX target: %d apps, %d BCs, %d initiatives → %s",
+        len(seen_apps), len(seen_bcs), len(initiatives), output_path,
     )
 
 
@@ -461,6 +779,114 @@ def write_leanix(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def write_leanix_excel_from_xlsx(
+    enriched_xlsx: Path,
+    output_path: Path,
+    client_name: str,
+    header_row: int = 8,
+    data_start_row: int = 9,
+) -> None:
+    """
+    Generate a LeanIX-importable Excel directly from an enriched Requerimientos Excel
+    (as produced by map_requirements.py).
+
+    Column mapping (1-based):
+      B(2)=req_id, H(8)=coverage, I(9)=module, N(14)=comment, O(15)=BCs full path, P(16)=RSA app
+
+    BCs are stored as full paths separated by ' | ', e.g.:
+      'Corporate / Finance / Accounting and Financial Close | Corporate / Asset Management / ...'
+
+    RSA column may contain comma-separated canonical app names, e.g.:
+      'SAP S/4HANA, SAP Analytics Cloud' → two separate Application rows.
+    Each name is resolved against the RSA catalog name_index for exact canonical spelling.
+    """
+    import openpyxl as _xl
+
+    # Load RSA name_index for canonical resolution: lowercase → canonical
+    rsa_catalog   = json.loads((KNOWLEDGE_DIR / "sap_rsa_catalog.json").read_text())
+    rsa_name_index = rsa_catalog.get("name_index", {})  # {lowercase: canonical}
+
+    def _canonical_rsa(name: str) -> str:
+        """Return exact canonical RSA name, or original if not found in catalog."""
+        return rsa_name_index.get(name.strip().lower(), name.strip())
+
+    wb_in = _xl.load_workbook(str(enriched_xlsx))
+    ws_in = wb_in.active
+
+    enriched: list[dict] = []
+    for r in range(data_start_row, ws_in.max_row + 1):
+        req_id   = ws_in.cell(r, 2).value
+        proceso  = ws_in.cell(r, 1).value   # col A = proceso (initiative group)
+        coverage = ws_in.cell(r, 8).value
+        module   = ws_in.cell(r, 9).value
+        comment  = ws_in.cell(r, 14).value
+        bcs_raw  = ws_in.cell(r, 15).value
+        rsa_raw  = ws_in.cell(r, 16).value
+        if not req_id:
+            continue
+
+        # Parse BCs: 'Domain / Area / Leaf | Domain / Area / Leaf2'
+        bcs_parsed: list[str] = []
+        if bcs_raw:
+            for part in str(bcs_raw).split("|"):
+                part = part.strip()
+                segments = [s.strip() for s in part.split("/")]
+                if len(segments) >= 2:
+                    bcs_parsed.append(part)   # keep full path for resolution
+
+        # Split comma-separated RSA string into individual canonical app names
+        rsa_apps: list[str] = []
+        if rsa_raw:
+            for part in str(rsa_raw).split(","):
+                canonical = _canonical_rsa(part.strip())
+                if canonical:
+                    rsa_apps.append(canonical)
+        if not rsa_apps:
+            rsa_apps = ["SAP S/4HANA"]
+
+        # Group key: use proceso (col A) as initiative grouping
+        group = str(proceso or "").strip() or str(req_id).strip()
+
+        # Emit one record per canonical RSA app (same BCs apply to all)
+        for app_name in rsa_apps:
+            enriched.append({
+                "id":       str(req_id).strip(),
+                "_group":   group,
+                "coverage": str(coverage or ""),
+                "module":   str(module or ""),
+                "comment":  str(comment or "")[:2000],
+                "bcs_full": bcs_parsed,
+                "rsa":      app_name,
+            })
+
+    # Build intermediate enriched dicts compatible with write_leanix_excel
+    # Map full BC paths to leaf names
+    def _leaf(full_path: str) -> str:
+        parts = [s.strip() for s in full_path.split("/")]
+        return parts[-1] if parts else full_path
+
+    bcs_index_full: dict[str, str] = {}   # leaf → full_path (deduplicated)
+    enriched_compat: list[dict] = []
+
+    for row in enriched:
+        bc_leaves = []
+        for fp in row["bcs_full"]:
+            leaf = _leaf(fp)
+            bcs_index_full[leaf] = fp
+            bc_leaves.append(leaf)
+        enriched_compat.append({
+            "id":       row["id"],
+            "_group":   row.get("_group", row["id"]),
+            "bcs":      bc_leaves,
+            "rsa":      row["rsa"],
+            "coverage": row["coverage"],
+            "comment":  row["comment"],
+            "module":   row["module"],
+        })
+
+    write_leanix_excel(enriched_compat, bcs_index_full, output_path, client_name)
+
+
 def write(
     enriched_path: str | Path,
     template_path: str | Path,
@@ -469,10 +895,10 @@ def write(
 ) -> tuple[Path, Path]:
     """
     Run the write step:
-      1. Write client Excel (columns H–P on original template)
-      2. Write LeanIX staging Excel (three-sheet import file)
+      1. Write client Excel (columns H–P on original template)  → <stem>_enriched.xlsx
+      2. Write LeanIX importable Excel (multi-sheet, formatted) → <client>_target_leanix.xlsx
 
-    Returns (client_excel_path, leanix_staging_path).
+    Returns (client_excel_path, leanix_target_path).
     Push to LeanIX separately with push_leanix().
     """
     enriched_path = Path(enriched_path)
@@ -482,13 +908,13 @@ def write(
     enriched  = json.loads(enriched_path.read_text())
     bcs_index = _load_bcs_index()
 
-    out_excel   = output_dir / f"{template_path.stem}_enriched.xlsx"
-    out_staging = output_dir / f"{client_name}_leanix_import.xlsx"
+    out_excel  = output_dir / f"{template_path.stem}_enriched.xlsx"
+    out_target = output_dir / f"{client_name}_target_leanix.xlsx"
 
     write_excel(enriched, template_path, out_excel, bcs_index)
-    write_leanix_excel(enriched, bcs_index, out_staging, client_name)
+    write_leanix_excel(enriched, bcs_index, out_target, client_name)
 
-    return out_excel, out_staging
+    return out_excel, out_target
 
 
 def push_leanix(staging_path: str | Path, client_name: str) -> None:

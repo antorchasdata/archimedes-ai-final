@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archimedes AI — Automated LeanIX Population</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --sap-blue:       #002A86;
+    --sap-blue-mid:   #0057D2;
+    --sap-blue-light: #0070F2;
+    --sap-gray:       #EAECEE;
+    --sap-gray-mid:   #8396A8;
+    --sap-gray-dark:  #354A5E;
+    --sap-green:      #107E3E;
+    --sap-red:        #BB0000;
+    --sap-gold:       #E8A000;
+    --white:          #FFFFFF;
+    --font-display:   'Barlow Condensed', sans-serif;
+    --font-body:      'Barlow', sans-serif;
+    --font-mono:      'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: var(--font-body);
+  }
+
+  /* ── DECK CONTAINER ─────────────────────────────────────────── */
+  #deck {
+    width: 100vw; height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── SLIDES ─────────────────────────────────────────────────── */
+  .slide {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s cubic-bezier(0.4,0,0.2,1),
+                transform 0.45s cubic-bezier(0.4,0,0.2,1);
+    transform: translateX(60px);
+    background: var(--white);
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
+  }
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  /* ── CHROME: header bar ─────────────────────────────────────── */
+  .slide-header {
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    border-bottom: 2px solid var(--sap-gray);
+    flex-shrink: 0;
+    background: var(--white);
+    position: relative;
+    z-index: 10;
+  }
+  .slide-header.dark {
+    background: var(--sap-blue);
+    border-bottom-color: rgba(255,255,255,0.15);
+  }
+  .logo-mark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    color: var(--sap-blue);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-mark .sap-box {
+    background: var(--sap-blue);
+    color: white;
+    padding: 2px 7px;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    font-weight: 800;
+  }
+  .logo-mark.light .sap-box { background: white; color: var(--sap-blue); }
+  .logo-mark.light { color: white; }
+  .slide-section-label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sap-gray-mid);
+  }
+  .slide-header.dark .slide-section-label { color: rgba(255,255,255,0.5); }
+
+  /* ── SLIDE CONTENT WRAPPER ──────────────────────────────────── */
+  .slide-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 44px 60px 32px;
+    overflow: hidden;
+  }
+
+  /* ── SLIDE TITLE ────────────────────────────────────────────── */
+  .slide-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 46px;
+    line-height: 1.05;
+    color: var(--sap-blue);
+    margin-bottom: 32px;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+  }
+  .slide-title .accent {
+    color: var(--sap-blue-mid);
+  }
+
+  /* ── PROGRESS BAR ────────────────────────────────────────────── */
+  #progress-bar {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 4px;
+    background: var(--sap-blue-mid);
+    transition: width 0.45s cubic-bezier(0.4,0,0.2,1);
+    z-index: 100;
+  }
+
+  /* ── NAV CONTROLS ────────────────────────────────────────────── */
+  #nav {
+    position: fixed;
+    bottom: 24px;
+    right: 40px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 100;
+  }
+  .nav-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--sap-blue);
+    background: white;
+    color: var(--sap-blue);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+    user-select: none;
+  }
+  .nav-btn:hover { background: var(--sap-blue); color: white; transform: scale(1.07); }
+  .nav-btn:active { transform: scale(0.97); }
+  #slide-counter {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sap-gray-dark);
+    letter-spacing: 0.08em;
+    min-width: 52px;
+    text-align: center;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SLIDE TYPES
+  ════════════════════════════════════════════════════════════════ */
+
+  /* ── 1. COVER ──────────────────────────────────────────────── */
+  #s1 {
+    flex-direction: row;
+    padding: 0;
+  }
+  #s1 .cover-left {
+    flex: 0 0 62%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 72px;
+    position: relative;
+    overflow: hidden;
+  }
+  #s1 .cover-left::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: -60px;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,87,210,0.06) 0%, transparent 70%);
+  }
+  #s1 .cover-eyebrow {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sap-blue-mid);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #s1 .cover-eyebrow::before {
+    content: '';
+    display: block;
+    width: 32px; height: 2px;
+    background: var(--sap-blue-mid);
+  }
+  #s1 .cover-title {
+    font-family: var(--font-display);
+    font-size: 88px;
+    font-weight: 800;
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+    color: var(--sap-blue);
+    margin-bottom: 24px;
+  }
+  #s1 .cover-title span {
+    color: var(--sap-blue-mid);
+    display: block;
+  }
+  #s1 .cover-sub {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--sap-gray-dark);
+    margin-bottom: 48px;
+    letter-spacing: 0.01em;
+  }
+  #s1 .cover-tag {
+    font-size: 13px;
+    color: var(--sap-gray-mid);
+    letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #s1 .cover-tag::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--sap-blue-mid);
+    flex-shrink: 0;
+  }
+  #s1 .cover-right {
+    flex: 0 0 38%;
+    background: var(--sap-blue);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cover-right-photo {
+    position: absolute; inset: 0;
+    background-image: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.25;
+    mix-blend-mode: luminosity;
+  }
+  .geo-pattern {
+    position: absolute; inset: 0;
+    opacity: 0.18;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.4) 0px, rgba(255,255,255,0.4) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,0.4) 0px, rgba(255,255,255,0.4) 1px, transparent 1px, transparent 40px);
+  }
+  .cover-icon-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .arch-symbol {
+    width: 120px; height: 120px;
+    border-radius: 24px;
+    border: 3px solid rgba(255,255,255,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display);
+    font-size: 56px;
+    font-weight: 800;
+    color: white;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(4px);
+  }
+  .cover-version {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  /* ── DIVIDER SLIDES ─────────────────────────────────────────── */
+  .slide-divider {
+    background: var(--sap-blue);
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .slide-divider .slide-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 24px;
+  }
+  .divider-label {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .divider-label::before {
+    content: '';
+    display: block; width: 40px; height: 2px;
+    background: rgba(255,255,255,0.3);
+  }
+  .divider-title {
+    font-family: var(--font-display);
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    color: white;
+    max-width: 700px;
+  }
+  .divider-accent-line {
+    width: 64px; height: 5px;
+    background: var(--sap-blue-mid);
+    border-radius: 3px;
+  }
+
+  /* ── BULLETS ────────────────────────────────────────────────── */
+  .bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+  }
+  .bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    font-size: 19px;
+    line-height: 1.5;
+    color: var(--sap-gray-dark);
+    font-weight: 400;
+  }
+  .bullet-dot {
+    flex-shrink: 0;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--sap-blue-mid);
+    margin-top: 9px;
+  }
+
+  /* ── AGENDA ─────────────────────────────────────────────────── */
+  .agenda-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+  }
+  .agenda-item {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--sap-gray);
+    font-size: 22px;
+    color: var(--sap-gray-dark);
+    font-weight: 400;
+    transition: background 0.2s;
+  }
+  .agenda-item:last-child { border-bottom: none; }
+  .agenda-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--sap-blue);
+    min-width: 36px;
+    line-height: 1;
+  }
+  .agenda-dash {
+    color: var(--sap-blue-mid);
+    margin: 0 4px;
+  }
+
+  /* ── TWO COLUMNS ─────────────────────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    flex: 1;
+  }
+  .col-card {
+    background: var(--sap-gray);
+    border-radius: 8px;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-top: 4px solid var(--sap-blue);
+  }
+  .col-card.accent { border-top-color: var(--sap-blue-mid); }
+  .col-card-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sap-blue);
+    margin-bottom: 4px;
+  }
+  .col-card .bullet-item { font-size: 17px; }
+  .code-chip {
+    background: var(--sap-blue);
+    color: white;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    display: inline-block;
+    word-break: break-all;
+  }
+  .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,42,134,0.08);
+    border: 1px solid rgba(0,42,134,0.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: var(--sap-blue);
+    font-weight: 600;
+    margin-top: 4px;
+    flex-shrink: 0;
+    width: fit-content;
+  }
+
+  /* ── TABLES ─────────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 16px;
+    flex: 1;
+  }
+  .data-table thead tr {
+    background: var(--sap-blue);
+  }
+  .data-table thead th {
+    color: white;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 13px 18px;
+    text-align: left;
+  }
+  .data-table tbody tr:nth-child(even) { background: var(--sap-gray); }
+  .data-table tbody tr:nth-child(odd) { background: white; }
+  .data-table tbody tr:hover { background: rgba(0,87,210,0.07); }
+  .data-table tbody td {
+    padding: 11px 18px;
+    color: var(--sap-gray-dark);
+    border-bottom: 1px solid var(--sap-gray);
+    line-height: 1.4;
+    vertical-align: middle;
+  }
+  .data-table tbody td:first-child {
+    font-weight: 600;
+    color: var(--sap-blue);
+  }
+  .output-row td { color: var(--sap-gray-dark) !important; }
+  .output-row td:first-child {
+    color: var(--sap-green) !important;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  /* ── STEP CARDS ─────────────────────────────────────────────── */
+  .step-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    flex: 1;
+    align-items: stretch;
+  }
+  .step-card {
+    background: var(--sap-gray);
+    border-radius: 10px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 4px solid var(--sap-blue-mid);
+  }
+  .step-card::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: radial-gradient(circle at top right, rgba(0,87,210,0.1), transparent);
+  }
+  .step-num {
+    font-family: var(--font-display);
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--sap-blue);
+    opacity: 0.18;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .step-label {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--sap-blue);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+  }
+  .step-desc {
+    font-size: 16px;
+    color: var(--sap-gray-dark);
+    line-height: 1.55;
+    flex: 1;
+  }
+
+  /* ── COMPARISON TABLE ────────────────────────────────────────── */
+  .cmp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    flex: 1;
+  }
+  .cmp-table thead tr { background: var(--sap-blue); }
+  .cmp-table thead th {
+    color: white;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 13px 20px;
+    text-align: left;
+  }
+  .cmp-table thead th:first-child { width: 25%; }
+  .cmp-table thead th:nth-child(2) { width: 37.5%; }
+  .cmp-table thead th:nth-child(3) {
+    width: 37.5%;
+    background: var(--sap-blue-mid);
+  }
+  .cmp-table tbody tr:nth-child(even) { background: #F7F8FA; }
+  .cmp-table tbody tr:nth-child(odd) { background: white; }
+  .cmp-table tbody td {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--sap-gray);
+    line-height: 1.4;
+    vertical-align: middle;
+    color: var(--sap-gray-dark);
+    font-size: 15px;
+  }
+  .cmp-table tbody td:first-child { font-weight: 600; color: var(--sap-blue); }
+  .cmp-table .bad  { color: var(--sap-red);   }
+  .cmp-table .good { color: var(--sap-green); font-weight: 500; }
+  .icon { margin-right: 6px; font-size: 13px; }
+
+  /* ── BEFORE/AFTER ────────────────────────────────────────────── */
+  .before-after {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    flex: 1;
+    align-items: center;
+  }
+  .ba-panel {
+    border-radius: 10px;
+    padding: 36px 32px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .ba-panel.before {
+    background: #F4F5F7;
+    border: 2px solid #CDD3DA;
+  }
+  .ba-panel.after {
+    background: var(--sap-blue);
+    border: 2px solid var(--sap-blue);
+  }
+  .ba-label {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .ba-panel.before .ba-label { color: var(--sap-gray-mid); }
+  .ba-panel.after  .ba-label { color: rgba(255,255,255,0.55); }
+  .ba-heading {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .ba-panel.before .ba-heading { color: var(--sap-gray-dark); }
+  .ba-panel.after  .ba-heading { color: white; }
+  .ba-items { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; flex: 1; }
+  .ba-item {
+    font-size: 17px;
+    line-height: 1.4;
+    padding: 10px 16px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ba-panel.before .ba-item {
+    background: rgba(83,116,139,0.1);
+    color: var(--sap-gray-dark);
+  }
+  .ba-panel.before .ba-item::before {
+    content: '—';
+    color: var(--sap-gray-mid);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .ba-panel.after .ba-item {
+    background: rgba(255,255,255,0.1);
+    color: white;
+  }
+  .ba-panel.after .ba-item::before {
+    content: '→';
+    color: rgba(255,255,255,0.6);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .ba-arrow {
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ba-arrow-icon {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--sap-blue-mid);
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 22px;
+  }
+  .ba-arrow-text {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--sap-gray-mid);
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* ── GETTING STARTED ─────────────────────────────────────────── */
+  .steps-numbered {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+  .step-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: var(--sap-gray);
+    border-radius: 8px;
+    padding: 16px 24px;
+    border-left: 4px solid var(--sap-blue);
+  }
+  .step-row-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--sap-blue);
+    min-width: 28px;
+    line-height: 1;
+  }
+  .step-row-content { flex: 1; }
+  .step-row-content strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sap-blue);
+    margin-bottom: 4px;
+  }
+  .step-row-content code,
+  .mono { font-family: var(--font-mono); font-size: 15px; color: var(--sap-blue-mid); }
+  .info-pills {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-top: 16px;
+  }
+  .info-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(0,42,134,0.07);
+    border: 1px solid rgba(0,42,134,0.15);
+    border-radius: 20px;
+    padding: 6px 18px;
+    font-size: 15px;
+    color: var(--sap-blue);
+  }
+  .info-pill::before {
+    content: '●';
+    font-size: 7px;
+    color: var(--sap-blue-mid);
+  }
+
+  /* ── Q&A ─────────────────────────────────────────────────────── */
+  #s19 {
+    background: var(--sap-blue);
+    align-items: center;
+    justify-content: center;
+  }
+  #s19::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.1;
+    mix-blend-mode: luminosity;
+    pointer-events: none;
+  }
+  #s19 .slide-header {
+    background: rgba(0,0,0,0.2);
+    border-bottom-color: rgba(255,255,255,0.1);
+  }
+  .qa-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 20px;
+    padding: 40px;
+    position: relative;
+  }
+  .qa-body::before {
+    content: '?';
+    position: absolute;
+    font-family: var(--font-display);
+    font-size: 320px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.04);
+    line-height: 1;
+    pointer-events: none;
+  }
+  .qa-title {
+    font-family: var(--font-display);
+    font-size: 96px;
+    font-weight: 800;
+    color: white;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    position: relative;
+  }
+  .qa-sub {
+    font-size: 22px;
+    color: rgba(255,255,255,0.7);
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    position: relative;
+  }
+  .qa-tag {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.12em;
+    margin-top: 16px;
+    position: relative;
+  }
+
+  /* ── DIVIDER PHOTO ──────────────────────────────────────────── */
+  .slide-divider .slide-header { position: relative; z-index: 3; }
+  .slide-divider .slide-body   { position: relative; z-index: 3; }
+
+  /* ── SLIDE PHOTO STRIP ───────────────────────────────────────── */
+  .photo-strip {
+    position: absolute;
+    right: 0; top: 54px; bottom: 0;
+    width: 260px;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .photo-strip img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center;
+    opacity: 0.18;
+    filter: grayscale(40%);
+  }
+  .photo-strip::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to right, white 0%, transparent 50%);
+    z-index: 1;
+  }
+  .slide-body { position: relative; z-index: 1; }
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-shrink: 0;
+  }
+  .metric-card {
+    background: var(--sap-blue);
+    border-radius: 8px;
+    padding: 20px 16px;
+    text-align: center;
+    color: white;
+  }
+  .metric-val {
+    font-family: var(--font-display);
+    font-size: 44px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .metric-val .unit {
+    font-size: 22px;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+  .metric-label {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.6;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.3;
+  }
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 1 — COVER
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide active" id="s1">
+    <div class="cover-left">
+      <div class="cover-eyebrow">SAP Advisory Architecture</div>
+      <div class="cover-title">
+        Archimedes
+        <span>AI</span>
+      </div>
+      <div class="cover-sub">Automated LeanIX Population</div>
+      <div class="cover-tag">SAP Advisory Architecture &nbsp;·&nbsp; May 2026</div>
+    </div>
+    <div class="cover-right">
+      <div class="cover-right-photo"></div>
+      <div class="geo-pattern"></div>
+      <div class="cover-icon-wrap">
+        <div class="arch-symbol">Λ</div>
+        <div class="cover-version">v2026.05 · Internal Tool</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 2 — AGENDA
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s2">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Overview</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Agenda</div>
+      <div class="agenda-list">
+        <div class="agenda-item"><span class="agenda-num">01</span>The challenge <span class="agenda-dash">—</span> manual LeanIX population</div>
+        <div class="agenda-item"><span class="agenda-num">02</span>What is Archimedes AI</div>
+        <div class="agenda-item"><span class="agenda-num">03</span>How it works <span class="agenda-dash">—</span> 5-step pipeline</div>
+        <div class="agenda-item"><span class="agenda-num">04</span>Real case <span class="agenda-dash">—</span> Acciona</div>
+        <div class="agenda-item"><span class="agenda-num">05</span>Value for the Advisory Architect</div>
+        <div class="agenda-item"><span class="agenda-num">06</span>Getting started</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- SLIDE 3 — DIVIDER: The Challenge -->
+  <div class="slide slide-divider" id="s3">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 01</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">The Challenge</div>
+      <div class="divider-title">Manual<br>LeanIX<br>Population</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4 — THE PROBLEM -->
+  <div class="slide" id="s4">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">The Challenge</div>
+    </div>
+    <!-- photo strip: stressed consultant with spreadsheets -->
+    <div class="photo-strip"><img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=400&q=80" alt=""></div>
+    <div class="slide-body">
+      <div class="slide-title">Manual LeanIX Population: <span class="accent">A Costly Process</span></div>
+      <div class="bullets">
+        <div class="bullet-item"><div class="bullet-dot"></div>2–3 days of manual work per client engagement to populate LeanIX</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>Multiple disconnected sources: OnPrem/Cloud Excel, requirements, PDFs, architecture diagrams</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>BC coverage depends on individual knowledge of the RBA catalog (756 BCs, 22 domains)</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>Application-to-RSA mapping is manual, subjective, and error-prone</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>Not scalable — depends on who knows the SAP catalog in the team</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>LeanIX stays empty or incomplete until late in the engagement</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5 — DIVIDER: What is Archimedes AI -->
+  <div class="slide slide-divider" id="s5">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 02</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">The Solution</div>
+      <div class="divider-title">What is<br>Archimedes<br>AI</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 6 — OVERVIEW
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s6">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">What is Archimedes AI</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Archimedes AI — <span class="accent">Overview</span></div>
+      <div class="two-col">
+        <div class="col-card">
+          <div class="col-card-title">What it does</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>AI-powered orchestrator: client inputs → LeanIX import files</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>Covers full EA cycle: AS-IS Baseline + TO-BE Target</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>Runs locally — client data stays on your machine</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>Output directly importable into LeanIX via GraphQL</div>
+        </div>
+        <div class="col-card accent">
+          <div class="col-card-title">The Engine</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>Claude API (claude-sonnet-4-6)</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>SAP RBA: 756 Business Capabilities, 22 domains</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>SAP RSA: 324 canonical SAP products</div>
+          <div class="bullet-item"><div class="bullet-dot"></div>All AI calls routed via SAP Hyperspace AI gateway</div>
+          <div class="code-chip">python3 run.py pipeline --client &lt;name&gt;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 7 — INPUTS & OUTPUTS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s7">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">What is Archimedes AI</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Inputs and <span class="accent">Outputs</span></div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Input Type</th>
+            <th>Source</th>
+            <th>What Archimedes Extracts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>OnPrem Systems Excel</td><td>Client-provided</td><td>Applications + hosting tags (Baseline AS-IS)</td></tr>
+          <tr><td>Cloud Systems Excel</td><td>Client-provided</td><td>Cloud apps + solution area tags (Baseline AS-IS)</td></tr>
+          <tr><td>Requirements Excel</td><td>Client-provided</td><td>BCs (RBA mapping) + SAP apps (RSA mapping)</td></tr>
+          <tr><td>PDF documents</td><td>Proposals, RFPs, reports</td><td>Fact sheets: Applications, BCs, Initiatives</td></tr>
+          <tr><td>Architecture diagrams</td><td>PNG / JPG images</td><td>Applications and IT components (Claude Vision)</td></tr>
+          <tr class="output-row"><td>baseline.xlsx</td><td>→ LeanIX</td><td>AS-IS applications with Baseline tags</td></tr>
+          <tr class="output-row"><td>target_leanix.xlsx</td><td>→ LeanIX</td><td>TO-BE: Application, BC, Initiative, ITComponent</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SLIDE 8 — DIVIDER: Pipeline -->
+  <div class="slide slide-divider" id="s8">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 03</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">How it works</div>
+      <div class="divider-title">The 5-Step<br>Pipeline</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 9 — STEPS 0-2
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s9">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">5-Step Pipeline</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Pipeline — <span class="accent">Steps 0 to 2</span></div>
+      <div class="step-cards">
+        <div class="step-card">
+          <div class="step-num">0</div>
+          <div class="step-label">Catalog Check</div>
+          <div class="step-desc">Verifies RBA/RSA catalog version and date. Offers update from Value Experience Hub. Ensures the knowledge base is current before processing.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-label">Baseline AS-IS</div>
+          <div class="step-desc">Reads OnPrem + Cloud Systems Excel → generates <code class="mono">baseline.xlsx</code> with <code class="mono">Baseline;OnPremise</code> / <code class="mono">Baseline;Cloud</code> tags per application.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-label">Requirements TO-BE</div>
+          <div class="step-desc">Reads requirements Excel → Claude maps each row to RBA Business Capabilities and RSA canonical products. Also processes additional PDFs for supplementary fact sheets.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 10 — STEPS 3-5
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s10">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">5-Step Pipeline</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Pipeline — <span class="accent">Steps 3 to 5</span></div>
+      <div class="step-cards">
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-label">Images &amp; Diagrams</div>
+          <div class="step-desc">Reads architecture diagrams (.png / .jpg). Claude Vision extracts applications and IT components directly from visual diagrams — no manual transcription needed.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-label">Output Generation</div>
+          <div class="step-desc">Produces multi-sheet LeanIX Excel: <strong>Application · BusinessCapability · Initiative · ITComponent · ReadMe</strong>. Each sheet is import-ready.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">5</div>
+          <div class="step-label">LeanIX Import</div>
+          <div class="step-desc">Optional GraphQL push in the correct import order: <strong>BC → ITC → App → Initiative</strong>. Requires <code class="mono">LEANIX_API_TOKEN</code> in <code class="mono">.env</code>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 11 — DIVIDER: Acciona -->
+  <div class="slide slide-divider" id="s11">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 04</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">Real Case</div>
+      <div class="divider-title">Acciona</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 12 — ACCIONA METRICS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s12">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Real Case — Acciona</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Acciona — <span class="accent">Pipeline Results</span></div>
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-val">37<span class="unit"> apps</span></div><div class="metric-label">Baseline Total</div></div>
+        <div class="metric-card"><div class="metric-val">462<span class="unit"> rows</span></div><div class="metric-label">Requirements Processed</div></div>
+        <div class="metric-card"><div class="metric-val">20<span class="unit"> BCs</span></div><div class="metric-label">Business Capabilities (RBA)</div></div>
+        <div class="metric-card"><div class="metric-val">9<span class="unit"> init.</span></div><div class="metric-label">Initiatives by Process</div></div>
+      </div>
+      <table class="data-table" style="flex:1">
+        <thead>
+          <tr><th>Phase</th><th>Metric</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Baseline AS-IS</td><td>On-Premise systems</td><td>14 apps (Baseline;OnPremise)</td></tr>
+          <tr><td>Baseline AS-IS</td><td>Cloud systems</td><td>23 apps (Baseline;Cloud)</td></tr>
+          <tr><td>Target TO-BE</td><td>SAP applications mapped (RSA)</td><td>7 canonical SAP apps</td></tr>
+          <tr><td>Target TO-BE</td><td>Business Capabilities with parent chain</td><td>20 leaf BCs</td></tr>
+          <tr><td>Target TO-BE</td><td>IT Components derived</td><td>8 ITCs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SLIDE 13 — ACCIONA NARRATIVE -->
+  <div class="slide" id="s13">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Real Case — Acciona</div>
+    </div>
+    <!-- photo strip: data dashboard / results -->
+    <div class="photo-strip"><img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&q=80" alt=""></div>
+    <div class="slide-body">
+      <div class="slide-title">Acciona — <span class="accent">What This Means</span></div>
+      <div class="bullets">
+        <div class="bullet-item"><div class="bullet-dot"></div>Full LeanIX population for a real client engagement — from baseline to target in one run</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>462 requirements processed and mapped to RBA/RSA in minutes, not days</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>BC hierarchy automatically built from RBA: leaf nodes + full parent chain</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>Initiatives grouped by process (col A), not by individual requirement — ready for roadmap</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>IT Components auto-derived from the app-to-ITC static map (S/4HANA, SAC, IBP, Ariba…)</div>
+        <div class="bullet-item"><div class="bullet-dot"></div>Output imported into LeanIX directly — Advisory Architect can start working on day 1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 14 — DIVIDER: Value -->
+  <div class="slide slide-divider" id="s14">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 05</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">The Value</div>
+      <div class="divider-title">Advisory<br>Architect<br>Impact</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 15 — COMPARISON TABLE
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s15">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Value for Advisory Architects</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Without vs. <span class="accent">With Archimedes AI</span></div>
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Without Archimedes</th>
+            <th>With Archimedes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>LeanIX population</td><td class="bad"><span class="icon">✗</span>2–3 days manual work</td><td class="good"><span class="icon">✓</span>Minutes (automated pipeline)</td></tr>
+          <tr><td>BC coverage (RBA)</td><td class="bad"><span class="icon">✗</span>Depends on individual knowledge</td><td class="good"><span class="icon">✓</span>Guaranteed — 756 BCs, 22 domains</td></tr>
+          <tr><td>App-to-RSA mapping</td><td class="bad"><span class="icon">✗</span>Manual, subjective</td><td class="good"><span class="icon">✓</span>Canonical resolution (324 SAP products)</td></tr>
+          <tr><td>Multi-source handling</td><td class="bad"><span class="icon">✗</span>Each source processed separately</td><td class="good"><span class="icon">✓</span>One orchestrator, all sources</td></tr>
+          <tr><td>PDF / diagram input</td><td class="bad"><span class="icon">✗</span>Manual extraction</td><td class="good"><span class="icon">✓</span>Claude API vision + NLP</td></tr>
+          <tr><td>LeanIX import</td><td class="bad"><span class="icon">✗</span>Manual upload + mapping</td><td class="good"><span class="icon">✓</span>Direct GraphQL push</td></tr>
+          <tr><td>Scalability</td><td class="bad"><span class="icon">✗</span>Depends on catalog expert</td><td class="good"><span class="icon">✓</span>Any Advisory Architect, any client</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SLIDE 16 — BEFORE / AFTER -->
+  <div class="slide" id="s16">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Value for Advisory Architects</div>
+    </div>
+    <!-- photo strip: architect presenting strategy to client -->
+    <div class="photo-strip"><img src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&q=80" alt=""></div>
+    <div class="slide-body">
+      <div class="slide-title">The Advisory Architect's Time — <span class="accent">Refocused</span></div>
+      <div class="before-after">
+        <div class="ba-panel before">
+          <div class="ba-label">Before Archimedes</div>
+          <div class="ba-heading">Mechanical Work</div>
+          <div class="ba-items">
+            <div class="ba-item">Manual data entry into LeanIX</div>
+            <div class="ba-item">Catalog lookup (RBA/RSA)</div>
+            <div class="ba-item">Spreadsheet formatting</div>
+            <div class="ba-item">Waiting for complete data</div>
+          </div>
+        </div>
+        <div class="ba-arrow">
+          <div class="ba-arrow-icon">→</div>
+          <div class="ba-arrow-text">Archimedes<br>AI</div>
+        </div>
+        <div class="ba-panel after">
+          <div class="ba-label">After Archimedes</div>
+          <div class="ba-heading">Strategic Work</div>
+          <div class="ba-items">
+            <div class="ba-item">Strategic validation of the model</div>
+            <div class="ba-item">Gap analysis and recommendations</div>
+            <div class="ba-item">Client-facing decisions</div>
+            <div class="ba-item">EA ready on day 1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 17 — DIVIDER: Getting Started -->
+  <div class="slide slide-divider" id="s17">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Section 06</div>
+    </div>
+    <div class="slide-body">
+      <div class="divider-label">Hands On</div>
+      <div class="divider-title">Getting<br>Started</div>
+      <div class="divider-accent-line"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 18 — HOW TO RUN
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s18">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Getting Started</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Running <span class="accent">Archimedes AI</span></div>
+      <div class="steps-numbered">
+        <div class="step-row">
+          <div class="step-row-num">1</div>
+          <div class="step-row-content">
+            <strong>Prerequisites</strong>
+            Python 3.10+ &nbsp;·&nbsp; <code>ANTHROPIC_API_KEY</code> &nbsp;·&nbsp; optional: <code>LEANIX_API_TOKEN</code>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-row-num">2</div>
+          <div class="step-row-content">
+            <strong>Repository</strong>
+            <code>git clone https://github.com/antorchasdata/archimedes-ai-final.git</code>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-row-num">3</div>
+          <div class="step-row-content">
+            <strong>Install dependencies</strong>
+            <code>pip install -r requirements.txt</code>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-row-num">4</div>
+          <div class="step-row-content">
+            <strong>Run the pipeline</strong>
+            <code>python3 run.py pipeline --client &lt;client_name&gt;</code>
+          </div>
+        </div>
+      </div>
+      <div class="info-pills">
+        <div class="info-pill">Interactive — prompts for each input file</div>
+        <div class="info-pill">Output: output/&lt;client&gt;/baseline.xlsx + target_leanix.xlsx</div>
+        <div class="info-pill">Safe to re-run — idempotent pipeline</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 19 — Q&A
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s19">
+    <div class="slide-header dark">
+      <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">Archimedes AI</div>
+    </div>
+    <div class="qa-body">
+      <div class="qa-title">Questions?</div>
+      <div class="qa-sub">Let's talk about your next engagement</div>
+      <div class="qa-tag">Archimedes AI — SAP EA Internal Tool · v2026.05</div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Progress bar -->
+<div id="progress-bar"></div>
+
+<!-- Navigation -->
+<div id="nav">
+  <button class="nav-btn" id="btn-prev" title="Previous (←)">&#8592;</button>
+  <div id="slide-counter">1 / 19</div>
+  <button class="nav-btn" id="btn-next" title="Next (→)">&#8594;</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total  = slides.length;
+  let current  = 0;
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[current].classList.remove('active');
+    slides[current].classList.add('exit');
+    const prev = current;
+    current = n;
+    slides[current].classList.add('active');
+    setTimeout(() => slides[prev].classList.remove('exit'), 480);
+    // Counter
+    document.getElementById('slide-counter').textContent = `${current + 1} / ${total}`;
+    // Progress bar
+    document.getElementById('progress-bar').style.width = `${((current + 1) / total) * 100}%`;
+    // Nav button border colors matching slide bg
+    const isDark = slides[current].classList.contains('slide-divider') || slides[current].id === 's19';
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.style.borderColor = isDark ? 'rgba(255,255,255,0.5)' : 'var(--sap-blue)';
+      b.style.color       = isDark ? 'rgba(255,255,255,0.8)' : 'var(--sap-blue)';
+      b.style.background  = 'transparent';
+    });
+    document.getElementById('slide-counter').style.color = isDark ? 'rgba(255,255,255,0.6)' : 'var(--sap-gray-dark)';
+    document.getElementById('progress-bar').style.background = isDark ? 'rgba(255,255,255,0.5)' : 'var(--sap-blue-mid)';
+  }
+
+  document.getElementById('btn-next').addEventListener('click', () => goTo(current + 1));
+  document.getElementById('btn-prev').addEventListener('click', () => goTo(current - 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') goTo(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp') goTo(current - 1);
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End')  goTo(total - 1);
+  });
+
+  // Touch swipe support
+  let touchStartX = 0;
+  document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) goTo(current + (dx < 0 ? 1 : -1));
+  });
+
+  // Init progress bar
+  document.getElementById('progress-bar').style.width = `${(1 / total) * 100}%`;
+</script>
+</body>
+</html>
