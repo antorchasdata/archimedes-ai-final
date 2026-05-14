@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archimedes AI — Pipeline Wizard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue-10: #002A86;
+  --blue-7:  #0070F2;
+  --blue-2:  #D1EFFF;
+  --blue-1:  #EBF8FF;
+  --green-7: #107E3E;
+  --green-1: #F1FDF6;
+  --mango-7: #E76500;
+  --mango-1: #FEF3E7;
+  --red-7:   #BB0000;
+  --red-1:   #FFEBEB;
+  --grey-7:  #354A5E;
+  --grey-6:  #5B738B;
+  --grey-4:  #89919A;
+  --grey-2:  #EAECEE;
+  --grey-1:  #F5F6F7;
+  --white:   #FFFFFF;
+  --font: "72 Brand","72",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono: "SFMono-Regular","Consolas","Liberation Mono",Menlo,monospace;
+  --radius: 8px;
+  --radius-l: 14px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-l: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+html, body { height: 100%; background: var(--grey-1); font-family: var(--font); color: var(--grey-7); }
+
+/* ── Header ────────────────────────────────────────────────── */
+.header {
+  background: var(--blue-10);
+  padding: 0 32px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.header-logo { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+.header-logo span { color: var(--blue-2); }
+.header-sub { font-size: 12px; color: rgba(255,255,255,0.5); }
+.header-sep { flex: 1; }
+.header-step-label { font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 600; }
+
+/* ── Progress bar ──────────────────────────────────────────── */
+.progress-wrap {
+  background: var(--white);
+  padding: 20px 32px 0;
+  border-bottom: 1px solid var(--grey-2);
+  box-shadow: var(--shadow);
+}
+.progress-steps {
+  display: flex;
+  gap: 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.progress-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding-bottom: 14px;
+  cursor: default;
+}
+.progress-step::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: -50%;
+  right: 50%;
+  height: 2px;
+  background: var(--grey-2);
+  z-index: 0;
+}
+.progress-step:first-child::before { display: none; }
+.progress-step.done::before  { background: var(--blue-10); }
+.progress-step.active::before { background: var(--blue-7); }
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--grey-2);
+  color: var(--grey-4);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  transition: all 0.2s;
+}
+.progress-step.done  .step-circle { background: var(--blue-10); color: #fff; }
+.progress-step.active .step-circle { background: var(--blue-7); color: #fff; box-shadow: 0 0 0 4px rgba(0,112,242,0.18); }
+
+.step-label {
+  font-size: 10px;
+  color: var(--grey-4);
+  margin-top: 6px;
+  text-align: center;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.progress-step.done .step-label   { color: var(--blue-10); font-weight: 600; }
+.progress-step.active .step-label { color: var(--blue-7);  font-weight: 700; }
+
+/* ── Main layout ───────────────────────────────────────────── */
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 36px 24px 100px;
+}
+
+/* ── Step card ─────────────────────────────────────────────── */
+.step-card {
+  background: var(--white);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+  padding: 36px 40px;
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.step-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--blue-7);
+  margin-bottom: 8px;
+}
+.step-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--blue-10);
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.step-desc {
+  font-size: 14px;
+  color: var(--grey-6);
+  line-height: 1.65;
+  margin-bottom: 28px;
+}
+
+/* ── Form elements ─────────────────────────────────────────── */
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-7);
+  margin-bottom: 6px;
+  display: block;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--grey-4);
+  margin-bottom: 8px;
+}
+input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--grey-2);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--grey-7);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--grey-1);
+}
+input[type="text"]:focus {
+  border-color: var(--blue-7);
+  box-shadow: 0 0 0 3px rgba(0,112,242,0.12);
+  background: var(--white);
+}
+input[type="text"]::placeholder { color: var(--grey-4); }
+
+/* ── Drop zones ────────────────────────────────────────────── */
+.drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 4px; }
+.drop-grid.single { grid-template-columns: 1fr; }
+.drop-zone {
+  border: 2px dashed var(--grey-2);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--grey-1);
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--blue-7);
+  background: var(--blue-1);
+}
+.drop-zone.has-file {
+  border-color: var(--blue-7);
+  border-style: solid;
+  background: var(--blue-1);
+}
+.drop-zone.has-file.is-image {
+  border-color: var(--green-7);
+  background: var(--green-1);
+}
+.drop-icon { font-size: 28px; margin-bottom: 8px; }
+.drop-title { font-size: 13px; font-weight: 600; color: var(--grey-7); margin-bottom: 4px; }
+.drop-hint  { font-size: 11px; color: var(--grey-4); }
+.drop-filename {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue-10);
+  margin-top: 6px;
+  word-break: break-all;
+}
+.drop-zone.is-image .drop-filename { color: var(--green-7); }
+.drop-remove {
+  position: absolute;
+  top: 8px; right: 10px;
+  font-size: 16px;
+  color: var(--grey-4);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.drop-remove:hover { color: var(--red-7); background: var(--red-1); }
+input[type="file"] { display: none; }
+
+/* Multi-image thumbnails */
+.img-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.img-thumb {
+  position: relative;
+  width: 70px; height: 70px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid var(--grey-2);
+}
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.img-thumb-remove {
+  position: absolute;
+  top: 2px; right: 2px;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border-radius: 50%;
+  width: 16px; height: 16px;
+  font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* ── Result cards ──────────────────────────────────────────── */
+.result-card {
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-top: 20px;
+  display: none;
+}
+.result-card.show { display: block; animation: fadeIn 0.2s ease; }
+.result-card.success { background: var(--green-1); border: 1px solid #c5e8d3; }
+.result-card.info    { background: var(--blue-1);  border: 1px solid var(--blue-2); }
+.result-card.warning { background: var(--mango-1); border: 1px solid #f7c59f; }
+.result-card.error   { background: var(--red-1);   border: 1px solid #f4b8b8; }
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.result-card.success .result-header { color: var(--green-7); }
+.result-card.info    .result-header { color: var(--blue-10); }
+.result-card.warning .result-header { color: var(--mango-7); }
+.result-card.error   .result-header { color: var(--red-7); }
+
+.result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.stat-pill {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255,255,255,0.7);
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-width: 70px;
+}
+.stat-pill .stat-n    { font-size: 20px; font-weight: 800; color: var(--blue-10); line-height: 1; }
+.stat-pill .stat-lbl  { font-size: 10px; color: var(--grey-4); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.result-summary { font-size: 13px; color: var(--grey-7); line-height: 1.55; }
+
+/* Download buttons */
+.download-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.download-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--white);
+  border: 1.5px solid var(--grey-2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.download-item .di-icon { font-size: 24px; flex-shrink: 0; }
+.download-item .di-info { flex: 1; }
+.download-item .di-label { font-size: 13px; font-weight: 700; color: var(--blue-10); }
+.download-item .di-desc  { font-size: 11px; color: var(--grey-4); margin-top: 2px; }
+.download-item .di-stats { font-size: 11px; color: var(--grey-6); margin-top: 3px; font-family: var(--mono); }
+.btn-download {
+  padding: 8px 16px;
+  background: var(--blue-7);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.btn-download:hover { background: var(--blue-10); }
+
+/* ── Catalog info cards ─────────────────────────────────────── */
+.catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.catalog-card {
+  background: var(--grey-1);
+  border: 1.5px solid var(--grey-2);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.catalog-card .cc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.catalog-card.rba .cc-badge { background: var(--blue-10); color: #fff; }
+.catalog-card.rsa .cc-badge { background: var(--blue-7);  color: #fff; }
+.catalog-card .cc-title { font-size: 14px; font-weight: 700; color: var(--blue-10); margin-bottom: 6px; }
+.catalog-card .cc-meta  { font-size: 11px; color: var(--grey-6); line-height: 1.7; font-family: var(--mono); }
+.catalog-card .cc-stats { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-stat {
+  font-size: 11px;
+  background: var(--white);
+  border: 1px solid var(--grey-2);
+  border-radius: 4px;
+  padding: 3px 8px;
+  color: var(--grey-7);
+  font-weight: 600;
+}
+
+/* ── LeanIX toggle ──────────────────────────────────────────── */
+.push-options { display: flex; flex-direction: column; gap: 12px; }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--grey-1);
+  border: 1.5px solid var(--grey-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.toggle-row:hover { border-color: var(--blue-7); }
+.toggle-row.active { border-color: var(--blue-7); background: var(--blue-1); }
+.toggle-row input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue-7); }
+.toggle-row .tr-label { font-size: 13px; font-weight: 600; color: var(--grey-7); flex: 1; }
+.toggle-row .tr-file  { font-size: 11px; color: var(--grey-4); font-family: var(--mono); }
+
+/* ── Spinner ────────────────────────────────────────────────── */
+.spinner-wrap {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  color: var(--blue-7);
+  font-size: 13px;
+  font-weight: 600;
+}
+.spinner-wrap.show { display: flex; }
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid var(--blue-2);
+  border-top-color: var(--blue-7);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Bottom nav ─────────────────────────────────────────────── */
+.nav-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--white);
+  border-top: 1px solid var(--grey-2);
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+  z-index: 50;
+}
+.nav-bar-inner { max-width: 720px; margin: 0 auto; width: 100%; display: flex; gap: 12px; align-items: center; }
+.nav-spacer { flex: 1; }
+
+.btn-primary {
+  padding: 10px 28px;
+  background: var(--blue-7);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--blue-10); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: var(--white);
+  color: var(--blue-7);
+  border: 1.5px solid var(--blue-7);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover { background: var(--blue-1); }
+
+.btn-ghost {
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--grey-4);
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.15s, color 0.15s;
+}
+.btn-ghost:hover { background: var(--grey-2); color: var(--grey-7); }
+
+/* ── Done screen ────────────────────────────────────────────── */
+.done-screen {
+  text-align: center;
+  padding: 40px 0;
+}
+.done-icon  { font-size: 56px; margin-bottom: 16px; }
+.done-title { font-size: 26px; font-weight: 800; color: var(--green-7); margin-bottom: 8px; }
+.done-sub   { font-size: 14px; color: var(--grey-6); line-height: 1.65; max-width: 440px; margin: 0 auto 24px; }
+
+/* ── Inline info box ────────────────────────────────────────── */
+.info-box {
+  background: var(--blue-1);
+  border: 1px solid var(--blue-2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--grey-7);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.info-box strong { color: var(--blue-10); }
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--grey-2); border-radius: 3px; }
+
+/* ── Language selector ──────────────────────────────────────── */
+.lang-select {
+  appearance: none;
+  background: rgba(255,255,255,0.12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.7)'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  padding: 5px 28px 5px 10px;
+  transition: background 0.15s;
+}
+.lang-select:hover { background-color: rgba(255,255,255,0.2); }
+.lang-select option { background: var(--blue-10); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-logo">Archimedes <span>AI</span></div>
+  <div class="header-sub">LeanIX Population Pipeline</div>
+  <div class="header-sep"></div>
+  <div class="header-step-label" id="header-step-label"></div>
+  <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
+    <option value="en">🇬🇧 English</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="it">🇮🇹 Italiano</option>
+    <option value="fi">🇫🇮 Suomi</option>
+  </select>
+</header>
+
+<!-- Progress bar -->
+<div class="progress-wrap">
+  <div class="progress-steps" id="progress-steps"></div>
+</div>
+
+<!-- Main content -->
+<div class="main" id="main-content"></div>
+
+<!-- Nav bar -->
+<div class="nav-bar">
+  <div class="nav-bar-inner">
+    <button class="btn-ghost" id="btn-back" onclick="goBack()" style="display:none" data-t="back"></button>
+    <div class="nav-spacer"></div>
+    <button class="btn-secondary" id="btn-skip" onclick="skipStep()" style="display:none" data-t="skip"></button>
+    <button class="btn-primary" id="btn-next" onclick="nextStep()" data-t="continue"></button>
+  </div>
+</div>
+
+<script>
+// ── Translations ───────────────────────────────────────────────────────────────
+const LANGS = {
+  en: {
+    // nav
+    back: '← Back', skip: 'Skip step', continue: 'Continue →',
+    import_btn: 'Import to LeanIX →', finish: 'Finish',
+    // progress / header
+    step_of: (n, total) => `Step ${n} of ${total}`,
+    pipeline_done: 'Pipeline complete',
+    new_pipeline: 'New pipeline',
+    // step labels
+    steps: ['Client','Catalogs','Baseline','Requirements','PDF','Images','Generate','Import'],
+    // step 0
+    s0_eye: (n, total) => `Step 1 of ${total}`,
+    s0_title: 'Client name',
+    s0_desc: 'Enter the client name. It will be used as a prefix for generated files and as a tag in LeanIX.',
+    s0_label: 'Client name *',
+    s0_placeholder: 'E.g. Acme Corp, Contoso…',
+    s0_err: 'Enter the client name',
+    s0_busy: 'Creating session…',
+    // step 1
+    s1_eye: (n, total) => `Step 2 of ${total}`,
+    s1_title: 'SAP RBA / RSA Catalogs',
+    s1_desc: 'Status of the reference catalogs. The pipeline uses them to map Business Capabilities and Applications to canonical SAP nomenclature.',
+    s1_loading: 'Loading catalogs…',
+    s1_loaded: 'Catalogs loaded successfully',
+    s1_update_hint: 'To update the catalogs do it manually via Value Experience Hub and replace the JSON files in <code>knowledge/</code>.',
+    s1_version: 'Version',
+    s1_source: 'Source',
+    s1_err: 'Error loading catalogs',
+    // step 2
+    s2_eye: (n, total) => `Step 3 of ${total}`,
+    s2_title: 'Footprint / AS-IS Baseline',
+    s2_desc: 'Upload system inventory files to generate the Baseline (current architecture). Both files are optional — upload one or both, or skip this step.',
+    s2_onprem_hint: 'On-premise systems',
+    s2_cloud_hint: 'Cloud / SaaS systems',
+    s2_busy: 'Generating baseline…',
+    s2_ok: 'Baseline generated',
+    s2_download: '⬇ Download baseline.xlsx',
+    // step 3
+    s3_eye: (n, total) => `Step 4 of ${total}`,
+    s3_title: 'Requirements Excel',
+    s3_desc: 'Upload the client requirements Excel file. If already enriched (columns O/P filled) it will be used directly. Otherwise it will be processed with Claude API + RBA/RSA catalogs.',
+    s3_hint: 'Client requirements Excel',
+    s3_busy: 'Analysing requirements with Claude API…',
+    s3_ok: 'Requirements processed',
+    s3_already: '✓ Excel already enriched — using columns O/P directly.',
+    s3_enriched: (ok) => `✓ Enriched with Claude API. Validation: ${ok ? 'OK' : '⚠ with warnings'}`,
+    // step 4
+    s4_eye: (n, total) => `Step 5 of ${total}`,
+    s4_title: 'Client PDF document',
+    s4_desc: 'Upload additional client documentation in PDF. Claude API will extract fact sheets (Applications, BCs, Organizations, Initiatives, ITCs) mapping them against the RBA/RSA catalogs.',
+    s4_hint: 'Client documentation (.pdf)',
+    s4_hint2: 'Brief, proposal, RFP…',
+    s4_busy: 'Analysing PDF with Claude API…',
+    s4_ok: 'PDF processed',
+    // step 5
+    s5_eye: (n, total) => `Step 6 of ${total}`,
+    s5_title: 'Architecture diagrams',
+    s5_desc: 'Upload images or screenshots of architecture diagrams. Claude API (vision) will identify applications, domains, relationships and ITCs visible in the diagrams.',
+    s5_dz_title: 'Drag images here or click',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Multiple files',
+    s5_busy: 'Analysing diagrams with Claude API…',
+    s5_ok: (n) => `${n} diagram(s) analysed`,
+    // step 6
+    s6_eye: (n, total) => `Step 7 of ${total}`,
+    s6_title: 'Generate LeanIX files',
+    s6_desc: 'Files will be generated from all the collected information.',
+    s6_busy: 'Generating LeanIX files…',
+    s6_ok: 'Files generated',
+    s6_none: 'No files generated',
+    s6_none_hint: 'Complete at least Step 3 (Baseline) or Step 4 (Requirements).',
+    s6_download: '⬇ Download',
+    s6_label_baseline: 'AS-IS Baseline',
+    s6_desc_baseline: 'Current applications (on-premise + cloud) — import into LeanIX',
+    s6_label_target: 'TO-BE Target',
+    s6_desc_target: 'Fact sheets derived from requirements — import into LeanIX',
+    s6_label_supp: 'Additional fact sheets (PDF + images)',
+    s6_desc_supp: 'Review manually before importing into LeanIX',
+    // step 7
+    s7_eye: (n, total) => `Step 8 of ${total}`,
+    s7_title: 'Import into LeanIX',
+    s7_no_creds: 'LeanIX credentials not configured',
+    s7_no_creds_hint: 'Configure <strong>LEANIX_API_TOKEN</strong> and <strong>LEANIX_BASE_URL</strong> in the <code>.env</code> file to import automatically.',
+    s7_manual: '<strong>Manual import:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Order:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Select which files to import into your LeanIX workspace via API.',
+    s7_warn: 'Review files before importing',
+    s7_warn_hint: 'Download them in the previous step and verify the content before importing into LeanIX.',
+    s7_chk_baseline: 'Import AS-IS Baseline',
+    s7_chk_target: 'Import TO-BE Target',
+    s7_busy: 'Importing into LeanIX…',
+    s7_ok: 'Imported successfully',
+    s7_imported: (list) => `Files imported: ${list}`,
+    s7_err: 'Errors during import',
+    s7_none: 'Select at least one file to import',
+    // done
+    done_title: 'Pipeline complete',
+    done_sub: (n, client) => `${n} file${n !== 1 ? 's' : ''} generated for client <strong>${client}</strong>.<br>Download them from the previous step and import into LeanIX.`,
+    // processing
+    processing: 'Processing…',
+    generating: 'Generating files…',
+    // catalog
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+  es: {
+    back: '← Atrás', skip: 'Omitir paso', continue: 'Continuar →',
+    import_btn: 'Importar en LeanIX →', finish: 'Finalizar',
+    step_of: (n, total) => `Paso ${n} de ${total}`,
+    pipeline_done: 'Pipeline completado',
+    new_pipeline: 'Nuevo pipeline',
+    steps: ['Cliente','Catálogos','Baseline','Reqs','PDF','Imágenes','Generar','Importar'],
+    s0_eye: (n, total) => `Paso 1 de ${total}`,
+    s0_title: 'Nombre del cliente',
+    s0_desc: 'Introduce el nombre del cliente. Se usará como prefijo en los ficheros generados y como tag en LeanIX.',
+    s0_label: 'Nombre del cliente *',
+    s0_placeholder: 'Ej: Acme Corp, Acciona, N3C…',
+    s0_err: 'Introduce el nombre del cliente',
+    s0_busy: 'Creando sesión…',
+    s1_eye: (n, total) => `Paso 2 de ${total}`,
+    s1_title: 'Catálogos SAP RBA / RSA',
+    s1_desc: 'Estado de los catálogos de referencia. El pipeline los usa para mapear Business Capabilities y Applications a nomenclatura SAP canónica.',
+    s1_loading: 'Leyendo catálogos…',
+    s1_loaded: 'Catálogos cargados correctamente',
+    s1_update_hint: 'Para actualizar los catálogos hazlo manualmente vía Value Experience Hub y sustituye los ficheros JSON en <code>knowledge/</code>.',
+    s1_version: 'Versión',
+    s1_source: 'Fuente',
+    s1_err: 'Error cargando catálogos',
+    s2_eye: (n, total) => `Paso 3 de ${total}`,
+    s2_title: 'Footprint / Baseline AS-IS',
+    s2_desc: 'Sube los ficheros de inventario de sistemas para generar el Baseline (arquitectura actual). Ambos ficheros son opcionales — puedes subir uno o los dos, o saltar este paso.',
+    s2_onprem_hint: 'Sistemas on-premise',
+    s2_cloud_hint: 'Sistemas cloud / SaaS',
+    s2_busy: 'Generando baseline…',
+    s2_ok: 'Baseline generado',
+    s2_download: '⬇ Descargar baseline.xlsx',
+    s3_eye: (n, total) => `Paso 4 de ${total}`,
+    s3_title: 'Excel de Requerimientos',
+    s3_desc: 'Sube el fichero Excel con los requerimientos del cliente. Si ya está enriquecido (columnas O/P rellenas) se usará directamente. Si no, se procesará con Claude API + catálogos RBA/RSA.',
+    s3_hint: 'Excel de requerimientos del cliente',
+    s3_busy: 'Analizando requerimientos con Claude API…',
+    s3_ok: 'Requerimientos procesados',
+    s3_already: '✓ Excel ya enriquecido — usando columnas O/P directamente.',
+    s3_enriched: (ok) => `✓ Enriquecido con Claude API. Validación: ${ok ? 'OK' : '⚠ con advertencias'}`,
+    s4_eye: (n, total) => `Paso 5 de ${total}`,
+    s4_title: 'Documento PDF del cliente',
+    s4_desc: 'Sube documentación adicional del cliente en PDF. Claude API extraerá fact sheets (Applications, BCs, Organizaciones, Iniciativas, ITCs) mapeándolas contra los catálogos RBA/RSA.',
+    s4_hint: 'Documentación cliente (.pdf)',
+    s4_hint2: 'Memoria, propuesta, RFP…',
+    s4_busy: 'Extrayendo fact sheets del PDF…',
+    s4_ok: 'PDF procesado',
+    s5_eye: (n, total) => `Paso 6 de ${total}`,
+    s5_title: 'Diagramas de arquitectura',
+    s5_desc: 'Sube imágenes o capturas de diagramas de arquitectura. Claude API (visión) identificará aplicaciones, dominios, relaciones e ITCs visibles en los diagramas.',
+    s5_dz_title: 'Arrastra imágenes aquí o haz clic',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Múltiples ficheros',
+    s5_busy: 'Analizando diagramas con Claude AI…',
+    s5_ok: (n) => `${n} diagrama(s) analizados`,
+    s6_eye: (n, total) => `Paso 7 de ${total}`,
+    s6_title: 'Generar ficheros LeanIX',
+    s6_desc: 'Se generarán los ficheros de importación a partir de toda la información recopilada.',
+    s6_busy: 'Generando ficheros LeanIX…',
+    s6_ok: 'Ficheros generados',
+    s6_none: 'No se generaron ficheros',
+    s6_none_hint: 'Completa al menos el Paso 3 (Baseline) o el Paso 4 (Requerimientos).',
+    s6_download: '⬇ Descargar',
+    s6_label_baseline: 'Baseline AS-IS',
+    s6_desc_baseline: 'Applications actuales (on-premise + cloud) — importar en LeanIX',
+    s6_label_target: 'Target TO-BE',
+    s6_desc_target: 'Fact sheets derivados de requerimientos — importar en LeanIX',
+    s6_label_supp: 'Fact sheets adicionales (PDF + imágenes)',
+    s6_desc_supp: 'Revisar manualmente antes de importar en LeanIX',
+    s7_eye: (n, total) => `Paso 8 de ${total}`,
+    s7_title: 'Importar en LeanIX',
+    s7_no_creds: 'Credenciales LeanIX no configuradas',
+    s7_no_creds_hint: 'Configura <strong>LEANIX_API_TOKEN</strong> y <strong>LEANIX_BASE_URL</strong> en el fichero <code>.env</code> para importar automáticamente.',
+    s7_manual: '<strong>Importación manual:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Orden:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Selecciona qué ficheros importar en tu workspace LeanIX vía API.',
+    s7_warn: 'Revisa los ficheros antes de importar',
+    s7_warn_hint: 'Descárgalos en el paso anterior y verifica el contenido antes de importar en LeanIX.',
+    s7_chk_baseline: 'Importar Baseline AS-IS',
+    s7_chk_target: 'Importar Target TO-BE',
+    s7_busy: 'Importando en LeanIX…',
+    s7_ok: 'Importado correctamente',
+    s7_imported: (list) => `Ficheros importados: ${list}`,
+    s7_err: 'Errores en la importación',
+    s7_none: 'Selecciona al menos un fichero para importar',
+    done_title: 'Pipeline completado',
+    done_sub: (n, client) => `Se han generado ${n} fichero${n !== 1 ? 's' : ''} para el cliente <strong>${client}</strong>.<br>Descárgalos desde el paso anterior e impórtalos en LeanIX.`,
+    processing: 'Procesando…',
+    generating: 'Generando ficheros…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+  fr: {
+    back: '← Retour', skip: 'Passer l\'étape', continue: 'Continuer →',
+    import_btn: 'Importer dans LeanIX →', finish: 'Terminer',
+    step_of: (n, total) => `Étape ${n} sur ${total}`,
+    pipeline_done: 'Pipeline terminé',
+    new_pipeline: 'Nouveau pipeline',
+    steps: ['Client','Catalogues','Baseline','Exigences','PDF','Images','Générer','Importer'],
+    s0_eye: (n, total) => `Étape 1 sur ${total}`,
+    s0_title: 'Nom du client',
+    s0_desc: 'Saisissez le nom du client. Il sera utilisé comme préfixe dans les fichiers générés et comme tag dans LeanIX.',
+    s0_label: 'Nom du client *',
+    s0_placeholder: 'Ex : Acme Corp, Renault…',
+    s0_err: 'Saisissez le nom du client',
+    s0_busy: 'Création de la session…',
+    s1_eye: (n, total) => `Étape 2 sur ${total}`,
+    s1_title: 'Catalogues SAP RBA / RSA',
+    s1_desc: 'État des catalogues de référence. Le pipeline les utilise pour mapper les Business Capabilities et Applications à la nomenclature canonique SAP.',
+    s1_loading: 'Chargement des catalogues…',
+    s1_loaded: 'Catalogues chargés avec succès',
+    s1_update_hint: 'Pour mettre à jour les catalogues, faites-le manuellement via Value Experience Hub et remplacez les fichiers JSON dans <code>knowledge/</code>.',
+    s1_version: 'Version',
+    s1_source: 'Source',
+    s1_err: 'Erreur lors du chargement des catalogues',
+    s2_eye: (n, total) => `Étape 3 sur ${total}`,
+    s2_title: 'Empreinte / Baseline AS-IS',
+    s2_desc: 'Importez les fichiers d\'inventaire des systèmes pour générer le Baseline (architecture actuelle). Les deux fichiers sont optionnels.',
+    s2_onprem_hint: 'Systèmes on-premise',
+    s2_cloud_hint: 'Systèmes cloud / SaaS',
+    s2_busy: 'Génération du baseline…',
+    s2_ok: 'Baseline généré',
+    s2_download: '⬇ Télécharger baseline.xlsx',
+    s3_eye: (n, total) => `Étape 4 sur ${total}`,
+    s3_title: 'Excel des exigences',
+    s3_desc: 'Importez le fichier Excel des exigences client. S\'il est déjà enrichi (colonnes O/P remplies) il sera utilisé directement. Sinon, il sera traité avec Claude API + catalogues RBA/RSA.',
+    s3_hint: 'Excel des exigences client',
+    s3_busy: 'Analyse des exigences avec Claude API…',
+    s3_ok: 'Exigences traitées',
+    s3_already: '✓ Excel déjà enrichi — utilisation directe des colonnes O/P.',
+    s3_enriched: (ok) => `✓ Enrichi avec Claude API. Validation : ${ok ? 'OK' : '⚠ avec avertissements'}`,
+    s4_eye: (n, total) => `Étape 5 sur ${total}`,
+    s4_title: 'Document PDF client',
+    s4_desc: 'Importez la documentation supplémentaire du client en PDF. Claude API extraira les fact sheets (Applications, BCs, Organisations, Initiatives, ITCs).',
+    s4_hint: 'Documentation client (.pdf)',
+    s4_hint2: 'Mémoire, proposition, RFP…',
+    s4_busy: 'Analyse du PDF avec Claude API…',
+    s4_ok: 'PDF traité',
+    s5_eye: (n, total) => `Étape 6 sur ${total}`,
+    s5_title: 'Diagrammes d\'architecture',
+    s5_desc: 'Importez des images ou captures de diagrammes d\'architecture. Claude API (vision) identifiera les applications, domaines, relations et ITCs.',
+    s5_dz_title: 'Glissez des images ici ou cliquez',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Plusieurs fichiers',
+    s5_busy: 'Analyse des diagrammes avec Claude AI…',
+    s5_ok: (n) => `${n} diagramme(s) analysé(s)`,
+    s6_eye: (n, total) => `Étape 7 sur ${total}`,
+    s6_title: 'Générer les fichiers LeanIX',
+    s6_desc: 'Les fichiers d\'importation seront générés à partir de toutes les informations collectées.',
+    s6_busy: 'Génération des fichiers LeanIX…',
+    s6_ok: 'Fichiers générés',
+    s6_none: 'Aucun fichier généré',
+    s6_none_hint: 'Complétez au moins l\'étape 3 (Baseline) ou l\'étape 4 (Exigences).',
+    s6_download: '⬇ Télécharger',
+    s6_label_baseline: 'Baseline AS-IS',
+    s6_desc_baseline: 'Applications actuelles (on-premise + cloud) — importer dans LeanIX',
+    s6_label_target: 'Cible TO-BE',
+    s6_desc_target: 'Fact sheets dérivées des exigences — importer dans LeanIX',
+    s6_label_supp: 'Fact sheets supplémentaires (PDF + images)',
+    s6_desc_supp: 'À vérifier manuellement avant d\'importer dans LeanIX',
+    s7_eye: (n, total) => `Étape 8 sur ${total}`,
+    s7_title: 'Importer dans LeanIX',
+    s7_no_creds: 'Identifiants LeanIX non configurés',
+    s7_no_creds_hint: 'Configurez <strong>LEANIX_API_TOKEN</strong> et <strong>LEANIX_BASE_URL</strong> dans le fichier <code>.env</code> pour importer automatiquement.',
+    s7_manual: '<strong>Import manuel :</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Ordre :</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Sélectionnez les fichiers à importer dans votre workspace LeanIX via API.',
+    s7_warn: 'Vérifiez les fichiers avant d\'importer',
+    s7_warn_hint: 'Téléchargez-les à l\'étape précédente et vérifiez le contenu avant d\'importer dans LeanIX.',
+    s7_chk_baseline: 'Importer Baseline AS-IS',
+    s7_chk_target: 'Importer Cible TO-BE',
+    s7_busy: 'Importation dans LeanIX…',
+    s7_ok: 'Importé avec succès',
+    s7_imported: (list) => `Fichiers importés : ${list}`,
+    s7_err: 'Erreurs lors de l\'importation',
+    s7_none: 'Sélectionnez au moins un fichier à importer',
+    done_title: 'Pipeline terminé',
+    done_sub: (n, client) => `${n} fichier${n !== 1 ? 's' : ''} généré${n !== 1 ? 's' : ''} pour le client <strong>${client}</strong>.<br>Téléchargez-les depuis l'étape précédente et importez-les dans LeanIX.`,
+    processing: 'Traitement…',
+    generating: 'Génération des fichiers…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+  it: {
+    back: '← Indietro', skip: 'Salta passo', continue: 'Continua →',
+    import_btn: 'Importa in LeanIX →', finish: 'Fine',
+    step_of: (n, total) => `Passo ${n} di ${total}`,
+    pipeline_done: 'Pipeline completata',
+    new_pipeline: 'Nuova pipeline',
+    steps: ['Cliente','Cataloghi','Baseline','Requisiti','PDF','Immagini','Genera','Importa'],
+    s0_eye: (n, total) => `Passo 1 di ${total}`,
+    s0_title: 'Nome del cliente',
+    s0_desc: 'Inserisci il nome del cliente. Verrà usato come prefisso nei file generati e come tag in LeanIX.',
+    s0_label: 'Nome del cliente *',
+    s0_placeholder: 'Es: Acme Corp, Fiat…',
+    s0_err: 'Inserisci il nome del cliente',
+    s0_busy: 'Creazione sessione…',
+    s1_eye: (n, total) => `Passo 2 di ${total}`,
+    s1_title: 'Cataloghi SAP RBA / RSA',
+    s1_desc: 'Stato dei cataloghi di riferimento. La pipeline li usa per mappare le Business Capability e le Application alla nomenclatura SAP canonica.',
+    s1_loading: 'Caricamento cataloghi…',
+    s1_loaded: 'Cataloghi caricati correttamente',
+    s1_update_hint: 'Per aggiornare i cataloghi farlo manualmente tramite Value Experience Hub e sostituire i file JSON in <code>knowledge/</code>.',
+    s1_version: 'Versione',
+    s1_source: 'Fonte',
+    s1_err: 'Errore nel caricamento dei cataloghi',
+    s2_eye: (n, total) => `Passo 3 di ${total}`,
+    s2_title: 'Footprint / Baseline AS-IS',
+    s2_desc: 'Carica i file di inventario dei sistemi per generare il Baseline (architettura attuale). Entrambi i file sono opzionali.',
+    s2_onprem_hint: 'Sistemi on-premise',
+    s2_cloud_hint: 'Sistemi cloud / SaaS',
+    s2_busy: 'Generazione baseline…',
+    s2_ok: 'Baseline generato',
+    s2_download: '⬇ Scarica baseline.xlsx',
+    s3_eye: (n, total) => `Passo 4 di ${total}`,
+    s3_title: 'Excel dei requisiti',
+    s3_desc: 'Carica il file Excel con i requisiti del cliente. Se già arricchito (colonne O/P compilate) verrà usato direttamente. Altrimenti sarà elaborato con Claude API + cataloghi RBA/RSA.',
+    s3_hint: 'Excel dei requisiti cliente',
+    s3_busy: 'Analisi requisiti con Claude API…',
+    s3_ok: 'Requisiti elaborati',
+    s3_already: '✓ Excel già arricchito — uso diretto delle colonne O/P.',
+    s3_enriched: (ok) => `✓ Arricchito con Claude API. Validazione: ${ok ? 'OK' : '⚠ con avvisi'}`,
+    s4_eye: (n, total) => `Passo 5 di ${total}`,
+    s4_title: 'Documento PDF del cliente',
+    s4_desc: 'Carica documentazione aggiuntiva del cliente in PDF. Claude API estrarrà fact sheet (Application, BC, Organizzazioni, Iniziative, ITC).',
+    s4_hint: 'Documentazione cliente (.pdf)',
+    s4_hint2: 'Relazione, proposta, RFP…',
+    s4_busy: 'Analisi PDF con Claude API…',
+    s4_ok: 'PDF elaborato',
+    s5_eye: (n, total) => `Passo 6 di ${total}`,
+    s5_title: 'Diagrammi di architettura',
+    s5_desc: 'Carica immagini o screenshot di diagrammi di architettura. Claude API (visione) identificherà applicazioni, domini, relazioni e ITC visibili nei diagrammi.',
+    s5_dz_title: 'Trascina immagini qui o clicca',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · File multipli',
+    s5_busy: 'Analisi diagrammi con Claude AI…',
+    s5_ok: (n) => `${n} diagramma/i analizzato/i`,
+    s6_eye: (n, total) => `Passo 7 di ${total}`,
+    s6_title: 'Genera file LeanIX',
+    s6_desc: 'I file di importazione verranno generati da tutte le informazioni raccolte.',
+    s6_busy: 'Generazione file LeanIX…',
+    s6_ok: 'File generati',
+    s6_none: 'Nessun file generato',
+    s6_none_hint: 'Completa almeno il Passo 3 (Baseline) o il Passo 4 (Requisiti).',
+    s6_download: '⬇ Scarica',
+    s6_label_baseline: 'Baseline AS-IS',
+    s6_desc_baseline: 'Applicazioni attuali (on-premise + cloud) — importare in LeanIX',
+    s6_label_target: 'Target TO-BE',
+    s6_desc_target: 'Fact sheet derivati dai requisiti — importare in LeanIX',
+    s6_label_supp: 'Fact sheet aggiuntivi (PDF + immagini)',
+    s6_desc_supp: 'Verificare manualmente prima di importare in LeanIX',
+    s7_eye: (n, total) => `Passo 8 di ${total}`,
+    s7_title: 'Importa in LeanIX',
+    s7_no_creds: 'Credenziali LeanIX non configurate',
+    s7_no_creds_hint: 'Configura <strong>LEANIX_API_TOKEN</strong> e <strong>LEANIX_BASE_URL</strong> nel file <code>.env</code> per importare automaticamente.',
+    s7_manual: '<strong>Importazione manuale:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Ordine:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Seleziona quali file importare nel tuo workspace LeanIX via API.',
+    s7_warn: 'Verifica i file prima di importare',
+    s7_warn_hint: 'Scaricali dal passo precedente e verifica il contenuto prima di importare in LeanIX.',
+    s7_chk_baseline: 'Importa Baseline AS-IS',
+    s7_chk_target: 'Importa Target TO-BE',
+    s7_busy: 'Importazione in LeanIX…',
+    s7_ok: 'Importato correttamente',
+    s7_imported: (list) => `File importati: ${list}`,
+    s7_err: 'Errori durante l\'importazione',
+    s7_none: 'Seleziona almeno un file da importare',
+    done_title: 'Pipeline completata',
+    done_sub: (n, client) => `${n} file generato${n !== 1 ? '/i' : ''} per il cliente <strong>${client}</strong>.<br>Scaricali dal passo precedente e importali in LeanIX.`,
+    processing: 'Elaborazione…',
+    generating: 'Generazione file…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+  fi: {
+    back: '← Takaisin', skip: 'Ohita vaihe', continue: 'Jatka →',
+    import_btn: 'Tuo LeanIX:ään →', finish: 'Valmis',
+    step_of: (n, total) => `Vaihe ${n} / ${total}`,
+    pipeline_done: 'Pipeline valmis',
+    new_pipeline: 'Uusi pipeline',
+    steps: ['Asiakas','Katalogit','Baseline','Vaatimukset','PDF','Kuvat','Luo','Tuo'],
+    s0_eye: (n, total) => `Vaihe 1 / ${total}`,
+    s0_title: 'Asiakkaan nimi',
+    s0_desc: 'Syötä asiakkaan nimi. Sitä käytetään luotujen tiedostojen etuliitteenä ja tunnisteena LeanIX:ssä.',
+    s0_label: 'Asiakkaan nimi *',
+    s0_placeholder: 'Esim: Acme Corp, Nokia…',
+    s0_err: 'Syötä asiakkaan nimi',
+    s0_busy: 'Luodaan istuntoa…',
+    s1_eye: (n, total) => `Vaihe 2 / ${total}`,
+    s1_title: 'SAP RBA / RSA -katalogit',
+    s1_desc: 'Viitekatalogien tila. Pipeline käyttää niitä Business Capabilitien ja sovellusten kartoittamiseen SAP-nimikkeistöön.',
+    s1_loading: 'Ladataan katalogeja…',
+    s1_loaded: 'Katalogit ladattu onnistuneesti',
+    s1_update_hint: 'Päivitä katalogit manuaalisesti Value Experience Hubin kautta ja korvaa JSON-tiedostot hakemistossa <code>knowledge/</code>.',
+    s1_version: 'Versio',
+    s1_source: 'Lähde',
+    s1_err: 'Virhe katalogien latauksessa',
+    s2_eye: (n, total) => `Vaihe 3 / ${total}`,
+    s2_title: 'Jalanjälki / AS-IS-baseline',
+    s2_desc: 'Lataa järjestelmäinventaaritiedostot baselinea varten (nykyinen arkkitehtuuri). Molemmat tiedostot ovat valinnaisia.',
+    s2_onprem_hint: 'On-premise-järjestelmät',
+    s2_cloud_hint: 'Pilvi- / SaaS-järjestelmät',
+    s2_busy: 'Luodaan baselinea…',
+    s2_ok: 'Baseline luotu',
+    s2_download: '⬇ Lataa baseline.xlsx',
+    s3_eye: (n, total) => `Vaihe 4 / ${total}`,
+    s3_title: 'Vaatimusten Excel',
+    s3_desc: 'Lataa asiakkaan vaatimukset sisältävä Excel-tiedosto. Jos se on jo rikastettu (sarakkeet O/P täytetty), se käytetään suoraan. Muuten se käsitellään Claude API:lla + RBA/RSA-katalogeilla.',
+    s3_hint: 'Asiakkaan vaatimukset Excel',
+    s3_busy: 'Analysoidaan vaatimuksia Claude API:lla…',
+    s3_ok: 'Vaatimukset käsitelty',
+    s3_already: '✓ Excel jo rikastettu — käytetään sarakkeita O/P suoraan.',
+    s3_enriched: (ok) => `✓ Rikastettu Claude API:lla. Validointi: ${ok ? 'OK' : '⚠ varoituksilla'}`,
+    s4_eye: (n, total) => `Vaihe 5 / ${total}`,
+    s4_title: 'Asiakkaan PDF-dokumentti',
+    s4_desc: 'Lataa lisädokumentaatio PDF-muodossa. Claude API poimii fact sheetit (sovellukset, BC:t, organisaatiot, aloitteet, ITC:t) ja kartoittaa ne RBA/RSA-katalogeihin.',
+    s4_hint: 'Asiakkaan dokumentaatio (.pdf)',
+    s4_hint2: 'Muistio, tarjous, RFP…',
+    s4_busy: 'Analysoidaan PDF:ää Claude API:lla…',
+    s4_ok: 'PDF käsitelty',
+    s5_eye: (n, total) => `Vaihe 6 / ${total}`,
+    s5_title: 'Arkkitehtuurikaaviot',
+    s5_desc: 'Lataa kuvia tai kuvakaappauksia arkkitehtuurikaavioista. Claude API (näkökyky) tunnistaa sovellukset, alueet, suhteet ja ITC:t kaavioissa.',
+    s5_dz_title: 'Vedä kuvia tähän tai napsauta',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Useita tiedostoja',
+    s5_busy: 'Analysoidaan kaavioita Claude AI:lla…',
+    s5_ok: (n) => `${n} kaavio analysoitu`,
+    s6_eye: (n, total) => `Vaihe 7 / ${total}`,
+    s6_title: 'Luo LeanIX-tiedostot',
+    s6_desc: 'Tuontitiedostot luodaan kaikesta kerätystä tiedosta.',
+    s6_busy: 'Luodaan LeanIX-tiedostoja…',
+    s6_ok: 'Tiedostot luotu',
+    s6_none: 'Tiedostoja ei luotu',
+    s6_none_hint: 'Täytä vähintään vaihe 3 (Baseline) tai vaihe 4 (Vaatimukset).',
+    s6_download: '⬇ Lataa',
+    s6_label_baseline: 'AS-IS Baseline',
+    s6_desc_baseline: 'Nykyiset sovellukset (on-premise + pilvi) — tuo LeanIX:ään',
+    s6_label_target: 'TO-BE Target',
+    s6_desc_target: 'Vaatimuksista johdetut fact sheetit — tuo LeanIX:ään',
+    s6_label_supp: 'Lisä-fact sheetit (PDF + kuvat)',
+    s6_desc_supp: 'Tarkista manuaalisesti ennen LeanIX:ään tuomista',
+    s7_eye: (n, total) => `Vaihe 8 / ${total}`,
+    s7_title: 'Tuo LeanIX:ään',
+    s7_no_creds: 'LeanIX-tunnistetietoja ei ole määritetty',
+    s7_no_creds_hint: 'Määritä <strong>LEANIX_API_TOKEN</strong> ja <strong>LEANIX_BASE_URL</strong> tiedostossa <code>.env</code> automaattista tuontia varten.',
+    s7_manual: '<strong>Manuaalinen tuonti:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Järjestys:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Valitse mitkä tiedostot tuodaan LeanIX-työtilaan API:n kautta.',
+    s7_warn: 'Tarkista tiedostot ennen tuontia',
+    s7_warn_hint: 'Lataa ne edellisessä vaiheessa ja tarkista sisältö ennen LeanIX:ään tuomista.',
+    s7_chk_baseline: 'Tuo AS-IS Baseline',
+    s7_chk_target: 'Tuo TO-BE Target',
+    s7_busy: 'Tuodaan LeanIX:ään…',
+    s7_ok: 'Tuonti onnistui',
+    s7_imported: (list) => `Tuodut tiedostot: ${list}`,
+    s7_err: 'Virheitä tuonnissa',
+    s7_none: 'Valitse vähintään yksi tiedosto tuotavaksi',
+    done_title: 'Pipeline valmis',
+    done_sub: (n, client) => `${n} tiedosto luotu asiakkaalle <strong>${client}</strong>.<br>Lataa ne edellisestä vaiheesta ja tuo LeanIX:ään.`,
+    processing: 'Käsitellään…',
+    generating: 'Luodaan tiedostoja…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+};
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const API = '';  // same origin
+const STEPS = [
+  { id: 'client',    skippable: false },
+  { id: 'catalog',   skippable: false },
+  { id: 'baseline',  skippable: true  },
+  { id: 'reqs',      skippable: true  },
+  { id: 'pdf',       skippable: true  },
+  { id: 'images',    skippable: true  },
+  { id: 'generate',  skippable: false },
+  { id: 'import',    skippable: true  },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentStep    = 0;
+let sessionId      = null;
+let clientName     = '';
+let leanixOk       = false;
+let stepDone       = new Array(STEPS.length).fill(false);
+let pendingFiles   = {};   // key → File or File[]
+let generateOutputs = [];
+let currentLang    = 'en';
+
+// ── i18n ─────────────────────────────────────────────────────────────────────
+function t(key, ...args) {
+  const val = LANGS[currentLang]?.[key] ?? LANGS['en'][key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('lang-select').value = lang;
+  renderProgress();
+  renderStep(currentStep);
+  showNav();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const cfg = await apiFetch('/api/config');
+    leanixOk = cfg.leanix_configured;
+  } catch(e) {}
+  renderProgress();
+  renderStep(0);
+})();
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
+  const resp = await fetch(API + url, opts);
+  const data = await resp.json();
+  if (!resp.ok || data.ok === false) throw new Error(data.detail || data.error || 'API error');
+  return data;
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+function renderProgress() {
+  const labels = t('steps');
+  const el = document.getElementById('progress-steps');
+  el.innerHTML = STEPS.map((s, i) => `
+    <div class="progress-step ${i < currentStep ? 'done' : i === currentStep ? 'active' : ''}">
+      <div class="step-circle">${i < currentStep ? '✓' : i + 1}</div>
+      <div class="step-label">${labels[i]}</div>
+    </div>
+  `).join('');
+  document.getElementById('header-step-label').textContent =
+    t('step_of', currentStep + 1, STEPS.length) + ' — ' + labels[currentStep];
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showNav() {
+  const s = STEPS[currentStep];
+  const btnBack = document.getElementById('btn-back');
+  const btnSkip = document.getElementById('btn-skip');
+  const btnNext = document.getElementById('btn-next');
+
+  btnBack.style.display = currentStep > 0 ? '' : 'none';
+  btnBack.textContent   = t('back');
+  btnSkip.style.display = s.skippable ? '' : 'none';
+  btnSkip.textContent   = t('skip');
+
+  if (currentStep === STEPS.length - 1) {
+    btnNext.textContent = leanixOk ? t('import_btn') : t('finish');
+  } else {
+    btnNext.textContent = t('continue');
+  }
+}
+
+function setBusy(busy, msg) {
+  if (!msg) msg = t('processing');
+  document.getElementById('btn-next').disabled = busy;
+  document.getElementById('btn-skip').disabled = busy;
+  const spinners = document.querySelectorAll('.spinner-wrap');
+  spinners.forEach(s => {
+    s.classList.toggle('show', busy);
+    const tx = s.querySelector('.spinner-text');
+    if (tx) tx.textContent = msg;
+  });
+}
+
+async function nextStep() {
+  try {
+    await runStep(currentStep);
+  } catch(e) {
+    showStepError(e.message);
+    return;
+  }
+
+  stepDone[currentStep] = true;
+  advance();
+}
+
+function skipStep() {
+  stepDone[currentStep] = false;
+  advance();
+}
+
+function advance() {
+  let next = currentStep + 1;
+  if (next >= STEPS.length) {
+    showDone();
+    return;
+  }
+  currentStep = next;
+  renderProgress();
+  renderStep(currentStep);
+  showNav();
+}
+
+function goBack() {
+  if (currentStep > 0) {
+    currentStep--;
+    renderProgress();
+    renderStep(currentStep);
+    showNav();
+  }
+}
+
+// ── Step runner (API calls) ───────────────────────────────────────────────────
+async function runStep(step) {
+  if (step === 0) return runStepClient();
+  if (step === 1) return;   // catalog already auto-loaded
+  if (step === 2) return runStepBaseline();
+  if (step === 3) return runStepRequirements();
+  if (step === 4) return runStepPdf();
+  if (step === 5) return runStepImages();
+  if (step === 6) return runStepGenerate();
+  if (step === 7) return runStepPush();
+}
+
+// ── Step 0 — Client name ──────────────────────────────────────────────────────
+function renderStep0() {
+  return `
+    <div class="step-eyebrow">${t('s0_eye', 1, STEPS.length)}</div>
+    <h1 class="step-title">${t('s0_title')}</h1>
+    <p class="step-desc">${t('s0_desc')}</p>
+    <label class="field-label" for="client-input">${t('s0_label')}</label>
+    <input type="text" id="client-input" placeholder="${t('s0_placeholder')}"
+      value="${esc(clientName)}"
+      onkeydown="if(event.key==='Enter') nextStep()"
+      oninput="clientName=this.value.trim()">
+  `;
+}
+
+async function runStepClient() {
+  const val = (document.getElementById('client-input')?.value || '').trim();
+  if (!val) throw new Error(t('s0_err'));
+  clientName = val;
+  setBusy(true, t('s0_busy'));
+  const data = await apiFetch('/api/session', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({client_name: clientName})
+  });
+  sessionId = data.session_id;
+  setBusy(false);
+}
+
+// ── Step 1 — Catalog ──────────────────────────────────────────────────────────
+function renderStep1() {
+  return `
+    <div class="step-eyebrow">${t('s1_eye', 2, STEPS.length)}</div>
+    <h1 class="step-title">${t('s1_title')}</h1>
+    <p class="step-desc">${t('s1_desc')}</p>
+    <div class="spinner-wrap show" id="catalog-spinner">
+      <div class="spinner"></div>
+      <span class="spinner-text">${t('s1_loading')}</span>
+    </div>
+    <div id="catalog-content" style="display:none">
+      <div class="catalog-grid" id="catalog-grid"></div>
+      <div id="catalog-status" style="margin-top:16px"></div>
+    </div>
+  `;
+}
+
+async function loadCatalog() {
+  if (!sessionId) return;
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/catalog`);
+    document.getElementById('catalog-spinner').classList.remove('show');
+    document.getElementById('catalog-content').style.display = '';
+
+    const rba = data.rba || {};
+    const rsa = data.rsa || {};
+    const grid = document.getElementById('catalog-grid');
+    grid.innerHTML = catalogCard('rba', 'RBA', t('cat_rba_title'), rba)
+                   + catalogCard('rsa', 'RSA', t('cat_rsa_title'), rsa);
+
+    const statusEl = document.getElementById('catalog-status');
+    statusEl.innerHTML = `<div class="result-card info show">
+      <div class="result-header">ℹ️ ${t('s1_loaded')}</div>
+      <div class="result-summary">
+        RBA v${rba.version || '?'} · RSA v${rsa.version || '?'}<br>
+        ${t('s1_update_hint')}
+      </div>
+    </div>`;
+  } catch(e) {
+    document.getElementById('catalog-spinner').classList.remove('show');
+    document.getElementById('catalog-content').style.display = '';
+    document.getElementById('catalog-grid').innerHTML =
+      `<div class="result-card error show"><div class="result-header">⚠ ${t('s1_err')}: ${esc(e.message)}</div></div>`;
+  }
+}
+
+function catalogCard(cls, badge, title, info) {
+  const versionLabel = t('s1_version');
+  const sourceLabel  = t('s1_source');
+  const stats = Object.entries(info.stats || {})
+    .map(([k,v]) => `<span class="cc-stat">${k}: ${v}</span>`).join('');
+  return `<div class="catalog-card ${cls}">
+    <div class="cc-badge">${badge}</div>
+    <div class="cc-title">${title}</div>
+    <div class="cc-meta">
+      ${versionLabel}: ${info.version || '—'}<br>
+      ${sourceLabel}: ${(info.source || '—').slice(0,50)}
+    </div>
+    <div class="cc-stats">${stats}</div>
+  </div>`;
+}
+
+// ── Step 2 — Baseline ────────────────────────────────────────────────────────
+function renderStep2() {
+  return `
+    <div class="step-eyebrow">${t('s2_eye', 3, STEPS.length)}</div>
+    <h1 class="step-title">${t('s2_title')}</h1>
+    <p class="step-desc">${t('s2_desc')}</p>
+    <div class="drop-grid">
+      ${dropZone('onprem', '🖥️', 'OnPrem Systems.xlsx', t('s2_onprem_hint'), '.xlsx')}
+      ${dropZone('cloud',  '☁️', 'Cloud Systems.xlsx',  t('s2_cloud_hint'), '.xlsx')}
+    </div>
+    <div class="spinner-wrap" id="step2-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s2_busy')}</span>
+    </div>
+    <div class="result-card" id="step2-result"></div>
+  `;
+}
+
+async function runStepBaseline() {
+  const onprem = pendingFiles['onprem'];
+  const cloud  = pendingFiles['cloud'];
+  if (!onprem && !cloud) return;
+
+  const fd = new FormData();
+  if (onprem) fd.append('onprem_file', onprem);
+  if (cloud)  fd.append('cloud_file',  cloud);
+
+  setBusy(true, t('s2_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/baseline`, {method:'POST', body: fd});
+  setBusy(false);
+
+  if (!data.skipped) {
+    const rc = document.getElementById('step2-result');
+    rc.className = 'result-card success show';
+    rc.innerHTML = `
+      <div class="result-header">✅ ${t('s2_ok')}</div>
+      <div class="result-stats">
+        ${statPill(data.n_onprem, 'On-Prem')}
+        ${statPill(data.n_cloud, 'Cloud')}
+        ${statPill(data.n_total, 'Total Apps')}
+      </div>
+      <a href="${data.download_url}" download class="btn-download" style="display:inline-block;margin-top:4px;text-decoration:none">${t('s2_download')}</a>
+    `;
+  }
+}
+
+// ── Step 3 — Requirements ────────────────────────────────────────────────────
+function renderStep3() {
+  return `
+    <div class="step-eyebrow">${t('s3_eye', 4, STEPS.length)}</div>
+    <h1 class="step-title">${t('s3_title')}</h1>
+    <p class="step-desc">${t('s3_desc')}</p>
+    <div class="drop-grid single">
+      ${dropZone('req', '📊', 'Requirements.xlsx', t('s3_hint'), '.xlsx')}
+    </div>
+    <div class="spinner-wrap" id="step3-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s3_busy')}</span>
+    </div>
+    <div class="result-card" id="step3-result"></div>
+  `;
+}
+
+async function runStepRequirements() {
+  const file = pendingFiles['req'];
+  if (!file) return;
+
+  const fd = new FormData();
+  fd.append('req_file', file);
+
+  setBusy(true, t('s3_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/requirements`, {method:'POST', body: fd});
+  setBusy(false);
+
+  const rc = document.getElementById('step3-result');
+  if (data.skipped) return;
+
+  rc.className = 'result-card success show';
+  rc.innerHTML = `
+    <div class="result-header">✅ ${t('s3_ok')}</div>
+    <div class="result-stats">
+      ${statPill(data.n_requirements, 'Reqs')}
+    </div>
+    <div class="result-summary" style="margin-top:8px">
+      ${data.already_enriched ? t('s3_already') : t('s3_enriched', data.validation_ok)}
+    </div>
+  `;
+}
+
+// ── Step 4 — PDF ─────────────────────────────────────────────────────────────
+function renderStep4() {
+  return `
+    <div class="step-eyebrow">${t('s4_eye', 5, STEPS.length)}</div>
+    <h1 class="step-title">${t('s4_title')}</h1>
+    <p class="step-desc">${t('s4_desc')}</p>
+    <div class="drop-grid single">
+      ${dropZone('pdf', '📕', t('s4_hint'), t('s4_hint2'), '.pdf')}
+    </div>
+    <div class="spinner-wrap" id="step4-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s4_busy')}</span>
+    </div>
+    <div class="result-card" id="step4-result"></div>
+  `;
+}
+
+async function runStepPdf() {
+  const file = pendingFiles['pdf'];
+  if (!file) return;
+
+  const fd = new FormData();
+  fd.append('pdf_file', file);
+
+  setBusy(true, t('s4_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/pdf`, {method:'POST', body: fd});
+  setBusy(false);
+
+  if (data.skipped) return;
+  const rc = document.getElementById('step4-result');
+  rc.className = 'result-card success show';
+  rc.innerHTML = `
+    <div class="result-header">✅ ${t('s4_ok')}</div>
+    <div class="result-stats">
+      ${statPill(data.n_applications,          'Apps')}
+      ${statPill(data.n_business_capabilities, 'BCs')}
+      ${statPill(data.n_organizations,         'Orgs')}
+      ${statPill(data.n_initiatives,           'Init')}
+      ${statPill(data.n_it_components,         'ITCs')}
+    </div>
+    ${data.summary ? `<div class="result-summary" style="margin-top:8px">${esc(data.summary)}</div>` : ''}
+  `;
+}
+
+// ── Step 5 — Images ──────────────────────────────────────────────────────────
+function renderStep5() {
+  return `
+    <div class="step-eyebrow">${t('s5_eye', 6, STEPS.length)}</div>
+    <h1 class="step-title">${t('s5_title')}</h1>
+    <p class="step-desc">${t('s5_desc')}</p>
+    <div class="drop-grid single">
+      <div class="drop-zone" id="dz-images"
+        onclick="document.getElementById('fi-images').click()"
+        ondragover="dzDragOver(event,'images')"
+        ondragleave="dzDragLeave('images')"
+        ondrop="dzDrop(event,'images',true)">
+        <div class="drop-icon">🖼️</div>
+        <div class="drop-title">${t('s5_dz_title')}</div>
+        <div class="drop-hint">${t('s5_dz_hint')}</div>
+        <input type="file" id="fi-images" multiple accept=".png,.jpg,.jpeg,.gif,.webp" onchange="handleMultiImages(event)">
+      </div>
+    </div>
+    <div id="img-thumbs-wrap" class="img-thumbs" style="margin-top:0"></div>
+    <div class="spinner-wrap" id="step5-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s5_busy')}</span>
+    </div>
+    <div class="result-card" id="step5-result"></div>
+  `;
+}
+
+let pendingImages = [];
+
+function handleMultiImages(evt) {
+  const files = Array.from(evt.target.files);
+  files.forEach(f => pendingImages.push(f));
+  renderImageThumbs();
+  evt.target.value = '';
+}
+
+function removeImage(i) {
+  pendingImages.splice(i, 1);
+  renderImageThumbs();
+}
+
+function renderImageThumbs() {
+  const wrap = document.getElementById('img-thumbs-wrap');
+  if (!wrap) return;
+  if (!pendingImages.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = pendingImages.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return `<div class="img-thumb">
+      <img src="${url}" alt="${esc(f.name)}">
+      <div class="img-thumb-remove" onclick="removeImage(${i})">✕</div>
+    </div>`;
+  }).join('');
+}
+
+async function runStepImages() {
+  if (!pendingImages.length) return;
+
+  const fd = new FormData();
+  pendingImages.forEach(f => fd.append('images', f));
+
+  setBusy(true, t('s5_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/images`, {method:'POST', body: fd});
+  setBusy(false);
+
+  if (data.skipped) return;
+  const rc = document.getElementById('step5-result');
+  rc.className = 'result-card success show';
+  rc.innerHTML = `
+    <div class="result-header">✅ ${t('s5_ok', data.n_files_processed)}</div>
+    <div class="result-stats">
+      ${statPill(data.n_applications,          'Apps')}
+      ${statPill(data.n_business_capabilities, 'BCs')}
+      ${statPill(data.n_it_components,         'ITCs')}
+      ${statPill(data.n_interfaces,            'Interfaces')}
+    </div>
+    ${data.summary ? `<div class="result-summary" style="margin-top:8px">${esc(data.summary)}</div>` : ''}
+  `;
+}
+
+// ── Step 6 — Generate ────────────────────────────────────────────────────────
+function renderStep6() {
+  return `
+    <div class="step-eyebrow">${t('s6_eye', 7, STEPS.length)}</div>
+    <h1 class="step-title">${t('s6_title')}</h1>
+    <p class="step-desc">${t('s6_desc')}</p>
+    <div class="spinner-wrap show" id="step6-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s6_busy')}</span>
+    </div>
+    <div id="step6-outputs"></div>
+  `;
+}
+
+async function runStepGenerate() {
+  if (generateOutputs.length) return;
+
+  setBusy(true, t('s6_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/generate`, {method:'POST'});
+  setBusy(false);
+  generateOutputs = data.outputs || [];
+
+  // patch server-side labels/descriptions with translated ones
+  generateOutputs.forEach(o => {
+    if (o.key === 'baseline')      { o.label = t('s6_label_baseline'); o.description = t('s6_desc_baseline'); }
+    if (o.key === 'target')        { o.label = t('s6_label_target');   o.description = t('s6_desc_target'); }
+    if (o.key === 'supplementary') { o.label = t('s6_label_supp');     o.description = t('s6_desc_supp'); }
+  });
+
+  document.getElementById('step6-spinner')?.classList.remove('show');
+  const outEl = document.getElementById('step6-outputs');
+  if (!outEl) return;
+
+  if (!generateOutputs.length) {
+    outEl.innerHTML = `<div class="result-card warning show">
+      <div class="result-header">⚠ ${t('s6_none')}</div>
+      <div class="result-summary">${t('s6_none_hint')}</div>
+    </div>`;
+    return;
+  }
+
+  const icons = {baseline: '🏗️', target: '🎯', supplementary: '📋'};
+  outEl.innerHTML = `
+    <div class="result-card success show">
+      <div class="result-header">✅ ${t('s6_ok')}</div>
+    </div>
+    <div class="download-list" style="margin-top:16px">
+      ${generateOutputs.map(o => `
+        <div class="download-item">
+          <div class="di-icon">${icons[o.key] || '📄'}</div>
+          <div class="di-info">
+            <div class="di-label">${esc(o.label)}</div>
+            <div class="di-desc">${esc(o.description)}</div>
+            ${o.stats ? `<div class="di-stats">${esc(o.stats)}</div>` : ''}
+          </div>
+          <a href="${o.download_url}" download="${esc(o.filename)}" class="btn-download" style="text-decoration:none">${t('s6_download')}</a>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ── Step 7 — Import ──────────────────────────────────────────────────────────
+function renderStep7() {
+  if (!leanixOk) {
+    return `
+      <div class="step-eyebrow">${t('s7_eye', 8, STEPS.length)}</div>
+      <h1 class="step-title">${t('s7_title')}</h1>
+      <div class="result-card info show" style="margin-top:0;margin-bottom:0">
+        <div class="result-header">ℹ️ ${t('s7_no_creds')}</div>
+        <div class="result-summary">
+          ${t('s7_no_creds_hint')}<br><br>
+          ${t('s7_manual')}<br><br>
+          ${t('s7_order')}
+        </div>
+      </div>
+    `;
+  }
+
+  const hasBaseline = generateOutputs.some(o => o.key === 'baseline');
+  const hasTarget   = generateOutputs.some(o => o.key === 'target');
+
+  return `
+    <div class="step-eyebrow">${t('s7_eye', 8, STEPS.length)}</div>
+    <h1 class="step-title">${t('s7_title')}</h1>
+    <p class="step-desc">${t('s7_desc')}</p>
+    <div class="result-card warning show" style="margin-bottom:20px">
+      <div class="result-header">⚠ ${t('s7_warn')}</div>
+      <div class="result-summary">${t('s7_warn_hint')}</div>
+    </div>
+    <div class="push-options">
+      ${hasBaseline ? `
+        <label class="toggle-row" id="tr-baseline" onclick="toggleRow('tr-baseline')">
+          <input type="checkbox" id="chk-baseline">
+          <span class="tr-label">${t('s7_chk_baseline')}</span>
+          <span class="tr-file">_baseline.xlsx</span>
+        </label>` : ''}
+      ${hasTarget ? `
+        <label class="toggle-row" id="tr-target" onclick="toggleRow('tr-target')">
+          <input type="checkbox" id="chk-target">
+          <span class="tr-label">${t('s7_chk_target')}</span>
+          <span class="tr-file">_target_leanix.xlsx</span>
+        </label>` : ''}
+    </div>
+    <div class="spinner-wrap" id="step7-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s7_busy')}</span>
+    </div>
+    <div class="result-card" id="step7-result"></div>
+  `;
+}
+
+function toggleRow(id) {
+  const row = document.getElementById(id);
+  const chk = row?.querySelector('input[type=checkbox]');
+  if (chk) chk.checked = !chk.checked;
+  row?.classList.toggle('active', chk?.checked);
+}
+
+async function runStepPush() {
+  if (!leanixOk) return;
+
+  const pushBaseline = document.getElementById('chk-baseline')?.checked || false;
+  const pushTarget   = document.getElementById('chk-target')?.checked   || false;
+  if (!pushBaseline && !pushTarget) throw new Error(t('s7_none'));
+
+  setBusy(true, t('s7_busy'));
+  const data = await apiFetch(`/api/session/${sessionId}/push`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({push_baseline: pushBaseline, push_target: pushTarget})
+  });
+  setBusy(false);
+
+  const rc = document.getElementById('step7-result');
+  if (data.ok) {
+    rc.className = 'result-card success show';
+    rc.innerHTML = `
+      <div class="result-header">✅ ${t('s7_ok')}</div>
+      <div class="result-summary">${t('s7_imported', data.pushed.join(', '))}</div>
+    `;
+  } else {
+    rc.className = 'result-card error show';
+    rc.innerHTML = `
+      <div class="result-header">⚠ ${t('s7_err')}</div>
+      <div class="result-summary">${data.errors.map(esc).join('<br>')}</div>
+    `;
+  }
+}
+
+// ── Done screen ───────────────────────────────────────────────────────────────
+function showDone() {
+  currentStep = STEPS.length;
+  renderProgress();
+  document.getElementById('header-step-label').textContent = t('pipeline_done');
+  document.getElementById('btn-back').style.display  = 'none';
+  document.getElementById('btn-skip').style.display  = 'none';
+  document.getElementById('btn-next').style.display  = 'none';
+
+  const n = generateOutputs.length;
+  document.getElementById('main-content').innerHTML = `
+    <div class="step-card">
+      <div class="done-screen">
+        <div class="done-icon">✅</div>
+        <div class="done-title">${t('done_title')}</div>
+        <div class="done-sub">${t('done_sub', n, esc(clientName))}</div>
+        <button class="btn-primary" onclick="location.reload()">${t('new_pipeline')}</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Render step ───────────────────────────────────────────────────────────────
+function renderStep(n) {
+  pendingImages = [];
+  const renderers = [renderStep0, renderStep1, renderStep2, renderStep3,
+                     renderStep4, renderStep5, renderStep6, renderStep7];
+  const html = renderers[n] ? renderers[n]() : '';
+  document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
+  showNav();
+
+  if (n === 1 && sessionId) loadCatalog();
+  if (n === 6 && sessionId) {
+    setBusy(true, t('generating'));
+    runStepGenerate().then(() => setBusy(false)).catch(e => {
+      setBusy(false);
+      showStepError(e.message);
+    });
+  }
+
+  requestAnimationFrame(() => {
+    ['onprem','cloud','req','pdf'].forEach(k => initDropZone(k));
+  });
+}
+
+// ── Drop zone helper ──────────────────────────────────────────────────────────
+function dropZone(key, icon, title, hint, accept) {
+  return `
+    <div class="drop-zone" id="dz-${key}"
+      onclick="document.getElementById('fi-${key}').click()"
+      ondragover="dzDragOver(event,'${key}')"
+      ondragleave="dzDragLeave('${key}')"
+      ondrop="dzDrop(event,'${key}',false)">
+      <div class="drop-icon">${icon}</div>
+      <div class="drop-title">${title}</div>
+      <div class="drop-hint">${hint}</div>
+      <div class="drop-filename" id="dfn-${key}"></div>
+      <input type="file" id="fi-${key}" accept="${accept}" onchange="dzSelect(event,'${key}')">
+    </div>
+  `;
+}
+
+function initDropZone(key) {
+  const dz = document.getElementById(`dz-${key}`);
+  if (!dz) return;
+  if (pendingFiles[key]) {
+    dz.classList.add('has-file');
+    document.getElementById(`dfn-${key}`).textContent = pendingFiles[key].name;
+  }
+}
+
+function dzDragOver(e, key) {
+  e.preventDefault();
+  document.getElementById(`dz-${key}`)?.classList.add('drag-over');
+}
+
+function dzDragLeave(key) {
+  document.getElementById(`dz-${key}`)?.classList.remove('drag-over');
+}
+
+function dzDrop(e, key, multi) {
+  e.preventDefault();
+  dzDragLeave(key);
+  if (multi) {
+    Array.from(e.dataTransfer.files).forEach(f => pendingImages.push(f));
+    renderImageThumbs();
+  } else {
+    const f = e.dataTransfer.files[0];
+    if (f) setDropFile(key, f);
+  }
+}
+
+function dzSelect(e, key) {
+  const f = e.target.files[0];
+  if (f) setDropFile(key, f);
+}
+
+function setDropFile(key, file) {
+  pendingFiles[key] = file;
+  const dz  = document.getElementById(`dz-${key}`);
+  const dfn = document.getElementById(`dfn-${key}`);
+  if (dz)  dz.classList.add('has-file');
+  if (dfn) dfn.textContent = file.name;
+}
+
+function removeDropFile(key) {
+  delete pendingFiles[key];
+  const dz  = document.getElementById(`dz-${key}`);
+  const dfn = document.getElementById(`dfn-${key}`);
+  if (dz)  dz.classList.remove('has-file');
+  if (dfn) dfn.textContent = '';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function statPill(n, label) {
+  return `<div class="stat-pill"><span class="stat-n">${n ?? 0}</span><span class="stat-lbl">${label}</span></div>`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showStepError(msg) {
+  let rc = document.getElementById('step-error-card');
+  if (!rc) {
+    rc = document.createElement('div');
+    rc.id = 'step-error-card';
+    document.querySelector('.step-card')?.appendChild(rc);
+  }
+  rc.className = 'result-card error show';
+  rc.innerHTML = `<div class="result-header">⚠ Error</div><div class="result-summary">${esc(msg)}</div>`;
+}
+</script>
+</body>
+</html>
