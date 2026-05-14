@@ -1,37 +1,18 @@
 # Archimedes AI
 
-Automated SAP requirements enrichment pipeline. Takes a client Excel or PDF with raw functional requirements and enriches each row with:
+AI-powered orchestrator that automates SAP LeanIX population from client data. Converts OnPrem/Cloud inventories, requirements Excel files, PDFs, and architecture diagrams into LeanIX-importable Excel files — covering the full EA cycle: AS-IS Baseline + TO-BE Target.
 
-- **Module** — SAP module (MM, FI, CO, etc.)
-- **Business Capabilities** — 1–3 leaf BCs from the SAP Reference Business Architecture (RBA)
-- **RSA application** — exact SAP Reference Solution Architecture app name
-- **Coverage / Dev / Licensing** — standard classification fields
-- **Comment** — functional description with t-codes, Fiori app IDs, and OSS Note references
-
-Optionally pushes results to a **LeanIX** workspace as Application and BusinessCapability fact sheets.
+**Engine**: Claude API (`claude-sonnet-4-6`) + SAP RBA catalog (756 BCs, 22 domains) + SAP RSA catalog (324 products)
 
 ---
 
-## Architecture
+## What it produces
 
-```
-input (.xlsx / .pdf)
-        │
-        ▼
-  01  extract          → output/reqs_raw.json
-        │
-        ▼
-  02  enrich           → output/reqs_enriched.json
-        │  (Claude API, claude-sonnet-4-6)
-        ▼
-  03  validate         → output/validation_report.json
-        │  (catalog checks, comment quality gate)
-        ▼
-  04  write            → output/<name>_enriched.xlsx
-                           └── LeanIX push (optional)
-```
-
-See [`docs/architecture.md`](docs/architecture.md) for a detailed description of each step.
+| Output file | Content |
+|---|---|
+| `<client>_baseline.xlsx` | AS-IS applications with `Baseline;OnPremise` / `Baseline;Cloud` tags |
+| `<client>_target_leanix.xlsx` | TO-BE: Application, BusinessCapability, Initiative, ITComponent sheets |
+| `<client>_supplementary_factsheets.json` | Fact sheets extracted from PDFs and diagrams (also merged into target Excel) |
 
 ---
 
@@ -46,149 +27,109 @@ pip install -r requirements.txt
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — at minimum set ANTHROPIC_API_KEY
+# Edit .env — set ANTHROPIC_API_KEY at minimum
 
-# 3. Run
-python run.py path/to/requirements.xlsx
+# 3. Run interactive pipeline
+python3 run.py pipeline --client <client_name>
 ```
 
-Output files land in `output/` by default.
+The pipeline prompts for each input file and can skip any step.
 
 ---
 
-## Usage
+## Pipeline — 5 steps
 
 ```
-python run.py <input_file> [options]
-
-positional arguments:
-  input_file            Path to .xlsx, .xls, or .pdf input file
-
-options:
-  --no-validate         Skip the validation step (validation errors won't block output)
-  --push-leanix         Push enriched results to LeanIX
-  --output-dir OUTPUT   Directory for output files (default: output)
+STEP 0  Catalog check       — verifies RBA/RSA version, offers update
+STEP 1  Baseline AS-IS      — OnPrem + Cloud Excel → <client>_baseline.xlsx
+STEP 2  Requirements TO-BE  — Excel → Claude API (RBA/RSA mapping) → enriched output
+        + PDF extraction    — PDFs → Claude API → supplementary fact sheets
+STEP 3  Images/diagrams     — PNG/JPG → Claude Vision → apps and IT components
+STEP 4  Output generation   — multi-sheet LeanIX Excel (Application, BC, Initiative, ITC)
+STEP 5  LeanIX import       — optional GraphQL push (BC → ITC → App → Initiative)
 ```
 
-### Examples
+---
+
+## Commands
 
 ```bash
-# Basic run
-python run.py input/client_requirements.xlsx
+# Full interactive pipeline (recommended)
+python3 run.py pipeline --client <name>
 
-# Skip validation (e.g. during development)
-python run.py input/reqs.xlsx --no-validate
+# Enrich only (extract → enrich → validate → write)
+python3 run.py enrich <requirements.xlsx> --client <name>
 
-# Push to LeanIX after enrichment
-python run.py input/reqs.xlsx --push-leanix
-
-# Custom output directory
-python run.py input/reqs.pdf --output-dir results/client_abc
+# Push a previously generated staging Excel to LeanIX
+python3 run.py push <client_target_leanix.xlsx> --client <name>
 ```
 
 ---
 
 ## Environment variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key |
-| `LEANIX_API_TOKEN` | Only for `--push-leanix` | — | LeanIX API token |
-| `LEANIX_WORKSPACE_ID` | Only for `--push-leanix` | — | LeanIX workspace UUID |
-| `LEANIX_BASE_URL` | Only for `--push-leanix` | `https://app.leanix.net` | LeanIX instance URL |
-| `ENRICH_MODEL` | No | `claude-sonnet-4-6` | Claude model ID |
-| `ENRICH_BATCH_SIZE` | No | `10` | Requirements per Claude API call |
-| `ENRICH_MAX_RETRIES` | No | `3` | Retries on Claude API error |
-| `LOG_LEVEL` | No | `INFO` | Python logging level |
-
-Copy `.env.example` to `.env` and fill in the values.
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
+| `LEANIX_API_TOKEN` | For push | LeanIX API token |
+| `LEANIX_BASE_URL` | For push | LeanIX instance URL |
+| `ENRICH_MODEL` | No (default: `claude-sonnet-4-6`) | Claude model ID |
+| `ENRICH_BATCH_SIZE` | No (default: `10`) | Requirements per batch |
+| `ENRICH_MAX_RETRIES` | No (default: `3`) | Retries on API error |
+| `LOG_LEVEL` | No (default: `INFO`) | Python logging level |
 
 ---
 
-## Input format
+## Architecture
 
-The pipeline auto-detects the structure of the input file. It looks for:
-
-- **ID column** — a header cell matching `id`, `req`, `n°`, `num`, `code`, or `ref` (case-insensitive)
-- **Description column** — a header matching `description`, `requirement`, `title`, `detail`, or `name`
-- **Area column** (optional) — a header matching `area`, `module`, `domain`, or `process`
-
-The header row is detected automatically (first row with ≥ 2 non-null string cells).
-
-For PDFs, the pipeline extracts the first table from each page using `pdfplumber`.
+```
+archimedes-ai/
+├── run.py                      # CLI orchestrator (pipeline / enrich / push)
+├── pipeline/
+│   ├── catalog.py              # Step 0 — RBA/RSA version check
+│   ├── footprint.py            # Step 1 — Baseline AS-IS from OnPrem/Cloud Excel
+│   ├── extract.py              # Step 2 — parse requirements Excel
+│   ├── enrich.py               # Step 2 — Claude API enrichment with catalog subsetting
+│   ├── validate.py             # Step 2 — quality gate
+│   ├── write.py                # Step 4 — Excel + LeanIX output + GraphQL push
+│   ├── pdf_extract.py          # Step 2 — PDF → fact sheets via Claude API
+│   └── image_extract.py        # Step 3 — diagrams → fact sheets via Claude Vision
+├── knowledge/
+│   ├── sap_rba_catalog.json    # 756 BCs, 22 domains (v2026-05)
+│   ├── sap_rsa_catalog.json    # 324 SAP products (v2026-05)
+│   └── prompt_template.txt     # Enrichment prompt template
+├── archimedes_wizard.py        # Web wizard UI (guided pipeline)
+├── archimedes_chat.py          # Conversational interface for enriched data
+└── output/
+    └── <client>/               # All outputs per client engagement
+```
 
 ---
 
-## Output format
+## Key design decisions
 
-### `output/reqs_raw.json`
-
-```json
-[
-  {"id": "REQ_001", "description": "...", "area": "MM"},
-  ...
-]
-```
-
-### `output/reqs_enriched.json`
-
-```json
-[
-  {
-    "id": "REQ_001",
-    "module": "SAP S/4HANA – MM",
-    "bcs": ["Operational Procurement", "Procurement Contract Management"],
-    "rsa": "SAP S/4HANA",
-    "coverage": "Total",
-    "dev": "No",
-    "dev_exp": "",
-    "ext_apps": "",
-    "licensing": "Básico",
-    "comment": "..."
-  },
-  ...
-]
-```
-
-### `output/validation_report.json`
-
-```json
-{
-  "total": 42,
-  "passed": 40,
-  "failed": 2,
-  "errors": {
-    "REQ_007": ["REQ_007: comment missing Fiori app ID (e.g. '(F0842A)')"],
-    "REQ_019": ["REQ_019: rsa 'Ariba' not in RSA catalog. Valid values: [...]"]
-  }
-}
-```
-
-### `output/<name>_enriched.xlsx`
-
-Original template with columns H–P filled in:
-
-| Col | Field |
-|---|---|
-| H | coverage |
-| I | module |
-| J | dev |
-| K | dev_exp |
-| L | ext_apps |
-| M | licensing |
-| N | comment |
-| O | Business Capabilities (full RBA paths) |
-| P | RSA application |
+- **Catalog subsetting**: before enrichment, a pre-scan call identifies relevant RBA L1 domains. Only BCs from those domains are sent in each enrichment prompt — reducing catalog tokens by ~70-80%.
+- **Checkpoint/resume**: enrichment writes a checkpoint every 10 requirements. If the run is interrupted, the next execution resumes from where it left off instead of starting over.
+- **Supplementary merge**: fact sheets extracted from PDFs and images are automatically merged into the final `target_leanix.xlsx` — no manual copy-paste needed.
+- **Idempotent LeanIX push**: Applications, Business Capabilities, and Initiatives all use upsert logic — re-running the pipeline against the same workspace updates existing fact sheets instead of creating duplicates.
+- **Client name sanitization**: `--client` values are sanitized before use in file paths to prevent path traversal.
 
 ---
 
-## Knowledge base
+## Proven results — Acciona
 
-The `knowledge/` directory contains the SAP reference catalogs:
+| Phase | Metric | Result |
+|---|---|---|
+| Baseline AS-IS | Total applications | 37 apps |
+| Baseline AS-IS | On-Premise | 14 apps (`Baseline;OnPremise`) |
+| Baseline AS-IS | Cloud | 23 apps (`Baseline;Cloud`) |
+| Requirements | Rows analyzed | 462 rows |
+| Target TO-BE | SAP applications | 7 canonical RSA apps |
+| Target TO-BE | Business Capabilities | 20 leaf BCs with parent hierarchy |
+| Target TO-BE | Initiatives | 9 (grouped by process) |
+| Target TO-BE | IT Components | 8 ITCs |
 
-- **`sap_rba_catalog.json`** — SAP Reference Business Architecture. Used for BC name lookup and validation.
-- **`sap_rsa_catalog.json`** — SAP Reference Solution Architecture. Defines valid RSA application names.
-- **`prompt_template.txt`** — Master prompt sent to Claude. See [`docs/prompt_design.md`](docs/prompt_design.md) for rationale.
+Time to populate LeanIX: **minutes**, vs. 2–3 days manual.
 
 ---
 
@@ -198,38 +139,11 @@ The `knowledge/` directory contains the SAP reference catalogs:
 pytest tests/ -v
 ```
 
-Tests cover the validation logic in `pipeline/validate.py`. See `tests/test_validate.py`.
-
 ---
 
-## Project structure
+## Input formats
 
-```
-archimedes-ai/
-├── run.py                    # CLI entry point
-├── requirements.txt
-├── .env.example
-├── pipeline/
-│   ├── extract.py            # Step 1 — parse Excel/PDF
-│   ├── enrich.py             # Step 2 — Claude API enrichment
-│   ├── validate.py           # Step 3 — quality gate
-│   └── write.py              # Step 4 — Excel + LeanIX output
-├── knowledge/
-│   ├── sap_rba_catalog.json
-│   ├── sap_rsa_catalog.json
-│   └── prompt_template.txt
-├── tests/
-│   └── test_validate.py
-└── docs/
-    ├── architecture.md
-    └── prompt_design.md
-```
-
----
-
-## Contributing
-
-1. Fork and create a feature branch
-2. Run `pytest tests/` before submitting a PR
-3. Keep prompt changes documented in `docs/prompt_design.md`
-4. Do not commit `.env`, client data, or files under `output/` or `input_samples/`
+- **OnPrem/Cloud Systems Excel**: any Excel with application names and hosting info
+- **Requirements Excel**: any Excel with ID + description columns (auto-detected)
+- **PDF**: proposals, RFPs, architecture reports — Claude extracts fact sheets
+- **Images**: PNG/JPG architecture diagrams — Claude Vision extracts apps and IT components

@@ -73,10 +73,13 @@ def _setup_logging(level: str) -> None:
 def cmd_pipeline(args: argparse.Namespace) -> None:
     """Interactive 5-step LeanIX pipeline."""
     import json
+    import re
     import anthropic as _anthropic
 
     logger = logging.getLogger("archimedes")
-    client_name = args.client
+    client_name = re.sub(r"[^\w\-]", "_", args.client)  # strip path separators
+    if client_name != args.client:
+        logger.warning("Client name sanitized: '%s' → '%s'", args.client, client_name)
     output_dir  = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -230,31 +233,37 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
     out_target    = None
     out_supp      = None
 
-    if req_enriched_xlsx:
-        # Already-enriched Excel from map_requirements.py → generate LeanIX target directly
-        out_enriched = req_enriched_xlsx
-        out_target   = output_dir / f"{client_name}_target_leanix.xlsx"
-        write_leanix_excel_from_xlsx(req_enriched_xlsx, out_target, client_name)
-        print(f"\n  ✓ [1] Requerimientos enriquecidos (cliente):  {out_enriched}")
-        print(f"  ✓ [2] Target LeanIX importable (TO-BE):       {out_target}")
-    elif target_json_path and req_excel_path:
-        out_enriched, out_target = write(
-            target_json_path, req_excel_path, output_dir, client_name=client_name,
-        )
-        print(f"\n  ✓ [1] Requerimientos enriquecidos (cliente):  {out_enriched}")
-        print(f"  ✓ [2] Target LeanIX importable (TO-BE):       {out_target}")
-
-    # PDF + imágenes → JSON suplementario
+    # Assemble supplementary dict from PDF + images (populated in steps 2-3)
     supplementary = {}
     if pdf_factsheets:
         supplementary["from_pdf"] = pdf_factsheets
     if image_factsheets:
         supplementary["from_images"] = image_factsheets
+
+    if req_enriched_xlsx:
+        # Already-enriched Excel from map_requirements.py → generate LeanIX target directly
+        out_enriched = req_enriched_xlsx
+        out_target   = output_dir / f"{client_name}_target_leanix.xlsx"
+        write_leanix_excel_from_xlsx(req_enriched_xlsx, out_target, client_name, supplementary=supplementary or None)
+        print(f"\n  ✓ [1] Requerimientos enriquecidos (cliente):  {out_enriched}")
+        print(f"  ✓ [2] Target LeanIX importable (TO-BE):       {out_target}")
+    elif target_json_path and req_excel_path:
+        out_enriched, out_target = write(
+            target_json_path, req_excel_path, output_dir, client_name=client_name,
+            supplementary=supplementary or None,
+        )
+        print(f"\n  ✓ [1] Requerimientos enriquecidos (cliente):  {out_enriched}")
+        print(f"  ✓ [2] Target LeanIX importable (TO-BE):       {out_target}")
+
+    # Also save supplementary JSON as backup reference
     if supplementary:
         out_supp = output_dir / f"{client_name}_supplementary_factsheets.json"
         out_supp.write_text(json.dumps(supplementary, ensure_ascii=False, indent=2))
         print(f"  ✓ [3] Fact sheets adicionales (PDF+imágenes): {out_supp}")
-        print(f"      → Revisa y completa manualmente antes de importar en LeanIX.")
+        if out_target:
+            print(f"      → Ya incluidos en {out_target.name}")
+        else:
+            print(f"      → Revisa y completa manualmente antes de importar en LeanIX.")
 
     if not (target_json_path or pdf_factsheets or image_factsheets):
         print("  → Sin datos Target. Paso omitido.")

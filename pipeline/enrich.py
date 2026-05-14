@@ -32,12 +32,17 @@ RETRY_DELAY   = 5  # seconds between retries
 
 # ── Load knowledge base ───────────────────────────────────────────────────────
 
-def _load_knowledge() -> tuple[str, str, str]:
-    """Return (prompt_template, rba_catalog_str, rsa_catalog_str)."""
+def _load_knowledge() -> tuple[str, dict, str, str]:
+    """Return (prompt_template, rba_full_index, rba_catalog_str, rsa_catalog_str).
+
+    rba_full_index: the complete short_name_index dict (used for domain pre-scan).
+    rba_catalog_str: full catalog serialized as JSON string (fallback).
+    """
     template = (KNOWLEDGE_DIR / "prompt_template.txt").read_text()
 
     rba = json.loads((KNOWLEDGE_DIR / "sap_rba_catalog.json").read_text())
-    rba_str = json.dumps(rba["short_name_index"], ensure_ascii=False, indent=2)
+    rba_full_index: dict[str, str] = rba["short_name_index"]
+    rba_str = json.dumps(rba_full_index, ensure_ascii=False, indent=2)
 
     rsa = json.loads((KNOWLEDGE_DIR / "sap_rsa_catalog.json").read_text())
     rsa_str = "\n".join(
@@ -45,7 +50,78 @@ def _load_knowledge() -> tuple[str, str, str]:
         for a in rsa["applications"]
     )
 
-    return template, rba_str, rsa_str
+    return template, rba_full_index, rba_str, rsa_str
+
+
+def _subset_rba(
+    reqs: list[dict],
+    rba_full_index: dict[str, str],
+    client: anthropic.Anthropic,
+) -> str:
+    """Pre-scan all requirements with one Claude call to identify relevant RBA L1 domains,
+    then return a filtered catalog string containing only BCs from those domains.
+
+    Falls back to the full catalog if the pre-scan fails.
+    """
+    all_domains = sorted({v.split(" / ")[0] for v in rba_full_index.values()})
+
+    # Build a compact summary of all requirements for the pre-scan prompt
+    req_summary = "\n".join(
+        f"- [{r['id']}] {r.get('area', '')} | {r['description'][:120]}"
+        for r in reqs
+    )
+
+    prescan_prompt = f"""You are an SAP Enterprise Architect.
+Below is a list of {len(reqs)} client requirements. Identify which SAP RBA L1 domains are relevant.
+
+Available L1 domains:
+{chr(10).join(f'- {d}' for d in all_domains)}
+
+Requirements:
+{req_summary}
+
+Respond with a JSON array of relevant domain names (exact spelling), e.g.:
+["Finance", "Supply Chain Planning", "Human Resources"]
+Include a domain if ANY requirement could map to a BC within it. When in doubt, include it.
+Return ONLY the JSON array, no explanation."""
+
+    try:
+        message = client.messages.create(
+            model=MODEL,
+            max_tokens=256,
+            messages=[{"role": "user", "content": prescan_prompt}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        relevant_domains: list[str] = json.loads(raw)
+        # Validate against known domains
+        relevant_domains = [d for d in relevant_domains if d in all_domains]
+        if not relevant_domains:
+            raise ValueError("No valid domains returned")
+        logger.info(
+            "Catalog pre-scan: %d/%d domains selected — %s",
+            len(relevant_domains), len(all_domains), relevant_domains,
+        )
+    except Exception as exc:
+        logger.warning("Catalog pre-scan failed (%s) — using full RBA catalog", exc)
+        return json.dumps(rba_full_index, ensure_ascii=False, indent=2)
+
+    # Filter index to only BCs whose L1 domain is in the relevant set
+    filtered = {
+        short: full_path
+        for short, full_path in rba_full_index.items()
+        if full_path.split(" / ")[0] in relevant_domains
+    }
+    logger.info(
+        "RBA catalog subset: %d → %d BCs (%.0f%% reduction)",
+        len(rba_full_index), len(filtered),
+        100 * (1 - len(filtered) / len(rba_full_index)),
+    )
+    return json.dumps(filtered, ensure_ascii=False, indent=2)
 
 
 # ── Prompt building ───────────────────────────────────────────────────────────
@@ -138,20 +214,42 @@ def enrich(
     logger.info("Enriching %d requirements with model %s …", len(reqs), MODEL)
 
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    template, rba_str, rsa_str = _load_knowledge()
+    template, rba_full_index, rba_str_full, rsa_str = _load_knowledge()
+
+    # Pre-scan: select relevant RBA domains to reduce prompt tokens
+    rba_str = _subset_rba(reqs, rba_full_index, client) if len(reqs) >= 5 else rba_str_full
+
+    # ── Resume from checkpoint if available ───────────────────────────────────
+    checkpoint_path = output_dir / f"{raw_path.stem}_checkpoint.json"
+    already_done: dict[str, dict] = {}
+    if checkpoint_path.exists():
+        try:
+            saved = json.loads(checkpoint_path.read_text())
+            already_done = {r["_source_id"]: r for r in saved if "_source_id" in r}
+            logger.info("Resuming from checkpoint: %d/%d already enriched", len(already_done), len(reqs))
+        except Exception as exc:
+            logger.warning("Could not read checkpoint (%s) — starting fresh", exc)
 
     enriched: list[dict] = []
     errors: list[str] = []
 
     for i, req in enumerate(reqs, start=1):
+        # Skip requirements already in checkpoint
+        if req["id"] in already_done:
+            enriched.append(already_done[req["id"]])
+            logger.debug("[%d/%d] %s — from checkpoint", i, len(reqs), req["id"])
+            continue
+
         logger.info("[%d/%d] %s", i, len(reqs), req["id"])
         result = _enrich_one(client, req, template, rba_str, rsa_str)
         enriched.append(result)
         if "_error" in result:
             errors.append(req["id"])
 
-        # Brief pause every batch to respect rate limits
+        # Write checkpoint after every batch
         if i % BATCH_SIZE == 0:
+            checkpoint_path.write_text(json.dumps(enriched, ensure_ascii=False, indent=2))
+            logger.debug("Checkpoint saved (%d/%d)", i, len(reqs))
             time.sleep(1)
 
     out_path = output_dir / "reqs_enriched.json"
@@ -162,6 +260,11 @@ def enrich(
     )
     if errors:
         logger.warning("Failed IDs: %s", errors)
+
+    # Remove checkpoint on successful completion
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+        logger.debug("Checkpoint removed")
 
     return out_path
 

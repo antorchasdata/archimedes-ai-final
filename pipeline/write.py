@@ -333,6 +333,7 @@ def write_leanix_excel(
     bcs_index: dict[str, str],
     output_path: Path,
     client_name: str,
+    supplementary: dict | None = None,
 ) -> None:
     """
     Write a LeanIX-importable multi-sheet Excel with proper format:
@@ -346,6 +347,11 @@ def write_leanix_excel(
     Row 1: technical keys (colored headers)
     Row 2: human-readable translations
     Row 3+: data rows
+
+    supplementary: optional dict from pdf_extract / image_extract containing
+      keys "from_pdf" and/or "from_images", each with lists "applications",
+      "business_capabilities", "initiatives", "it_components". These are merged
+      into the respective sheets (deduplicated by name).
     """
     import openpyxl
 
@@ -423,6 +429,54 @@ def write_leanix_excel(
             if itc_name not in seen_itcs:
                 seen_itcs[itc_name] = hosting
 
+    # ── Merge supplementary fact sheets (from PDF / images) ───────────────────
+    supp_initiatives: list[dict] = []
+    if supplementary:
+        for source_key in ("from_pdf", "from_images"):
+            source = supplementary.get(source_key, {})
+            if not source:
+                continue
+
+            for app in source.get("applications", []):
+                name = (app.get("name") or "").strip()
+                if name and name not in seen_apps:
+                    seen_apps[name] = {
+                        "name":      name,
+                        "lifecycle": "plan",
+                        "bcs":       set(),
+                        "itcs":      set(),
+                    }
+
+            for bc in source.get("business_capabilities", []):
+                name = (bc.get("name") or "").strip()
+                if name and name not in seen_bcs:
+                    seen_bcs[name] = bc.get("path") or name
+
+            for itc in source.get("it_components", []):
+                name = (itc.get("name") or "").strip()
+                if name and name not in seen_itcs:
+                    seen_itcs[name] = itc.get("hosting_type") or "onPremise"
+
+            for init in source.get("initiatives", []):
+                name = (init.get("name") or "").strip()
+                if name:
+                    supp_initiatives.append({
+                        "name":      name,
+                        "description": (init.get("description") or f"Derived from {source_key}. Client: {client_name}.")[:2000],
+                        "lifecycle": init.get("lifecycle_phase") or "plan",
+                        "app":       init.get("relInitiativeToApplication") or "",
+                        "bcs":       init.get("relInitiativeToBusinessCapability") or "",
+                    })
+
+        if supplementary:
+            logger.info(
+                "Supplementary merged: +%d apps, +%d BCs, +%d ITCs, +%d initiatives",
+                sum(len(supplementary.get(k, {}).get("applications", [])) for k in ("from_pdf", "from_images")),
+                sum(len(supplementary.get(k, {}).get("business_capabilities", [])) for k in ("from_pdf", "from_images")),
+                sum(len(supplementary.get(k, {}).get("it_components", [])) for k in ("from_pdf", "from_images")),
+                len(supp_initiatives),
+            )
+
     tags = f"Target;{client_name}"
     wb = openpyxl.Workbook()
 
@@ -471,7 +525,7 @@ def write_leanix_excel(
     _sheet_header(ws_init, _COLS_INITIATIVE)
     keys_init = [c[0] for c in _COLS_INITIATIVE]
 
-    for row_idx, init in enumerate(initiatives, start=3):
+    for row_idx, init in enumerate(initiatives + supp_initiatives, start=3):
         vals = {
             "id": "", "type": "Initiative", "name": init["name"],
             "description": init["description"],
@@ -520,7 +574,7 @@ def write_leanix_excel(
         (f"Applications: {len(seen_apps)}", False, "223548", 9),
         (f"Business Capabilities: {len(seen_bcs)}", False, "223548", 9),
         (f"IT Components: {len(seen_itcs)}", False, "223548", 9),
-        (f"Initiatives: {len(initiatives)}", False, "223548", 9),
+        (f"Initiatives: {len(initiatives) + len(supp_initiatives)}", False, "223548", 9),
     ]
     for r_idx, (text, bold, color, size) in enumerate(readme_rows, start=1):
         c = readme.cell(row=r_idx, column=1, value=text)
@@ -739,19 +793,21 @@ def write_leanix(
             _tag_fs(app_id, tag_id)
         logger.debug("LeanIX App %s '%s'", "created" if created else "found", name)
 
-    # 3. Create Initiatives + relations
+    # 3. Upsert Initiatives + relations
     pushed = failed = 0
     for row in init_rows:
         req_id = str(row.get("id", "")).strip()
         if not req_id:
             continue
         try:
-            initiative_id = _create_fs(
+            init_name = str(row.get("name", req_id)).strip()
+            initiative_id, created = _upsert(
                 "Initiative",
-                str(row.get("name", req_id)).strip(),
+                init_name,
                 desc=str(row.get("description", "")),
             )
-            _tag_fs(initiative_id, tag_id)
+            if created:
+                _tag_fs(initiative_id, tag_id)
             _set_lifecycle(initiative_id, str(row.get("lifecycle", "plan")).strip())
 
             # Link → BCs
@@ -767,7 +823,7 @@ def write_leanix(
                 _create_relation(initiative_id, app_id_cache[rsa_name],
                                  "relInitiativeToApplication")
 
-            logger.info("LeanIX: pushed %s", req_id)
+            logger.info("LeanIX: %s initiative '%s'", "created" if created else "updated", init_name)
             pushed += 1
 
         except Exception as exc:
@@ -785,6 +841,7 @@ def write_leanix_excel_from_xlsx(
     client_name: str,
     header_row: int = 8,
     data_start_row: int = 9,
+    supplementary: dict | None = None,
 ) -> None:
     """
     Generate a LeanIX-importable Excel directly from an enriched Requerimientos Excel
@@ -884,7 +941,7 @@ def write_leanix_excel_from_xlsx(
             "module":   row["module"],
         })
 
-    write_leanix_excel(enriched_compat, bcs_index_full, output_path, client_name)
+    write_leanix_excel(enriched_compat, bcs_index_full, output_path, client_name, supplementary=supplementary)
 
 
 def write(
@@ -892,6 +949,7 @@ def write(
     template_path: str | Path,
     output_dir: str | Path = "output",
     client_name: str = "unknown",
+    supplementary: dict | None = None,
 ) -> tuple[Path, Path]:
     """
     Run the write step:
@@ -912,7 +970,7 @@ def write(
     out_target = output_dir / f"{client_name}_target_leanix.xlsx"
 
     write_excel(enriched, template_path, out_excel, bcs_index)
-    write_leanix_excel(enriched, bcs_index, out_target, client_name)
+    write_leanix_excel(enriched, bcs_index, out_target, client_name, supplementary=supplementary)
 
     return out_excel, out_target
 
