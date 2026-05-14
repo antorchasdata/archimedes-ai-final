@@ -8,6 +8,7 @@ Endpoints:
   GET  /api/session/{id}/catalog          → catalog status (Step 1)
   POST /api/session/{id}/baseline         → baseline generation (Step 2)
   POST /api/session/{id}/requirements     → requirements Excel (Step 3)
+  POST /api/session/{id}/contrast         → SAP Help Portal contrast (Step 3b, optional)
   POST /api/session/{id}/pdf              → PDF extraction (Step 4)
   POST /api/session/{id}/images           → image extraction (Step 5)
   POST /api/session/{id}/generate         → generate LeanIX outputs (Step 6)
@@ -54,6 +55,7 @@ from pipeline.validate      import validate
 from pipeline.write         import write, write_leanix_excel_from_xlsx, push_leanix
 from pipeline.pdf_extract   import extract_pdf_factsheets
 from pipeline.image_extract import extract_image_factsheets
+from pipeline.help_contrast import run_contrast, print_contrast_summary
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
@@ -272,6 +274,41 @@ async def run_requirements(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# ── Step 3b — SAP Help Portal Contrast (optional) ────────────────────────────
+
+@app.post("/api/session/{session_id}/contrast")
+async def run_help_contrast(session_id: str):
+    sess = _session(session_id)
+
+    target_json = sess.get("target_json_path")
+    if not target_json:
+        return {"ok": True, "skipped": True, "reason": "No enriched requirements available"}
+
+    out_dir = sess["output_dir"]
+
+    try:
+        report_path = await asyncio.to_thread(run_contrast, target_json, out_dir)
+        sess["out_contrast"] = report_path
+
+        report = json.loads(report_path.read_text())
+        validated   = sum(1 for r in report if r["validated"])
+        unvalidated = sum(1 for r in report if not r["validated"] and r["rsa_product"])
+        skipped     = sum(1 for r in report if not r["rsa_product"])
+
+        return {
+            "ok":           True,
+            "skipped":      False,
+            "n_total":      len(report),
+            "n_validated":  validated,
+            "n_unvalidated": unvalidated,
+            "n_skipped":    skipped,
+            "download_url": f"/api/session/{session_id}/download/contrast",
+        }
+    except Exception as exc:
+        logger.exception("SAP Help contrast error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # ── Step 4 — PDF ──────────────────────────────────────────────────────────────
 
 @app.post("/api/session/{session_id}/pdf")
@@ -486,6 +523,7 @@ _DOWNLOAD_KEYS = {
     "baseline":      "out_baseline",
     "target":        "out_target",
     "supplementary": "out_supplementary",
+    "contrast":      "out_contrast",
 }
 
 @app.get("/api/session/{session_id}/download/{key}")

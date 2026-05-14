@@ -9,6 +9,7 @@ Commands:
      Step 0: Catalog version check (RBA/RSA) with optional update
      Step 1: Baseline AS-IS from OnPrem/Cloud Systems Excel files
      Step 2: Target TO-BE from requirements Excel and/or PDF
+              + optional SAP Help Portal contrast (help.sap.com)
      Step 3: Architecture diagrams/images (optional)
      Step 4: Generate LeanIX import Excel files
 
@@ -60,6 +61,7 @@ from pipeline.catalog  import check_catalogs      # noqa: E402
 from pipeline.footprint import generate_baseline  # noqa: E402
 from pipeline.pdf_extract import extract_pdf_factsheets   # noqa: E402
 from pipeline.image_extract import extract_image_factsheets  # noqa: E402
+from pipeline.help_contrast import run_contrast, print_contrast_summary  # noqa: E402
 
 
 def _setup_logging(level: str) -> None:
@@ -176,6 +178,17 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
                 if not ok:
                     print(f"  ⚠  Validación con errores. Revisa {output_dir}/validation_report.json")
             target_json_path = enriched_path
+
+    # ── Contraste SAP Help Portal (opcional) ──────────────────────────────────
+    help_contrast_path = None
+    if target_json_path:
+        contrast_answer = input("  ¿Contrastar el mapeo RSA con SAP Help Portal (help.sap.com)? [s/N]: ").strip().lower()
+        if contrast_answer in ("s", "si", "sí", "y", "yes"):
+            print("  → Consultando SAP Help Portal para validar productos RSA …")
+            help_contrast_path = run_contrast(target_json_path, output_dir)
+            print_contrast_summary(help_contrast_path)
+        else:
+            print("  → Contraste SAP Help Portal omitido.")
 
     # PDF additional info
     pdf_factsheets: dict = {}
@@ -316,6 +329,8 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
         print(f"  [3] Target LeanIX importable:    {out_target}")
     if out_supp:
         print(f"  [4] Fact sheets adicionales:     {out_supp}")
+    if help_contrast_path:
+        print(f"  [5] Contraste SAP Help Portal:   {help_contrast_path}")
     print("═" * 60 + "\n")
 
 

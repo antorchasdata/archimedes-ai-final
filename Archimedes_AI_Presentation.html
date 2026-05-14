@@ -739,12 +739,12 @@
   }
 
   /* ── Q&A ─────────────────────────────────────────────────────── */
-  #s19 {
+  #s20 {
     background: var(--sap-blue);
     align-items: center;
     justify-content: center;
   }
-  #s19::before {
+  #s20::before {
     content: '';
     position: absolute; inset: 0;
     background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80');
@@ -907,7 +907,7 @@
       <div class="agenda-list">
         <div class="agenda-item"><span class="agenda-num">01</span>The challenge <span class="agenda-dash">—</span> manual LeanIX population</div>
         <div class="agenda-item"><span class="agenda-num">02</span>What is Archimedes AI</div>
-        <div class="agenda-item"><span class="agenda-num">03</span>How it works <span class="agenda-dash">—</span> 5-step pipeline</div>
+        <div class="agenda-item"><span class="agenda-num">03</span>How it works <span class="agenda-dash">—</span> 5-step pipeline + SAP Help contrast</div>
         <div class="agenda-item"><span class="agenda-num">04</span>Real case <span class="agenda-dash">—</span> Acciona</div>
         <div class="agenda-item"><span class="agenda-num">05</span>Value for the Advisory Architect</div>
         <div class="agenda-item"><span class="agenda-num">06</span>Getting started</div>
@@ -1096,8 +1096,39 @@
     </div>
   </div>
 
-  <!-- SLIDE 11 — DIVIDER: Acciona -->
-  <div class="slide slide-divider" id="s11">
+  <!-- SLIDE 11 — SAP Help Portal Contrast -->
+  <div class="slide" id="s11">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">How it works</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">SAP Help Portal <span class="accent">Contrast</span></div>
+      <div class="two-col" style="gap:32px;margin-top:28px">
+        <div class="info-box">
+          <div class="info-box-title">What it does</div>
+          <ul class="bullet-list">
+            <li>After enrichment, optionally validates each RSA product mapping against <strong>help.sap.com</strong></li>
+            <li>Searches official SAP documentation for each requirement's assigned product</li>
+            <li>Flags mappings with no direct documentation confirmation</li>
+            <li>Generates a <code class="mono">help_contrast_report.json</code> with per-requirement results</li>
+          </ul>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">How to use</div>
+          <ul class="bullet-list">
+            <li><strong>CLI:</strong> prompted automatically after Step 2 enrichment — answer <code class="mono">s</code> to activate</li>
+            <li><strong>Wizard:</strong> checkbox appears after requirements are processed</li>
+            <li>Completely optional — pipeline continues either way</li>
+            <li>Results: <span style="color:#0a6e3f">✓ Validated</span> · <span style="color:#c97a00">⚠ Review</span> · — No RSA assigned</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 12 — DIVIDER: Acciona -->
+  <div class="slide slide-divider" id="s13">
     <div class="slide-header dark">
       <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Section 04</div>
@@ -1112,7 +1143,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SLIDE 12 — ACCIONA METRICS
   ══════════════════════════════════════════════════════════════ -->
-  <div class="slide" id="s12">
+  <div class="slide" id="s13">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Real Case — Acciona</div>
@@ -1141,7 +1172,7 @@
   </div>
 
   <!-- SLIDE 13 — ACCIONA NARRATIVE -->
-  <div class="slide" id="s13">
+  <div class="slide" id="s14">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Real Case — Acciona</div>
@@ -1162,7 +1193,7 @@
   </div>
 
   <!-- SLIDE 14 — DIVIDER: Value -->
-  <div class="slide slide-divider" id="s14">
+  <div class="slide slide-divider" id="s15">
     <div class="slide-header dark">
       <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Section 05</div>
@@ -1177,7 +1208,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SLIDE 15 — COMPARISON TABLE
   ══════════════════════════════════════════════════════════════ -->
-  <div class="slide" id="s15">
+  <div class="slide" id="s16">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Value for Advisory Architects</div>
@@ -1206,7 +1237,7 @@
   </div>
 
   <!-- SLIDE 16 — BEFORE / AFTER -->
-  <div class="slide" id="s16">
+  <div class="slide" id="s17">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Value for Advisory Architects</div>
@@ -1245,7 +1276,7 @@
   </div>
 
   <!-- SLIDE 17 — DIVIDER: Getting Started -->
-  <div class="slide slide-divider" id="s17">
+  <div class="slide slide-divider" id="s18">
     <div class="slide-header dark">
       <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Section 06</div>
@@ -1260,7 +1291,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SLIDE 18 — HOW TO RUN
   ══════════════════════════════════════════════════════════════ -->
-  <div class="slide" id="s18">
+  <div class="slide" id="s19">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Getting Started</div>
@@ -1310,7 +1341,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SLIDE 19 — Q&A
   ══════════════════════════════════════════════════════════════ -->
-  <div class="slide" id="s19">
+  <div class="slide" id="s20">
     <div class="slide-header dark">
       <div class="logo-mark light"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">Archimedes AI</div>
@@ -1330,7 +1361,7 @@
 <!-- Navigation -->
 <div id="nav">
   <button class="nav-btn" id="btn-prev" title="Previous (←)">&#8592;</button>
-  <div id="slide-counter">1 / 19</div>
+  <div id="slide-counter">1 / 20</div>
   <button class="nav-btn" id="btn-next" title="Next (→)">&#8594;</button>
 </div>
 
@@ -1352,7 +1383,7 @@
     // Progress bar
     document.getElementById('progress-bar').style.width = `${((current + 1) / total) * 100}%`;
     // Nav button border colors matching slide bg
-    const isDark = slides[current].classList.contains('slide-divider') || slides[current].id === 's19';
+    const isDark = slides[current].classList.contains('slide-divider') || slides[current].id === 's20';
     document.querySelectorAll('.nav-btn').forEach(b => {
       b.style.borderColor = isDark ? 'rgba(255,255,255,0.5)' : 'var(--sap-blue)';
       b.style.color       = isDark ? 'rgba(255,255,255,0.8)' : 'var(--sap-blue)';
