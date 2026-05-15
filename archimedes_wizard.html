@@ -2122,7 +2122,8 @@ async function runKpiImport() {
   if (spinner) spinner.style.display = 'flex';
   if (rc) { rc.className = ''; rc.innerHTML = ''; }
   try {
-    const data = await apiFetch(`/api/session/${sessionId}/push-kpi`, {method: 'POST'});
+    const resp = await fetch(API + `/api/session/${sessionId}/push-kpi`, {method: 'POST'});
+    const data = await resp.json();
     if (spinner) spinner.style.display = 'none';
     if (!rc) return;
     if (data.ok) {
