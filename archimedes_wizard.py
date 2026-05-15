@@ -99,6 +99,12 @@ async def serve_wizard():
     return WIZARD_HTML.read_text(encoding="utf-8")
 
 
+@app.get("/cookie_monster.png")
+async def serve_cookie_monster():
+    p = BASE_DIR / "cookie_monster.png"
+    return FileResponse(path=str(p), media_type="image/png")
+
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/config")

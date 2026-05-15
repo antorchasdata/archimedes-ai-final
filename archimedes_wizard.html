@@ -395,16 +395,16 @@ input[type="file"] { display: none; }
 
 /* ── 🍪 KPI Easter Egg ──────────────────────────────────────── */
 .kpi-cookie-wrap {
-  position: absolute;
-  width: 38px; height: 38px;
+  position: fixed;
+  width: 60px; height: 60px;
   cursor: pointer;
-  z-index: 10;
+  z-index: 9999;
   user-select: none;
   transition: transform 0.15s ease;
 }
 .kpi-cookie-wrap:hover { transform: scale(1.15) rotate(-8deg); }
-.kpi-cookie-wrap img   { width: 100%; height: 100%; border-radius: 50%; opacity: 0.55; transition: opacity 0.2s; }
-.kpi-cookie-wrap:hover img { opacity: 0.9; }
+.kpi-cookie-wrap img   { width: 100%; height: 100%; border-radius: 50%; opacity: 0.5; transition: opacity 0.2s; object-fit: cover; }
+.kpi-cookie-wrap:hover img { opacity: 0.85; }
 .kpi-cookie-wrap.active img { opacity: 1; animation: cookiePulse 0.4s ease; }
 @keyframes cookiePulse {
   0%   { transform: scale(1); }
@@ -1941,13 +1941,13 @@ function renderStep7() {
 let _cookieClicks = 0;
 let _kpiUnlocked  = false;
 
-// Pick a random corner on each render (top-left, top-right, bottom-left, bottom-right)
+// Pick a random corner on each render (viewport corners, fixed positioning)
 function _cookieCornerStyle() {
   const corners = [
-    'top:14px;left:14px',
-    'top:14px;right:14px',
-    'bottom:14px;left:14px',
-    'bottom:14px;right:14px',
+    'top:16px;left:16px',
+    'top:16px;right:16px',
+    'bottom:16px;left:16px',
+    'bottom:16px;right:16px',
   ];
   return corners[Math.floor(Math.random() * corners.length)];
 }
@@ -1974,10 +1974,25 @@ function cookieClick() {
 
 function renderStep8() {
   const cornerStyle = _cookieCornerStyle();
+  // Cookie Monster is rendered outside any step-card, fixed to the viewport
+  const cookieHtml = `
+    <div class="kpi-cookie-wrap" id="cookie-wrap" style="${cornerStyle}" onclick="cookieClick()" title="">
+      <img src="/cookie_monster.png"
+           onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 60 60%22><circle cx=%2230%22 cy=%2230%22 r=%2230%22 fill=%22%230070F2%22/><text x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2232%22>🍪</text></svg>'">
+      <div class="kpi-cookie-badge ${_kpiUnlocked ? 'show' : ''}" id="cookie-badge">${_cookieClicks > 0 ? (_kpiUnlocked ? '🍪' : _cookieClicks) : ''}</div>
+    </div>`;
+
+  // Inject cookie outside step-card (appended to body after render)
+  requestAnimationFrame(() => {
+    const existing = document.getElementById('cookie-wrap');
+    if (!existing) {
+      document.body.insertAdjacentHTML('beforeend', cookieHtml);
+    }
+  });
 
   if (!leanixOk) {
     return `
-      <div style="position:relative">
+      <div>
         <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
         <h1 class="step-title">${t('s7_title')}</h1>
         <div class="result-card info show" style="margin-top:0;margin-bottom:0">
@@ -1988,10 +2003,25 @@ function renderStep8() {
             ${t('s7_order')}
           </div>
         </div>
-        <div class="kpi-cookie-wrap" id="cookie-wrap" style="${cornerStyle}" onclick="cookieClick()" title="">
-          <img src="https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Cookie_Monster_Sesame_Street.png/220px-Cookie_Monster_Sesame_Street.png"
-               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2220%22 fill=%22%230070F2%22/><text x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2222%22>🍪</text></svg>'">
-          <div class="kpi-cookie-badge ${_kpiUnlocked ? 'show' : ''}" id="cookie-badge">${_cookieClicks > 0 ? (_kpiUnlocked ? '🍪' : _cookieClicks) : ''}</div>
+        <!-- 🍪 KPI Achievement Panel (unlocked after 3 clicks on Cookie Monster) -->
+        <div id="kpi-panel" class="${_kpiUnlocked ? 'show' : ''}">
+          <div class="kpi-panel-header"><span>${t('kpi_panel_title')}</span></div>
+          <div class="kpi-panel-hint">${t('kpi_panel_hint')}</div>
+          <div class="kpi-stats">
+            <div class="kpi-stat"><strong>5</strong>Objectives</div>
+            <div class="kpi-stat"><strong>91</strong>BCs</div>
+            <div class="kpi-stat"><strong>100</strong>Apps</div>
+            <div class="kpi-stat"><strong>5</strong>Initiatives</div>
+          </div>
+          <label class="toggle-row" id="tr-kpi" onclick="toggleRow('tr-kpi')">
+            <input type="checkbox" id="chk-kpi">
+            <span class="tr-label">${t('kpi_chk')}</span>
+            <span class="tr-file">kpi_achievement_leanix.xlsx</span>
+          </label>
+          <div class="spinner-wrap" id="kpi-spinner">
+            <div class="spinner"></div><span class="spinner-text" id="kpi-spinner-text">${t('kpi_busy')}</span>
+          </div>
+          <div class="result-card" id="kpi-result"></div>
         </div>
       </div>
     `;
@@ -2001,7 +2031,7 @@ function renderStep8() {
   const hasTarget   = generateOutputs.some(o => o.key === 'target');
 
   return `
-    <div style="position:relative">
+    <div>
       <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
       <h1 class="step-title">${t('s7_title')}</h1>
       <p class="step-desc">${t('s7_desc')}</p>
@@ -2051,13 +2081,6 @@ function renderStep8() {
         <div class="spinner"></div><span class="spinner-text">${t('s7_busy')}</span>
       </div>
       <div class="result-card" id="step7-result"></div>
-
-      <!-- 🍪 Cookie Monster easter egg — random corner -->
-      <div class="kpi-cookie-wrap" id="cookie-wrap" style="${cornerStyle}" onclick="cookieClick()" title="">
-        <img src="https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Cookie_Monster_Sesame_Street.png/220px-Cookie_Monster_Sesame_Street.png"
-             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2220%22 fill=%22%230070F2%22/><text x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2222%22>🍪</text></svg>'">
-        <div class="kpi-cookie-badge ${_kpiUnlocked ? 'show' : ''}" id="cookie-badge">${_cookieClicks > 0 ? (_kpiUnlocked ? '🍪' : _cookieClicks) : ''}</div>
-      </div>
     </div>
   `;
 }
@@ -2171,6 +2194,11 @@ function showDone() {
 // ── Render step ───────────────────────────────────────────────────────────────
 function renderStep(n) {
   pendingImages = [];
+  // Remove Cookie Monster from viewport when leaving step 8
+  if (n !== 8) {
+    const cw = document.getElementById('cookie-wrap');
+    if (cw) cw.remove();
+  }
   const renderers = [renderStep0, renderStep1, renderStep2, renderStep3,
                      renderStep4, renderStep5, renderStep6, renderStep7, renderStep8];
   const html = renderers[n] ? renderers[n]() : '';
