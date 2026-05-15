@@ -1096,8 +1096,43 @@
     </div>
   </div>
 
-  <!-- SLIDE 11 — SAP Help Portal Contrast -->
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 11 — INDUSTRY REFERENCE ARCHITECTURE (NEW)
+  ══════════════════════════════════════════════════════════════ -->
   <div class="slide" id="s11">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">How it works</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Industry Reference Architecture — <span class="accent">Whitespace Analysis</span></div>
+      <div class="two-col" style="gap:32px;margin-top:28px">
+        <div class="info-box">
+          <div class="info-box-title">What it does</div>
+          <ul class="bullet-list">
+            <li>Fetches SAP-recommended products for the client's industry from the <strong>SAP Business Accelerator Hub</strong> (public OData API)</li>
+            <li>Compares reference products against both <strong>Baseline</strong> and <strong>Target</strong> LeanIX Excels</li>
+            <li>Shows gaps (whitespace) as a checklist — products recommended by SAP not yet covered</li>
+            <li>Adds selected products to the Target Excel with <code class="mono">tag="Target Reference"</code>, <code class="mono">lifecycle="plan"</code></li>
+            <li>Derives <strong>BC + ITC relations</strong> per product via Claude API and RBA catalog</li>
+          </ul>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">Wizard — Step 8</div>
+          <ul class="bullet-list">
+            <li>Industry selector: 21 SAP industries (EC&amp;O, Retail, Automotive, Utilities…)</li>
+            <li>Load button → fetches reference → shows gap list with checkboxes</li>
+            <li><em>Already covered</em> products (Baseline or Target) clearly marked</li>
+            <li>Select all / individual checkbox → Apply → products written to Target Excel</li>
+            <li>Import order preserved: BC → App (with relApplicationToBusinessCapability + relApplicationToITComponent)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 12 — SAP Help Portal Contrast -->
+  <div class="slide" id="s12">
     <div class="slide-header">
       <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
       <div class="slide-section-label">How it works</div>
@@ -1361,7 +1396,7 @@
 <!-- Navigation -->
 <div id="nav">
   <button class="nav-btn" id="btn-prev" title="Previous (←)">&#8592;</button>
-  <div id="slide-counter">1 / 20</div>
+  <div id="slide-counter">1 / 21</div>
   <button class="nav-btn" id="btn-next" title="Next (→)">&#8594;</button>
 </div>
 
