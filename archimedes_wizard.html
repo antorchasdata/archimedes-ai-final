@@ -2013,11 +2013,7 @@ function renderStep8() {
             <div class="kpi-stat"><strong>100</strong>Apps</div>
             <div class="kpi-stat"><strong>5</strong>Initiatives</div>
           </div>
-          <label class="toggle-row" id="tr-kpi" onclick="toggleRow('tr-kpi')">
-            <input type="checkbox" id="chk-kpi">
-            <span class="tr-label">${t('kpi_chk')}</span>
-            <span class="tr-file">kpi_achievement_leanix.xlsx</span>
-          </label>
+          <button class="btn-primary" onclick="runKpiImport()" style="margin-top:4px">${t('kpi_chk')}</button>
           <div class="spinner-wrap" id="kpi-spinner">
             <div class="spinner"></div><span class="spinner-text" id="kpi-spinner-text">${t('kpi_busy')}</span>
           </div>
@@ -2066,11 +2062,7 @@ function renderStep8() {
           <div class="kpi-stat"><strong>100</strong>Apps</div>
           <div class="kpi-stat"><strong>5</strong>Initiatives</div>
         </div>
-        <label class="toggle-row" id="tr-kpi" onclick="toggleRow('tr-kpi')">
-          <input type="checkbox" id="chk-kpi">
-          <span class="tr-label">${t('kpi_chk')}</span>
-          <span class="tr-file">kpi_achievement_leanix.xlsx</span>
-        </label>
+        <button class="btn-primary" onclick="runKpiImport()" style="margin-top:4px">${t('kpi_chk')}</button>
         <div class="spinner-wrap" id="kpi-spinner">
           <div class="spinner"></div><span class="spinner-text" id="kpi-spinner-text">${t('kpi_busy')}</span>
         </div>
@@ -2097,15 +2089,8 @@ async function runStepPush() {
 
   const pushBaseline = document.getElementById('chk-baseline')?.checked || false;
   const pushTarget   = document.getElementById('chk-target')?.checked   || false;
-  const pushKpi      = document.getElementById('chk-kpi')?.checked      || false;
 
-  if (!pushBaseline && !pushTarget && !pushKpi) throw new Error(t('s7_none'));
-
-  // KPI easter egg — runs independently with its own result panel
-  if (pushKpi) await runKpiImport();
-
-  // Bail early if only KPI was selected
-  if (!pushBaseline && !pushTarget) return;
+  if (!pushBaseline && !pushTarget) throw new Error(t('s7_none'));
 
   setBusy(true, t('s7_busy'));
   const data = await apiFetch(`/api/session/${sessionId}/push`, {
