@@ -793,6 +793,17 @@ def write_leanix(
         app_id_cache[name] = app_id
         if created:
             _tag_fs(app_id, tag_id)
+        # Set lifecycle if present
+        lc = row.get("lifecycle_phase") or row.get("lifecycle")
+        if lc:
+            _set_lifecycle(app_id, str(lc).strip())
+        # Link → BCs
+        bc_rel_raw = row.get("relApplicationToBusinessCapability") or ""
+        for bc_name in str(bc_rel_raw).split(","):
+            bc_name = bc_name.strip()
+            if bc_name and bc_name in bc_id_cache:
+                _create_relation(app_id, bc_id_cache[bc_name],
+                                 "relApplicationToBusinessCapability")
         logger.debug("LeanIX App %s '%s'", "created" if created else "found", name)
 
     # 3. Upsert Initiatives + relations
@@ -810,17 +821,26 @@ def write_leanix(
             )
             if created:
                 _tag_fs(initiative_id, tag_id)
-            _set_lifecycle(initiative_id, str(row.get("lifecycle", "plan")).strip())
 
-            # Link → BCs
-            for bc_name in str(row.get("bcs", "")).split(","):
+            # lifecycle — accept both column names
+            lifecycle_val = (
+                row.get("lifecycle_phase") or row.get("lifecycle") or "plan"
+            )
+            _set_lifecycle(initiative_id, str(lifecycle_val).strip())
+
+            # Link → BCs — accept both column names
+            bcs_raw = row.get("relInitiativeToBusinessCapability") or row.get("bcs") or ""
+            for bc_name in str(bcs_raw).split(","):
                 bc_name = bc_name.strip()
                 if bc_name and bc_name in bc_id_cache:
                     _create_relation(initiative_id, bc_id_cache[bc_name],
                                      "relInitiativeToBusinessCapability")
 
-            # Link → Application
-            rsa_name = str(row.get("rsa", "")).strip()
+            # Link → Application — accept both column names
+            rsa_name = (
+                row.get("relInitiativeToApplication") or row.get("rsa") or ""
+            )
+            rsa_name = str(rsa_name).strip()
             if rsa_name and rsa_name in app_id_cache:
                 _create_relation(initiative_id, app_id_cache[rsa_name],
                                  "relInitiativeToApplication")
