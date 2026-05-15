@@ -752,8 +752,13 @@ def write_leanix(
     wb = openpyxl.load_workbook(str(staging_path))
 
     def _sheet_rows(sheet_name: str) -> list[dict]:
-        # Accept both plural (Initiatives) and singular (Initiative) sheet names
-        name = sheet_name if sheet_name in wb.sheetnames else sheet_name.rstrip("s")
+        # Accept both plural (old format) and singular (new format) sheet names
+        _singular = {
+            "Initiatives": "Initiative",
+            "Applications": "Application",
+            "BusinessCapabilities": "BusinessCapability",
+        }
+        name = sheet_name if sheet_name in wb.sheetnames else _singular.get(sheet_name, sheet_name)
         ws     = wb[name]
         header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
         return [
