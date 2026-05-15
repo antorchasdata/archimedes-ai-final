@@ -393,6 +393,67 @@ input[type="file"] { display: none; }
 .toggle-row .tr-label { font-size: 13px; font-weight: 600; color: var(--grey-7); flex: 1; }
 .toggle-row .tr-file  { font-size: 11px; color: var(--grey-4); font-family: var(--mono); }
 
+/* ── 🍪 KPI Easter Egg ──────────────────────────────────────── */
+.kpi-cookie-wrap {
+  position: absolute;
+  width: 38px; height: 38px;
+  cursor: pointer;
+  z-index: 10;
+  user-select: none;
+  transition: transform 0.15s ease;
+}
+.kpi-cookie-wrap:hover { transform: scale(1.15) rotate(-8deg); }
+.kpi-cookie-wrap img   { width: 100%; height: 100%; border-radius: 50%; opacity: 0.55; transition: opacity 0.2s; }
+.kpi-cookie-wrap:hover img { opacity: 0.9; }
+.kpi-cookie-wrap.active img { opacity: 1; animation: cookiePulse 0.4s ease; }
+@keyframes cookiePulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.3) rotate(15deg); }
+  100% { transform: scale(1); }
+}
+.kpi-cookie-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--blue-7); color: #fff;
+  font-size: 9px; font-weight: 700;
+  border-radius: 50%; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+}
+.kpi-cookie-badge.show { opacity: 1; }
+
+#kpi-panel {
+  display: none;
+  margin-top: 20px;
+  border: 2px dashed var(--blue-7);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  background: var(--blue-1);
+  animation: fadeIn 0.3s ease;
+}
+#kpi-panel.show { display: block; }
+.kpi-panel-header {
+  font-size: 13px; font-weight: 700;
+  color: var(--blue-10);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.kpi-panel-hint {
+  font-size: 11px; color: var(--grey-5);
+  margin-bottom: 14px; line-height: 1.5;
+}
+.kpi-stats {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kpi-stat {
+  background: #fff; border: 1px solid var(--blue-2);
+  border-radius: 6px; padding: 6px 12px;
+  font-size: 11px; color: var(--grey-6);
+  text-align: center; min-width: 80px;
+}
+.kpi-stat strong { display: block; font-size: 18px; color: var(--blue-7); }
+
 /* ── Spinner ────────────────────────────────────────────────── */
 .spinner-wrap {
   display: none;
@@ -676,6 +737,14 @@ const LANGS = {
     s7_imported: (list) => `Files imported: ${list}`,
     s7_err: 'Errors during import',
     s7_none: 'Select at least one file to import',
+    kpi_panel_title: '🍪 KPI Achievement Mode',
+    kpi_panel_hint: 'Generates and imports fictional fact sheets to maximize EA Engagement Dashboard Best Practice Metrics. All tagged <code>KPI_Achievement</code> for easy exclusion.',
+    kpi_chk: 'Generate + Import KPI Achievement Excel',
+    kpi_busy: 'Generating KPI data and importing…',
+    kpi_ok: 'KPI Achievement imported successfully',
+    kpi_ok_hint: (s) => `Imported: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--mango-7)">⚠ Create ≥3 Transformations manually in LeanIX to complete KPI 5.</span>`,
+    kpi_err: 'Error importing KPI data',
+    kpi_warn: 'Transformations must be created manually in LeanIX after import.',
     // done
     done_title: 'Pipeline complete',
     done_sub: (n, client) => `${n} file${n !== 1 ? 's' : ''} generated for client <strong>${client}</strong>.<br>Download them from the previous step and import into LeanIX.`,
@@ -791,6 +860,14 @@ const LANGS = {
     s7_imported: (list) => `Ficheros importados: ${list}`,
     s7_err: 'Errores en la importación',
     s7_none: 'Selecciona al menos un fichero para importar',
+    kpi_panel_title: '🍪 Modo KPI Achievement',
+    kpi_panel_hint: 'Genera e importa fact sheets ficticias para maximizar las Best Practice Metrics del EA Engagement Dashboard. Todas etiquetadas <code>KPI_Achievement</code> para excluirlas fácilmente.',
+    kpi_chk: 'Generar + Importar Excel KPI Achievement',
+    kpi_busy: 'Generando datos KPI e importando…',
+    kpi_ok: 'KPI Achievement importado correctamente',
+    kpi_ok_hint: (s) => `Importado: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--mango-7)">⚠ Crea ≥3 Transformations manualmente en LeanIX para completar el KPI 5.</span>`,
+    kpi_err: 'Error al importar datos KPI',
+    kpi_warn: 'Las Transformations deben crearse manualmente en LeanIX tras el import.',
     done_title: 'Pipeline completado',
     done_sub: (n, client) => `Se han generado ${n} fichero${n !== 1 ? 's' : ''} para el cliente <strong>${client}</strong>.<br>Descárgalos desde el paso anterior e impórtalos en LeanIX.`,
     processing: 'Procesando…',
@@ -902,6 +979,14 @@ const LANGS = {
     s7_imported: (list) => `Fichiers importés : ${list}`,
     s7_err: 'Erreurs lors de l\'importation',
     s7_none: 'Sélectionnez au moins un fichier à importer',
+    kpi_panel_title: '🍪 Mode KPI Achievement',
+    kpi_panel_hint: 'Génère et importe des fiches fictives pour maximiser les Best Practice Metrics du tableau de bord EA. Toutes étiquetées <code>KPI_Achievement</code> pour exclusion facile.',
+    kpi_chk: 'Générer + Importer Excel KPI Achievement',
+    kpi_busy: 'Génération des données KPI et importation…',
+    kpi_ok: 'KPI Achievement importé avec succès',
+    kpi_ok_hint: (s) => `Importé : ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--mango-7)">⚠ Créez ≥3 Transformations manuellement dans LeanIX pour compléter le KPI 5.</span>`,
+    kpi_err: 'Erreur lors de l\'import des données KPI',
+    kpi_warn: 'Les Transformations doivent être créées manuellement dans LeanIX après l\'import.',
     done_title: 'Pipeline terminé',
     done_sub: (n, client) => `${n} fichier${n !== 1 ? 's' : ''} généré${n !== 1 ? 's' : ''} pour le client <strong>${client}</strong>.<br>Téléchargez-les depuis l'étape précédente et importez-les dans LeanIX.`,
     processing: 'Traitement…',
@@ -1012,6 +1097,14 @@ const LANGS = {
     s7_imported: (list) => `File importati: ${list}`,
     s7_err: 'Errori durante l\'importazione',
     s7_none: 'Seleziona almeno un file da importare',
+    kpi_panel_title: '🍪 Modalità KPI Achievement',
+    kpi_panel_hint: 'Genera e importa fact sheet fittizie per massimizzare le Best Practice Metrics della dashboard EA. Tutte taggate <code>KPI_Achievement</code> per facile esclusione.',
+    kpi_chk: 'Genera + Importa Excel KPI Achievement',
+    kpi_busy: 'Generazione dati KPI e importazione…',
+    kpi_ok: 'KPI Achievement importato con successo',
+    kpi_ok_hint: (s) => `Importato: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--mango-7)">⚠ Crea ≥3 Transformations manualmente in LeanIX per completare il KPI 5.</span>`,
+    kpi_err: 'Errore durante l\'importazione dei dati KPI',
+    kpi_warn: 'Le Transformations devono essere create manualmente in LeanIX dopo l\'importazione.',
     done_title: 'Pipeline completata',
     done_sub: (n, client) => `${n} file generato${n !== 1 ? '/i' : ''} per il cliente <strong>${client}</strong>.<br>Scaricali dal passo precedente e importali in LeanIX.`,
     processing: 'Elaborazione…',
@@ -1122,6 +1215,14 @@ const LANGS = {
     s7_imported: (list) => `Tuodut tiedostot: ${list}`,
     s7_err: 'Virheitä tuonnissa',
     s7_none: 'Valitse vähintään yksi tiedosto tuotavaksi',
+    kpi_panel_title: '🍪 KPI Achievement -tila',
+    kpi_panel_hint: 'Luo ja tuo kuvitteelliset tietolomakkeet EA-hallintapaneelin parhaiksi käytännöiksi. Kaikki merkitty <code>KPI_Achievement</code>-tagilla helppoa poissulkemista varten.',
+    kpi_chk: 'Luo + Tuo KPI Achievement Excel',
+    kpi_busy: 'Luodaan KPI-dataa ja tuodaan…',
+    kpi_ok: 'KPI Achievement tuotu onnistuneesti',
+    kpi_ok_hint: (s) => `Tuotu: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--mango-7)">⚠ Luo ≥3 Transformations manuaalisesti LeanIX:ssä KPI 5:n täydentämiseksi.</span>`,
+    kpi_err: 'Virhe KPI-datan tuonnissa',
+    kpi_warn: 'Transformations täytyy luoda manuaalisesti LeanIX:ssä tuonnin jälkeen.',
     done_title: 'Pipeline valmis',
     done_sub: (n, client) => `${n} tiedosto luotu asiakkaalle <strong>${client}</strong>.<br>Lataa ne edellisestä vaiheesta ja tuo LeanIX:ään.`,
     processing: 'Käsitellään…',
@@ -1835,17 +1936,62 @@ function renderStep7() {
 }
 
 // ── Step 8 — Import ──────────────────────────────────────────────────────────
+
+// 🍪 Easter egg state
+let _cookieClicks = 0;
+let _kpiUnlocked  = false;
+
+// Pick a random corner on each render (top-left, top-right, bottom-left, bottom-right)
+function _cookieCornerStyle() {
+  const corners = [
+    'top:14px;left:14px',
+    'top:14px;right:14px',
+    'bottom:14px;left:14px',
+    'bottom:14px;right:14px',
+  ];
+  return corners[Math.floor(Math.random() * corners.length)];
+}
+
+function cookieClick() {
+  _cookieClicks++;
+  const badge = document.getElementById('cookie-badge');
+  if (badge) {
+    badge.textContent = _cookieClicks < 3 ? _cookieClicks : '🍪';
+    badge.classList.add('show');
+  }
+  const wrap = document.getElementById('cookie-wrap');
+  if (wrap) wrap.classList.add('active');
+  setTimeout(() => wrap?.classList.remove('active'), 400);
+
+  if (_cookieClicks >= 3 && !_kpiUnlocked) {
+    _kpiUnlocked = true;
+    const panel = document.getElementById('kpi-panel');
+    if (panel) panel.classList.add('show');
+    if (wrap) wrap.style.opacity = '1';
+    if (badge) badge.textContent = '🍪';
+  }
+}
+
 function renderStep8() {
+  const cornerStyle = _cookieCornerStyle();
+
   if (!leanixOk) {
     return `
-      <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
-      <h1 class="step-title">${t('s7_title')}</h1>
-      <div class="result-card info show" style="margin-top:0;margin-bottom:0">
-        <div class="result-header">ℹ️ ${t('s7_no_creds')}</div>
-        <div class="result-summary">
-          ${t('s7_no_creds_hint')}<br><br>
-          ${t('s7_manual')}<br><br>
-          ${t('s7_order')}
+      <div style="position:relative">
+        <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
+        <h1 class="step-title">${t('s7_title')}</h1>
+        <div class="result-card info show" style="margin-top:0;margin-bottom:0">
+          <div class="result-header">ℹ️ ${t('s7_no_creds')}</div>
+          <div class="result-summary">
+            ${t('s7_no_creds_hint')}<br><br>
+            ${t('s7_manual')}<br><br>
+            ${t('s7_order')}
+          </div>
+        </div>
+        <div class="kpi-cookie-wrap" id="cookie-wrap" style="${cornerStyle}" onclick="cookieClick()" title="">
+          <img src="https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Cookie_Monster_Sesame_Street.png/220px-Cookie_Monster_Sesame_Street.png"
+               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2220%22 fill=%22%230070F2%22/><text x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2222%22>🍪</text></svg>'">
+          <div class="kpi-cookie-badge ${_kpiUnlocked ? 'show' : ''}" id="cookie-badge">${_cookieClicks > 0 ? (_kpiUnlocked ? '🍪' : _cookieClicks) : ''}</div>
         </div>
       </div>
     `;
@@ -1855,31 +2001,64 @@ function renderStep8() {
   const hasTarget   = generateOutputs.some(o => o.key === 'target');
 
   return `
-    <div class="step-eyebrow">${t('s7_eye', 8, STEPS.length)}</div>
-    <h1 class="step-title">${t('s7_title')}</h1>
-    <p class="step-desc">${t('s7_desc')}</p>
-    <div class="result-card warning show" style="margin-bottom:20px">
-      <div class="result-header">⚠ ${t('s7_warn')}</div>
-      <div class="result-summary">${t('s7_warn_hint')}</div>
+    <div style="position:relative">
+      <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
+      <h1 class="step-title">${t('s7_title')}</h1>
+      <p class="step-desc">${t('s7_desc')}</p>
+      <div class="result-card warning show" style="margin-bottom:20px">
+        <div class="result-header">⚠ ${t('s7_warn')}</div>
+        <div class="result-summary">${t('s7_warn_hint')}</div>
+      </div>
+      <div class="push-options">
+        ${hasBaseline ? `
+          <label class="toggle-row" id="tr-baseline" onclick="toggleRow('tr-baseline')">
+            <input type="checkbox" id="chk-baseline">
+            <span class="tr-label">${t('s7_chk_baseline')}</span>
+            <span class="tr-file">_baseline.xlsx</span>
+          </label>` : ''}
+        ${hasTarget ? `
+          <label class="toggle-row" id="tr-target" onclick="toggleRow('tr-target')">
+            <input type="checkbox" id="chk-target">
+            <span class="tr-label">${t('s7_chk_target')}</span>
+            <span class="tr-file">_target_leanix.xlsx</span>
+          </label>` : ''}
+      </div>
+
+      <!-- 🍪 KPI Achievement Panel (unlocked after 3 clicks on Cookie Monster) -->
+      <div id="kpi-panel" class="${_kpiUnlocked ? 'show' : ''}">
+        <div class="kpi-panel-header">
+          <span>${t('kpi_panel_title')}</span>
+        </div>
+        <div class="kpi-panel-hint">${t('kpi_panel_hint')}</div>
+        <div class="kpi-stats">
+          <div class="kpi-stat"><strong>5</strong>Objectives</div>
+          <div class="kpi-stat"><strong>91</strong>BCs</div>
+          <div class="kpi-stat"><strong>100</strong>Apps</div>
+          <div class="kpi-stat"><strong>5</strong>Initiatives</div>
+        </div>
+        <label class="toggle-row" id="tr-kpi" onclick="toggleRow('tr-kpi')">
+          <input type="checkbox" id="chk-kpi">
+          <span class="tr-label">${t('kpi_chk')}</span>
+          <span class="tr-file">kpi_achievement_leanix.xlsx</span>
+        </label>
+        <div class="spinner-wrap" id="kpi-spinner">
+          <div class="spinner"></div><span class="spinner-text" id="kpi-spinner-text">${t('kpi_busy')}</span>
+        </div>
+        <div class="result-card" id="kpi-result"></div>
+      </div>
+
+      <div class="spinner-wrap" id="step7-spinner">
+        <div class="spinner"></div><span class="spinner-text">${t('s7_busy')}</span>
+      </div>
+      <div class="result-card" id="step7-result"></div>
+
+      <!-- 🍪 Cookie Monster easter egg — random corner -->
+      <div class="kpi-cookie-wrap" id="cookie-wrap" style="${cornerStyle}" onclick="cookieClick()" title="">
+        <img src="https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Cookie_Monster_Sesame_Street.png/220px-Cookie_Monster_Sesame_Street.png"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2220%22 fill=%22%230070F2%22/><text x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2222%22>🍪</text></svg>'">
+        <div class="kpi-cookie-badge ${_kpiUnlocked ? 'show' : ''}" id="cookie-badge">${_cookieClicks > 0 ? (_kpiUnlocked ? '🍪' : _cookieClicks) : ''}</div>
+      </div>
     </div>
-    <div class="push-options">
-      ${hasBaseline ? `
-        <label class="toggle-row" id="tr-baseline" onclick="toggleRow('tr-baseline')">
-          <input type="checkbox" id="chk-baseline">
-          <span class="tr-label">${t('s7_chk_baseline')}</span>
-          <span class="tr-file">_baseline.xlsx</span>
-        </label>` : ''}
-      ${hasTarget ? `
-        <label class="toggle-row" id="tr-target" onclick="toggleRow('tr-target')">
-          <input type="checkbox" id="chk-target">
-          <span class="tr-label">${t('s7_chk_target')}</span>
-          <span class="tr-file">_target_leanix.xlsx</span>
-        </label>` : ''}
-    </div>
-    <div class="spinner-wrap" id="step7-spinner">
-      <div class="spinner"></div><span class="spinner-text">${t('s7_busy')}</span>
-    </div>
-    <div class="result-card" id="step7-result"></div>
   `;
 }
 
@@ -1895,7 +2074,15 @@ async function runStepPush() {
 
   const pushBaseline = document.getElementById('chk-baseline')?.checked || false;
   const pushTarget   = document.getElementById('chk-target')?.checked   || false;
-  if (!pushBaseline && !pushTarget) throw new Error(t('s7_none'));
+  const pushKpi      = document.getElementById('chk-kpi')?.checked      || false;
+
+  if (!pushBaseline && !pushTarget && !pushKpi) throw new Error(t('s7_none'));
+
+  // KPI easter egg — runs independently with its own result panel
+  if (pushKpi) await runKpiImport();
+
+  // Bail early if only KPI was selected
+  if (!pushBaseline && !pushTarget) return;
 
   setBusy(true, t('s7_busy'));
   const data = await apiFetch(`/api/session/${sessionId}/push`, {
@@ -1918,6 +2105,44 @@ async function runStepPush() {
       <div class="result-header">⚠ ${t('s7_err')}</div>
       <div class="result-summary">${data.errors.map(esc).join('<br>')}</div>
     `;
+  }
+}
+
+async function runKpiImport() {
+  const spinner = document.getElementById('kpi-spinner');
+  const rc      = document.getElementById('kpi-result');
+  if (spinner) spinner.style.display = 'flex';
+  if (rc) { rc.className = ''; rc.innerHTML = ''; }
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/push-kpi`, {method: 'POST'});
+    if (spinner) spinner.style.display = 'none';
+    if (!rc) return;
+    if (data.ok) {
+      const s = data.stats || {};
+      rc.className = 'result-card success show';
+      rc.innerHTML = `
+        <div class="result-header">✅ ${t('kpi_ok')}</div>
+        <div class="result-summary">${t('kpi_ok_hint')}</div>
+        <div class="kpi-stats" style="margin-top:10px">
+          <div class="kpi-stat"><strong>${s.objectives || 5}</strong>${t('s_objectives','Objectives')}</div>
+          <div class="kpi-stat"><strong>${s.business_capabilities || 91}</strong>${t('s_bcs','BCs')}</div>
+          <div class="kpi-stat"><strong>${s.applications || 100}</strong>${t('s_apps','Apps')}</div>
+          <div class="kpi-stat"><strong>${s.initiatives || 5}</strong>${t('s_initiatives','Initiatives')}</div>
+        </div>
+      `;
+    } else {
+      rc.className = 'result-card error show';
+      rc.innerHTML = `
+        <div class="result-header">⚠ ${t('kpi_err')}</div>
+        <div class="result-summary">${(data.errors || []).map(esc).join('<br>')}</div>
+      `;
+    }
+  } catch(e) {
+    if (spinner) spinner.style.display = 'none';
+    if (rc) {
+      rc.className = 'result-card error show';
+      rc.innerHTML = `<div class="result-header">⚠ ${t('kpi_err')}</div><div class="result-summary">${esc(e.message)}</div>`;
+    }
   }
 }
 

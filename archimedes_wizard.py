@@ -13,6 +13,7 @@ Endpoints:
   POST /api/session/{id}/images           → image extraction (Step 5)
   POST /api/session/{id}/generate         → generate LeanIX outputs (Step 6)
   POST /api/session/{id}/push             → import to LeanIX (Step 7)
+  POST /api/session/{id}/push-kpi        → 🍪 easter egg: generate + import KPI Achievement Excel
   GET  /api/session/{id}/download/{key}   → download generated file
 
 Usage:
@@ -630,6 +631,60 @@ async def run_push(session_id: str, body: dict):
         "ok":     not errors,
         "pushed": pushed,
         "errors": errors,
+    }
+
+
+# ── Step 9 Easter Egg — KPI Achievement Import ────────────────────────────────
+
+@app.post("/api/session/{session_id}/push-kpi")
+async def run_push_kpi(session_id: str):
+    """🍪 Easter egg: generate KPI Achievement Excel and import it into LeanIX."""
+    sess = _session(session_id)
+
+    if not os.environ.get("LEANIX_API_TOKEN") or not os.environ.get("LEANIX_BASE_URL"):
+        raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
+
+    client_name = sess["client_name"]
+    out_dir     = sess["output_dir"]
+    kpi_path    = out_dir / "kpi_achievement_leanix.xlsx"
+
+    # ── Generate the KPI Excel into the session output dir ──────────────────
+    def _build_kpi():
+        import sys
+        sys.path.insert(0, str(BASE_DIR))
+        import importlib, types
+
+        # Import generate_kpi_excel and override OUTPUT_PATH to session dir
+        import generate_kpi_excel as _kpi_mod
+        original_path = _kpi_mod.OUTPUT_PATH
+        _kpi_mod.OUTPUT_PATH = kpi_path
+        try:
+            _kpi_mod.build()
+        finally:
+            _kpi_mod.OUTPUT_PATH = original_path
+
+    await asyncio.to_thread(_build_kpi)
+
+    if not kpi_path.exists():
+        raise HTTPException(status_code=500, detail="Error generando el fichero KPI Achievement Excel.")
+
+    # ── Push to LeanIX in order: Objective → BusinessCapability → Application → Initiative ──
+    try:
+        await asyncio.to_thread(push_leanix, kpi_path, client_name)
+    except Exception as exc:
+        return {"ok": False, "errors": [str(exc)], "path": str(kpi_path)}
+
+    sess["out_kpi"] = kpi_path
+    return {
+        "ok":       True,
+        "pushed":   ["kpi_achievement"],
+        "path":     str(kpi_path),
+        "stats": {
+            "objectives":           5,
+            "business_capabilities": 91,
+            "applications":          100,
+            "initiatives":           5,
+        },
     }
 
 
