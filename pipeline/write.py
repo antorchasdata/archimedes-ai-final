@@ -594,10 +594,12 @@ def write_leanix_excel(
 
 # GraphQL fragments reused across mutations
 _QUERY_FS_BY_NAME = """
-query FindFS($type: FactSheetType!, $name: String!) {
+query FindFS($type: String!, $name: String!) {
   allFactSheets(
-    factSheetType: $type
-    filter: { fullTextSearch: $name }
+    filter: {
+      facetFilters: [{ facetKey: "FactSheetTypes", keys: [$type] }]
+      fullTextSearch: $name
+    }
   ) {
     edges {
       node {
@@ -610,8 +612,8 @@ query FindFS($type: FactSheetType!, $name: String!) {
 """
 
 _MUTATION_CREATE_FS = """
-mutation CreateFS($type: FactSheetType!, $name: String!, $desc: String!) {
-  createFactSheet(input: { type: $type, name: $name, description: $desc }) {
+mutation CreateFS($type: FactSheetType!, $name: String!) {
+  createFactSheet(input: { type: $type, name: $name }) {
     factSheet { id displayName }
   }
 }
@@ -625,6 +627,26 @@ mutation AddTag($id: ID!, $patches: [Patch]!) {
 }
 """
 
+_QUERY_TAGS = """
+query GetTags {
+  allTags { edges { node { id name } } }
+}
+"""
+
+_QUERY_TAG_GROUPS = """
+query GetTagGroups {
+  allTagGroups { edges { node { id name restrictToFactSheetTypes } } }
+}
+"""
+
+_MUTATION_CREATE_TAG = """
+mutation CreateTag($name: String!, $groupId: ID) {
+  createTag(name: $name, tagGroupId: $groupId) {
+    id name
+  }
+}
+"""
+
 _MUTATION_SET_LIFECYCLE = """
 mutation SetLifecycle($id: ID!, $patches: [Patch]!) {
   updateFactSheet(id: $id, patches: $patches) {
@@ -634,12 +656,12 @@ mutation SetLifecycle($id: ID!, $patches: [Patch]!) {
 """
 
 _MUTATION_CREATE_RELATION = """
-mutation CreateRelation($from: ID!, $to: ID!, $relType: String!) {
-  createRelation(
-    factSheetId: $from
-    relationType: $relType
-    targetFactSheetId: $to
-  ) { id }
+mutation CreateRelation($from: ID!, $to: ID!, $relType: RelationName!) {
+  upsertRelation(
+    from: { id: $from }
+    to: { id: $to }
+    type: $relType
+  ) { fromFactSheetId }
 }
 """
 
@@ -689,35 +711,32 @@ def write_leanix(
 
     # ── Tag ───────────────────────────────────────────────────────────────────
     def _get_or_create_tag_id(tag_name: str) -> str:
-        tags_resp = requests.get(
-            f"{base_url}/services/pathfinder/v1/tags",
-            headers=headers, timeout=30,
-        )
-        tags_resp.raise_for_status()
-        for tag in tags_resp.json().get("data", []):
-            if tag.get("name") == tag_name:
-                return tag["id"]
-        groups_resp = requests.get(
-            f"{base_url}/services/pathfinder/v1/tagGroups",
-            headers=headers, timeout=30,
-        )
-        groups_resp.raise_for_status()
-        groups   = groups_resp.json().get("data", [])
-        group_id = groups[0]["id"] if groups else None
-        create   = requests.post(
-            f"{base_url}/services/pathfinder/v1/tags",
-            json={"name": tag_name, "tagGroupId": group_id},
-            headers=headers, timeout=30,
-        )
-        create.raise_for_status()
-        return create.json()["data"]["id"]
+        result = _gql(_QUERY_TAGS, {})
+        for edge in result.get("data", {}).get("allTags", {}).get("edges", []):
+            if edge["node"]["name"] == tag_name:
+                return edge["node"]["id"]
+        # Pick first unrestricted tag group
+        groups_result = _gql(_QUERY_TAG_GROUPS, {})
+        edges = groups_result.get("data", {}).get("allTagGroups", {}).get("edges", [])
+        group_id = None
+        for e in edges:
+            if not e["node"].get("restrictToFactSheetTypes"):
+                group_id = e["node"]["id"]
+                break
+        if group_id is None and edges:
+            group_id = edges[0]["node"]["id"]
+        result = _gql(_MUTATION_CREATE_TAG, {"name": tag_name, "groupId": group_id})
+        return result["data"]["createTag"]["id"]
 
     def _tag_fs(fs_id: str, tag_id: str) -> None:
-        _gql(_MUTATION_ADD_TAG, {
-            "id": fs_id,
-            "patches": [{"op": "add", "path": "/tags",
-                         "value": json.dumps([{"tagId": tag_id}])}],
-        })
+        try:
+            _gql(_MUTATION_ADD_TAG, {
+                "id": fs_id,
+                "patches": [{"op": "add", "path": "/tags",
+                             "value": json.dumps([{"tagId": tag_id}])}],
+            })
+        except Exception as exc:
+            logger.warning("LeanIX: skipping tag for %s — %s", fs_id, exc)
 
     # ── Fact sheet helpers ────────────────────────────────────────────────────
     def _find_by_name(fs_type: str, name: str) -> str | None:
@@ -728,7 +747,7 @@ def write_leanix(
         return None
 
     def _create_fs(fs_type: str, name: str, desc: str = "") -> str:
-        result = _gql(_MUTATION_CREATE_FS, {"type": fs_type, "name": name, "desc": desc[:2000]})
+        result = _gql(_MUTATION_CREATE_FS, {"type": fs_type, "name": name})
         return result["data"]["createFactSheet"]["factSheet"]["id"]
 
     def _upsert(fs_type: str, name: str, desc: str = "") -> tuple[str, bool]:
@@ -741,7 +760,7 @@ def write_leanix(
         _gql(_MUTATION_SET_LIFECYCLE, {
             "id": fs_id,
             "patches": [{"op": "add", "path": "/lifecycle",
-                         "value": json.dumps({"asIs": {"phase": phase}})}],
+                         "value": json.dumps({"phases": [{"phase": phase}]})}],
         })
 
     def _create_relation(from_id: str, to_id: str, rel_type: str) -> None:
