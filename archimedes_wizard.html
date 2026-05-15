@@ -1761,7 +1761,7 @@ function renderStep6() {
     <div class="step-eyebrow">${t('s6_eye', 7, STEPS.length)}</div>
     <h1 class="step-title">${t('s6_title')}</h1>
     <p class="step-desc">${t('s6_desc')}</p>
-    <div class="spinner-wrap show" id="step6-spinner">
+    <div class="spinner-wrap ${generateOutputs.length ? '' : 'show'}" id="step6-spinner">
       <div class="spinner"></div><span class="spinner-text">${t('s6_busy')}</span>
     </div>
     <div id="step6-outputs"></div>
@@ -1769,7 +1769,11 @@ function renderStep6() {
 }
 
 async function runStepGenerate() {
-  if (generateOutputs.length) return;
+  if (generateOutputs.length) {
+    // Already generated — just re-render the outputs list (DOM was recreated by renderStep)
+    _renderGenerateOutputs();
+    return;
+  }
 
   setBusy(true, t('s6_busy'));
   const data = await apiFetch(`/api/session/${sessionId}/generate`, {method:'POST'});
@@ -1784,6 +1788,10 @@ async function runStepGenerate() {
   });
 
   document.getElementById('step6-spinner')?.classList.remove('show');
+  _renderGenerateOutputs();
+}
+
+function _renderGenerateOutputs() {
   const outEl = document.getElementById('step6-outputs');
   if (!outEl) return;
 
