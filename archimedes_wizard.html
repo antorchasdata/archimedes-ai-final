@@ -612,6 +612,20 @@ const LANGS = {
     s3b_ok: (v, u) => `✓ SAP Help contrast complete: ${v} validated · ${u} to review`,
     s3b_download: '⬇ Download contrast report',
     s3b_skipped: 'Contrast skipped (no enriched requirements)',
+    // step 3c — Industry Reference Architecture
+    s3c_title: 'Industry Reference Architecture',
+    s3c_desc: 'Compare the client\'s Baseline against SAP\'s recommended products for the selected industry. Products not yet in the Baseline are shown as whitespace gaps.',
+    s3c_label: 'Industry',
+    s3c_fetch: 'Load reference architecture…',
+    s3c_busy: 'Fetching SAP Industry Reference Architecture…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} products not in Baseline`,
+    s3c_covered: (n) => `${n} products already in Baseline`,
+    s3c_select_all: 'Select all',
+    s3c_deselect_all: 'Deselect all',
+    s3c_apply: 'Add selected to Target →',
+    s3c_apply_busy: 'Adding to Target Excel…',
+    s3c_apply_ok: (n) => `✓ ${n} products added to Target with tag Reference`,
+    s3c_none_selected: 'Select at least one product',
     // step 4
     s4_eye: (n, total) => `Step 5 of ${total}`,
     s4_title: 'Client PDF document',
@@ -716,6 +730,20 @@ const LANGS = {
     s3b_ok: (v, u) => `✓ Contraste completado: ${v} validados · ${u} a revisar`,
     s3b_download: '⬇ Descargar informe de contraste',
     s3b_skipped: 'Contraste omitido (no hay requerimientos enriquecidos)',
+    // step 3c — Arquitectura de Referencia por Industria
+    s3c_title: 'Arquitectura de Referencia por Industria',
+    s3c_desc: 'Compara el Baseline del cliente con los productos SAP recomendados para la industria seleccionada. Los productos que no están en el Baseline se muestran como whitespace.',
+    s3c_label: 'Industria',
+    s3c_fetch: 'Cargar arquitectura de referencia…',
+    s3c_busy: 'Obteniendo Arquitectura de Referencia SAP…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} productos no están en el Baseline`,
+    s3c_covered: (n) => `${n} productos ya están en el Baseline`,
+    s3c_select_all: 'Seleccionar todo',
+    s3c_deselect_all: 'Deseleccionar todo',
+    s3c_apply: 'Añadir seleccionados al Target →',
+    s3c_apply_busy: 'Añadiendo al Excel Target…',
+    s3c_apply_ok: (n) => `✓ ${n} productos añadidos al Target con etiqueta Reference`,
+    s3c_none_selected: 'Selecciona al menos un producto',
     s4_eye: (n, total) => `Paso 5 de ${total}`,
     s4_title: 'Documento PDF del cliente',
     s4_desc: 'Sube documentación adicional del cliente en PDF. Claude API extraerá fact sheets (Applications, BCs, Organizaciones, Iniciativas, ITCs) mapeándolas contra los catálogos RBA/RSA.',
@@ -813,6 +841,19 @@ const LANGS = {
     s3b_ok: (v, u) => `✓ Contraste terminé : ${v} validés · ${u} à revoir`,
     s3b_download: '⬇ Télécharger le rapport de contraste',
     s3b_skipped: 'Contraste ignoré (pas d\'exigences enrichies)',
+    s3c_title: 'Architecture de référence par industrie',
+    s3c_desc: 'Comparez le Baseline du client avec les produits SAP recommandés pour l\'industrie sélectionnée.',
+    s3c_label: 'Industrie',
+    s3c_fetch: 'Charger l\'architecture de référence…',
+    s3c_busy: 'Récupération de l\'architecture de référence SAP…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} produits absents du Baseline`,
+    s3c_covered: (n) => `${n} produits déjà dans le Baseline`,
+    s3c_select_all: 'Tout sélectionner',
+    s3c_deselect_all: 'Tout désélectionner',
+    s3c_apply: 'Ajouter la sélection au Target →',
+    s3c_apply_busy: 'Ajout au Target Excel…',
+    s3c_apply_ok: (n) => `✓ ${n} produits ajoutés au Target avec tag Reference`,
+    s3c_none_selected: 'Sélectionnez au moins un produit',
     s4_eye: (n, total) => `Étape 5 sur ${total}`,
     s4_title: 'Document PDF client',
     s4_desc: 'Importez la documentation supplémentaire du client en PDF. Claude API extraira les fact sheets (Applications, BCs, Organisations, Initiatives, ITCs).',
@@ -909,6 +950,19 @@ const LANGS = {
     s3b_ok: (v, u) => `✓ Confronto completato: ${v} validati · ${u} da rivedere`,
     s3b_download: '⬇ Scarica il report di confronto',
     s3b_skipped: 'Confronto saltato (nessun requisito arricchito)',
+    s3c_title: 'Architettura di riferimento per industria',
+    s3c_desc: 'Confronta il Baseline del cliente con i prodotti SAP raccomandati per il settore selezionato.',
+    s3c_label: 'Settore',
+    s3c_fetch: 'Carica architettura di riferimento…',
+    s3c_busy: 'Recupero architettura di riferimento SAP…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} prodotti non nel Baseline`,
+    s3c_covered: (n) => `${n} prodotti già nel Baseline`,
+    s3c_select_all: 'Seleziona tutto',
+    s3c_deselect_all: 'Deseleziona tutto',
+    s3c_apply: 'Aggiungi selezionati al Target →',
+    s3c_apply_busy: 'Aggiunta al Target Excel…',
+    s3c_apply_ok: (n) => `✓ ${n} prodotti aggiunti al Target con tag Reference`,
+    s3c_none_selected: 'Seleziona almeno un prodotto',
     s4_eye: (n, total) => `Passo 5 di ${total}`,
     s4_title: 'Documento PDF del cliente',
     s4_desc: 'Carica documentazione aggiuntiva del cliente in PDF. Claude API estrarrà fact sheet (Application, BC, Organizzazioni, Iniziative, ITC).',
@@ -1005,6 +1059,19 @@ const LANGS = {
     s3b_ok: (v, u) => `✓ Vertailu valmis: ${v} vahvistettu · ${u} tarkistettava`,
     s3b_download: '⬇ Lataa vertailuraportti',
     s3b_skipped: 'Vertailu ohitettu (ei rikastettuja vaatimuksia)',
+    s3c_title: 'Toimialan viitearkkitehtuuri',
+    s3c_desc: 'Vertaa asiakkaan Baselinea SAP:n suositeltuihin tuotteisiin valitulle toimialalle.',
+    s3c_label: 'Toimiala',
+    s3c_fetch: 'Lataa viitearkkitehtuuri…',
+    s3c_busy: 'Haetaan SAP:n toimialan viitearkkitehtuuri…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} tuotetta puuttuu Baselinesta`,
+    s3c_covered: (n) => `${n} tuotetta jo Baselinessa`,
+    s3c_select_all: 'Valitse kaikki',
+    s3c_deselect_all: 'Poista valinnat',
+    s3c_apply: 'Lisää valitut Targetiin →',
+    s3c_apply_busy: 'Lisätään Target Exceliin…',
+    s3c_apply_ok: (n) => `✓ ${n} tuotetta lisätty Targetiin Reference-tagilla`,
+    s3c_none_selected: 'Valitse vähintään yksi tuote',
     s4_eye: (n, total) => `Vaihe 5 / ${total}`,
     s4_title: 'Asiakkaan PDF-dokumentti',
     s4_desc: 'Lataa lisädokumentaatio PDF-muodossa. Claude API poimii fact sheetit (sovellukset, BC:t, organisaatiot, aloitteet, ITC:t) ja kartoittaa ne RBA/RSA-katalogeihin.',
@@ -1352,11 +1419,7 @@ function renderStep3() {
     <div class="drop-grid single">
       ${dropZone('req', '📊', 'Requirements.xlsx', t('s3_hint'), '.xlsx')}
     </div>
-    <div class="spinner-wrap" id="step3-spinner">
-      <div class="spinner"></div><span class="spinner-text">${t('s3_busy')}</span>
-    </div>
-    <div class="result-card" id="step3-result"></div>
-    <div class="toggle-option" id="contrast-option" style="display:none;margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+    <div style="margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
       <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer">
         <input type="checkbox" id="contrast-toggle" style="margin-top:3px;accent-color:var(--sap-blue)">
         <span>
@@ -1364,11 +1427,13 @@ function renderStep3() {
           <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:2px">${t('s3b_toggle_hint')}</span>
         </span>
       </label>
-      <div class="spinner-wrap" id="contrast-spinner" style="display:none;margin-top:10px">
-        <div class="spinner"></div><span class="spinner-text">${t('s3b_busy')}</span>
-      </div>
-      <div class="result-card" id="contrast-result" style="margin-top:8px"></div>
     </div>
+    <div class="spinner-wrap" id="step3-spinner">
+      <div class="spinner"></div><span class="spinner-text">${t('s3_busy')}</span>
+    </div>
+    <div class="result-card" id="step3-result"></div>
+    <div class="result-card" id="contrast-result" style="margin-top:8px"></div>
+    ${renderIndustryReference()}
   `;
 }
 
@@ -1376,13 +1441,12 @@ async function runHelpContrast() {
   const toggle = document.getElementById('contrast-toggle');
   if (!toggle || !toggle.checked) return;
 
-  const spinner = document.getElementById('contrast-spinner');
-  const rc      = document.getElementById('contrast-result');
-  spinner.style.display = 'flex';
+  const rc = document.getElementById('contrast-result');
+  rc.className = 'result-card show';
+  rc.innerHTML = `<div class="result-summary" style="display:flex;align-items:center;gap:8px"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div>${t('s3b_busy')}</div>`;
 
   try {
     const data = await apiFetch(`/api/session/${sessionId}/contrast`, {method:'POST'});
-    spinner.style.display = 'none';
 
     if (data.skipped) {
       rc.className = 'result-card show';
@@ -1401,7 +1465,6 @@ async function runHelpContrast() {
       <a href="${data.download_url}" download class="btn-download" style="display:inline-block;margin-top:6px;text-decoration:none">${t('s3b_download')}</a>
     `;
   } catch(e) {
-    spinner.style.display = 'none';
     rc.className = 'result-card error show';
     rc.innerHTML = `<div class="result-header">⚠ ${e.message}</div>`;
   }
@@ -1431,11 +1494,134 @@ async function runStepRequirements() {
       ${data.already_enriched ? t('s3_already') : t('s3_enriched', data.validation_ok)}
     </div>
   `;
+}
 
-  // Show contrast option only when requirements are enriched (not pre-enriched xlsx)
-  if (!data.already_enriched) {
-    const opt = document.getElementById('contrast-option');
-    if (opt) opt.style.display = 'block';
+// ── Step 3c — Industry Reference Architecture / Whitespace ───────────────────
+
+let _industryData = null;   // cached whitespace result
+
+function renderIndustryReference() {
+  return `
+    <div style="margin-top:20px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)">
+      <div style="font-weight:600;font-size:15px;margin-bottom:6px">🏭 ${t('s3c_title')}</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">${t('s3c_desc')}</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select id="industry-select" style="flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px">
+          <option value="">— ${t('s3c_label')} —</option>
+          <option value="eco">Engineering, Construction &amp; Operations</option>
+          <option value="retail">Retail</option>
+          <option value="aad">Aerospace &amp; Defense</option>
+          <option value="auto">Automotive</option>
+          <option value="cp">Consumer Products</option>
+          <option value="fs">Financial Services</option>
+          <option value="hc">Healthcare</option>
+          <option value="ht">High Tech</option>
+          <option value="imc">Industrial Machinery &amp; Components</option>
+          <option value="ls">Life Sciences</option>
+          <option value="oilgas">Oil &amp; Gas</option>
+          <option value="ps">Professional Services</option>
+          <option value="pubsec">Public Sector</option>
+          <option value="utils">Utilities</option>
+        </select>
+        <button onclick="runIndustryReference()" class="btn-primary" style="white-space:nowrap">${t('s3c_fetch')}</button>
+      </div>
+      <div id="industry-result" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+
+async function runIndustryReference() {
+  const sel = document.getElementById('industry-select');
+  const industry_key = sel ? sel.value : '';
+  if (!industry_key) return;
+
+  const rc = document.getElementById('industry-result');
+  rc.innerHTML = `<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div>${t('s3c_busy')}</div>`;
+
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/industry-reference`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({industry_key})
+    });
+
+    _industryData = data;
+    rc.innerHTML = renderWhitespace(data);
+  } catch(e) {
+    rc.innerHTML = `<div style="color:var(--error);font-size:13px">⚠ ${e.message}</div>`;
+  }
+}
+
+function renderWhitespace(data) {
+  const gaps    = data.whitespace.filter(w => !w.in_baseline);
+  const covered = data.whitespace.filter(w =>  w.in_baseline);
+
+  let html = `<div style="font-size:13px;margin-bottom:10px">
+    <strong>${t('s3c_whitespace_title', gaps.length)}</strong>
+    <span style="color:var(--text-secondary);margin-left:12px">✓ ${t('s3c_covered', covered.length)}</span>
+  </div>`;
+
+  if (gaps.length === 0) {
+    html += `<div style="font-size:13px;color:var(--text-secondary);padding:8px">✓ No whitespace — all reference products are already in the Baseline.</div>`;
+    return html;
+  }
+
+  html += `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button onclick="toggleAllWhitespace(true)"  class="btn-secondary" style="font-size:12px;padding:4px 10px">${t('s3c_select_all')}</button>
+      <button onclick="toggleAllWhitespace(false)" class="btn-secondary" style="font-size:12px;padding:4px 10px">${t('s3c_deselect_all')}</button>
+    </div>
+    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg)">
+  `;
+
+  for (const item of gaps) {
+    const id = `ws-${item.name.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    html += `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;border-radius:6px;font-size:13px" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+        <input type="checkbox" class="ws-check" value="${item.name}" style="accent-color:var(--sap-blue)">
+        <span>${item.name}</span>
+      </label>
+    `;
+  }
+
+  html += `</div>
+    <div style="margin-top:10px">
+      <button onclick="applyWhitespace()" class="btn-primary">${t('s3c_apply')}</button>
+    </div>
+    <div id="industry-apply-result" style="margin-top:8px;font-size:13px"></div>
+  `;
+
+  return html;
+}
+
+function toggleAllWhitespace(checked) {
+  document.querySelectorAll('.ws-check').forEach(cb => cb.checked = checked);
+}
+
+async function applyWhitespace() {
+  const selected = [...document.querySelectorAll('.ws-check:checked')].map(cb => cb.value);
+  const ar = document.getElementById('industry-apply-result');
+
+  if (selected.length === 0) {
+    ar.innerHTML = `<span style="color:var(--text-secondary)">${t('s3c_none_selected')}</span>`;
+    return;
+  }
+
+  ar.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div>${t('s3c_apply_busy')}</div>`;
+
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/industry-reference/apply`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        selected_products: selected,
+        industry_label: _industryData ? _industryData.industry_label : ''
+      })
+    });
+    ar.innerHTML = `<span style="color:var(--success)">✅ ${t('s3c_apply_ok', data.n_added)}</span>
+      <a href="${data.download_url}" download class="btn-download" style="margin-left:10px;text-decoration:none;font-size:12px">⬇ Target Excel</a>`;
+  } catch(e) {
+    ar.innerHTML = `<span style="color:var(--error)">⚠ ${e.message}</span>`;
   }
 }
 

@@ -55,7 +55,8 @@ from pipeline.validate      import validate
 from pipeline.write         import write, write_leanix_excel_from_xlsx, push_leanix
 from pipeline.pdf_extract   import extract_pdf_factsheets
 from pipeline.image_extract import extract_image_factsheets
-from pipeline.help_contrast import run_contrast, print_contrast_summary
+from pipeline.help_contrast      import run_contrast, print_contrast_summary
+from pipeline.industry_reference import get_industry_reference, compute_whitespace, add_reference_to_target_excel, INDUSTRIES
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
@@ -280,33 +281,139 @@ async def run_requirements(
 async def run_help_contrast(session_id: str):
     sess = _session(session_id)
 
-    target_json = sess.get("target_json_path")
+    target_json      = sess.get("target_json_path")
+    req_enriched_xlsx = sess.get("req_enriched_xlsx")
+    out_dir          = sess["output_dir"]
+
+    # If pre-enriched xlsx (no JSON), build a minimal JSON from cols O/P for contrast
+    if not target_json and req_enriched_xlsx:
+        import openpyxl as _xl
+        wb = _xl.load_workbook(str(req_enriched_xlsx))
+        ws = wb.active
+        reqs = []
+        for r in range(9, ws.max_row + 1):
+            req_id = ws.cell(r, 2).value
+            rsa    = ws.cell(r, 16).value  # col P
+            desc   = ws.cell(r, 3).value or ""
+            if req_id and rsa:
+                reqs.append({"_source_id": str(req_id), "rsa": str(rsa), "description": str(desc)})
+        if not reqs:
+            return {"ok": True, "skipped": True, "reason": "No RSA products found in Excel"}
+        tmp_json = out_dir / "reqs_for_contrast.json"
+        tmp_json.write_text(json.dumps(reqs, ensure_ascii=False, indent=2))
+        target_json = tmp_json
+
     if not target_json:
         return {"ok": True, "skipped": True, "reason": "No enriched requirements available"}
-
-    out_dir = sess["output_dir"]
 
     try:
         report_path = await asyncio.to_thread(run_contrast, target_json, out_dir)
         sess["out_contrast"] = report_path
 
-        report = json.loads(report_path.read_text())
+        report      = json.loads(report_path.read_text())
         validated   = sum(1 for r in report if r["validated"])
         unvalidated = sum(1 for r in report if not r["validated"] and r["rsa_product"])
         skipped     = sum(1 for r in report if not r["rsa_product"])
 
         return {
-            "ok":           True,
-            "skipped":      False,
-            "n_total":      len(report),
-            "n_validated":  validated,
+            "ok":            True,
+            "skipped":       False,
+            "n_total":       len(report),
+            "n_validated":   validated,
             "n_unvalidated": unvalidated,
-            "n_skipped":    skipped,
-            "download_url": f"/api/session/{session_id}/download/contrast",
+            "n_skipped":     skipped,
+            "download_url":  f"/api/session/{session_id}/download/contrast",
         }
     except Exception as exc:
         logger.exception("SAP Help contrast error")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── Step 3c — Industry Reference Architecture / Whitespace ───────────────────
+
+@app.get("/api/industries")
+async def list_industries():
+    return {"ok": True, "industries": [{"key": k, "label": v} for k, v in INDUSTRIES.items()]}
+
+
+@app.post("/api/session/{session_id}/industry-reference")
+async def run_industry_reference(session_id: str, body: dict):
+    sess = _session(session_id)
+
+    industry_key = (body.get("industry_key") or "").strip()
+    if not industry_key:
+        raise HTTPException(status_code=400, detail="industry_key is required")
+
+    # Fetch reference products from SAP API Hub
+    try:
+        reference = await asyncio.to_thread(get_industry_reference, industry_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Industry reference fetch error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    # Compute whitespace against baseline
+    baseline_path = sess.get("out_baseline")
+    whitespace = await asyncio.to_thread(
+        compute_whitespace, reference["products"], baseline_path
+    )
+
+    sess["industry_reference"] = {
+        "industry_key":   industry_key,
+        "industry_label": reference["industry_label"],
+        "whitespace":     whitespace,
+    }
+
+    return {
+        "ok":             True,
+        "industry_key":   industry_key,
+        "industry_label": reference["industry_label"],
+        "n_reference":    reference["n_products"],
+        "whitespace":     whitespace,
+    }
+
+
+@app.post("/api/session/{session_id}/industry-reference/apply")
+async def apply_industry_reference(session_id: str, body: dict):
+    sess = _session(session_id)
+
+    selected: list[str] = body.get("selected_products", [])
+    if not selected:
+        return {"ok": True, "skipped": True, "n_added": 0}
+
+    ref = sess.get("industry_reference", {})
+    industry_label = ref.get("industry_label", body.get("industry_label", "Reference"))
+    out_dir = sess["output_dir"]
+    client_name = sess["client_name"]
+
+    # Create or reuse target Excel
+    out_target = sess.get("out_target")
+    if not out_target or not out_target.exists():
+        # Create a minimal target Excel
+        import openpyxl as xl
+        out_target = out_dir / f"{client_name}_target_leanix.xlsx"
+        wb = xl.Workbook()
+        ws = wb.active
+        ws.title = "Application"
+        ws.append(["type", "displayName", "description", "tags"])
+        wb.save(str(out_target))
+        sess["out_target"] = out_target
+
+    try:
+        await asyncio.to_thread(
+            add_reference_to_target_excel, out_target, selected, industry_label
+        )
+    except Exception as exc:
+        logger.exception("Apply industry reference error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return {
+        "ok":           True,
+        "skipped":      False,
+        "n_added":      len(selected),
+        "download_url": f"/api/session/{session_id}/download/target",
+    }
 
 
 # ── Step 4 — PDF ──────────────────────────────────────────────────────────────
