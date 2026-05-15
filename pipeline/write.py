@@ -635,7 +635,10 @@ query GetTags {
 
 _QUERY_TAG_GROUPS = """
 query GetTagGroups {
-  allTagGroups { edges { node { id name restrictToFactSheetTypes } } }
+  allTagGroups { edges { node {
+    id name restrictToFactSheetTypes
+    tags { edges { node { id name } } }
+  } } }
 }
 """
 
@@ -664,6 +667,27 @@ mutation CreateRelation($from: ID!, $to: ID!, $relType: RelationName!) {
   ) { fromFactSheetId }
 }
 """
+
+_MUTATION_PATCH_FS = """
+mutation PatchFS($id: ID!, $patches: [Patch]!) {
+  updateFactSheet(id: $id, patches: $patches) {
+    factSheet { id }
+  }
+}
+"""
+
+# TIME (functional fit display names) → LeanIX functionalSuitability API enum
+_TIME_TO_FUNCTIONAL = {
+    "tolerate":  "insufficient",
+    "invest":    "perfect",
+    "migrate":   "unreasonable",
+    "eliminate": "unreasonable",
+    # pass-through if already API enum value
+    "unreasonable": "unreasonable",
+    "insufficient": "insufficient",
+    "appropriate":  "appropriate",
+    "perfect":      "perfect",
+}
 
 
 def write_leanix(
@@ -710,23 +734,55 @@ def write_leanix(
         return data
 
     # ── Tag ───────────────────────────────────────────────────────────────────
-    def _get_or_create_tag_id(tag_name: str) -> str:
-        result = _gql(_QUERY_TAGS, {})
-        for edge in result.get("data", {}).get("allTags", {}).get("edges", []):
-            if edge["node"]["name"] == tag_name:
-                return edge["node"]["id"]
-        # Pick first unrestricted tag group
-        groups_result = _gql(_QUERY_TAG_GROUPS, {})
-        edges = groups_result.get("data", {}).get("allTagGroups", {}).get("edges", [])
+    # Cache tag group data (loaded once)
+    _tag_groups_cache: list[dict] | None = None
+    _all_tags_cache: list[dict] | None = None
+
+    def _load_tag_cache() -> None:
+        nonlocal _tag_groups_cache, _all_tags_cache
+        if _tag_groups_cache is None:
+            r = _gql(_QUERY_TAG_GROUPS, {})
+            _tag_groups_cache = [e["node"] for e in r.get("data", {}).get("allTagGroups", {}).get("edges", [])]
+        if _all_tags_cache is None:
+            r = _gql(_QUERY_TAGS, {})
+            _all_tags_cache = [e["node"] for e in r.get("data", {}).get("allTags", {}).get("edges", [])]
+
+    def _get_or_create_tag_id(tag_name: str, group_name: str | None = None) -> str:
+        """Get or create a tag, optionally in a specific named group."""
+        _load_tag_cache()
+        # Find existing tag
+        for t in _all_tags_cache:  # type: ignore[union-attr]
+            if t["name"] == tag_name:
+                return t["id"]
+        # Find target group
         group_id = None
-        for e in edges:
-            if not e["node"].get("restrictToFactSheetTypes"):
-                group_id = e["node"]["id"]
-                break
-        if group_id is None and edges:
-            group_id = edges[0]["node"]["id"]
+        if group_name:
+            for g in _tag_groups_cache:  # type: ignore[union-attr]
+                if g["name"] == group_name:
+                    group_id = g["id"]
+                    break
+        if group_id is None:
+            # Pick first unrestricted group
+            for g in _tag_groups_cache:  # type: ignore[union-attr]
+                if not g.get("restrictToFactSheetTypes"):
+                    group_id = g["id"]
+                    break
+            if group_id is None and _tag_groups_cache:
+                group_id = _tag_groups_cache[0]["id"]
         result = _gql(_MUTATION_CREATE_TAG, {"name": tag_name, "groupId": group_id})
-        return result["data"]["createTag"]["id"]
+        new_tag = result["data"]["createTag"]
+        _all_tags_cache.append({"id": new_tag["id"], "name": new_tag["name"]})  # type: ignore[union-attr]
+        return new_tag["id"]
+
+    def _find_tag_in_group(tag_name: str, group_name: str) -> str | None:
+        """Find an existing tag by name within a specific tag group (no create)."""
+        _load_tag_cache()
+        for g in _tag_groups_cache:  # type: ignore[union-attr]
+            if g["name"] == group_name:
+                for t in g.get("tags", {}).get("edges", []):
+                    if t["node"]["name"] == tag_name:
+                        return t["node"]["id"]
+        return None
 
     def _tag_fs(fs_id: str, tag_id: str) -> None:
         try:
@@ -737,6 +793,31 @@ def write_leanix(
             })
         except Exception as exc:
             logger.warning("LeanIX: skipping tag for %s — %s", fs_id, exc)
+
+    def _resolve_extra_tags(row: dict, skip: str = "") -> list[str]:
+        """Parse semicolon-separated tags field and return resolved tag IDs, skipping client tag."""
+        raw = str(row.get("tags") or "").strip()
+        ids: list[str] = []
+        for t in raw.split(";"):
+            t = t.strip()
+            if not t or t == skip:
+                continue
+            try:
+                ids.append(_get_or_create_tag_id(t))
+            except Exception as exc:
+                logger.warning("LeanIX: cannot resolve tag '%s' — %s", t, exc)
+        return ids
+
+    def _tag_fs_multi(fs_id: str, tag_ids: list[str]) -> None:
+        """Apply multiple tags at once."""
+        try:
+            _gql(_MUTATION_ADD_TAG, {
+                "id": fs_id,
+                "patches": [{"op": "add", "path": "/tags",
+                             "value": json.dumps([{"tagId": tid} for tid in tag_ids])}],
+            })
+        except Exception as exc:
+            logger.warning("LeanIX: skipping tags for %s — %s", fs_id, exc)
 
     # ── Fact sheet helpers ────────────────────────────────────────────────────
     def _find_by_name(fs_type: str, name: str) -> str | None:
@@ -767,6 +848,30 @@ def write_leanix(
         _gql(_MUTATION_CREATE_RELATION,
              {"from": from_id, "to": to_id, "relType": rel_type})
 
+    def _set_field(fs_id: str, field_path: str, value: str) -> None:
+        """Patch a single scalar field on a fact sheet (non-fatal).
+        LeanIX patch 'value' for enum/string fields must be the raw string, not JSON-encoded."""
+        try:
+            _gql(_MUTATION_PATCH_FS, {
+                "id": fs_id,
+                "patches": [{"op": "add", "path": f"/{field_path}", "value": value}],
+            })
+        except Exception as exc:
+            logger.warning("LeanIX: skipping field %s on %s — %s", field_path, fs_id, exc)
+
+    def _set_lifecycle_full(fs_id: str, phase: str, start_date: str = "", end_date: str = "") -> None:
+        """Set lifecycle phase and optional start/end dates."""
+        lc: dict = {"phases": [{"phase": phase}]}
+        if start_date:
+            lc["phases"][0]["startDate"] = start_date
+        if end_date:
+            lc["phases"][0]["endDate"] = end_date
+        _gql(_MUTATION_SET_LIFECYCLE, {
+            "id": fs_id,
+            "patches": [{"op": "add", "path": "/lifecycle",
+                         "value": json.dumps(lc)}],
+        })
+
     # ── Read staging Excel ────────────────────────────────────────────────────
     wb = openpyxl.load_workbook(str(staging_path))
 
@@ -776,54 +881,179 @@ def write_leanix(
             "Initiatives": "Initiative",
             "Applications": "Application",
             "BusinessCapabilities": "BusinessCapability",
+            "Objectives": "Objective",
         }
         name = sheet_name if sheet_name in wb.sheetnames else _singular.get(sheet_name, sheet_name)
+        if name not in wb.sheetnames:
+            return []
         ws     = wb[name]
         header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        # Detect 2-row header (row 2 = translations): skip row 2 if all non-empty
+        # cells look like human labels (no slash, no camelCase pattern of keys)
+        rows_iter = ws.iter_rows(min_row=2)
+        first_row = next(rows_iter, None)
+        data_start_iter = rows_iter  # remaining rows after potential header row 2
+        if first_row is not None:
+            # Row 2 is a translation row if 'type' column has value "Type" (title case)
+            type_idx = next((i for i, h in enumerate(header) if h == "type"), None)
+            if type_idx is not None and type_idx < len(first_row):
+                if str(first_row[type_idx].value or "").strip() == "Type":
+                    # This is the translation row — skip it, use data_start_iter
+                    pass
+                else:
+                    # Not a translation row — include it
+                    data_start_iter = [first_row, *ws.iter_rows(min_row=3)]
+            else:
+                data_start_iter = [first_row, *ws.iter_rows(min_row=3)]
         return [
             {header[i]: (cell.value or "") for i, cell in enumerate(row)}
-            for row in ws.iter_rows(min_row=2)
+            for row in data_start_iter
             if any(cell.value for cell in row)
         ]
 
     init_rows = _sheet_rows("Initiatives")
     bc_rows   = _sheet_rows("BusinessCapabilities")
     app_rows  = _sheet_rows("Applications")
+    obj_rows  = _sheet_rows("Objectives")
 
     # ── Push ──────────────────────────────────────────────────────────────────
     client_tag = f"client={client_name}"
     tag_id     = _get_or_create_tag_id(client_tag)
     logger.info("LeanIX: using tag '%s' (id=%s)", client_tag, tag_id)
 
+    # Pre-resolve "Architecture State" > "Baseline" tag (needed for TIME/6R KPIs)
+    arch_state_baseline_id = _find_tag_in_group("Baseline", "Architecture State")
+    if arch_state_baseline_id is None:
+        arch_state_baseline_id = _get_or_create_tag_id("Baseline", "Architecture State")
+    logger.info("LeanIX: Architecture State 'Baseline' tag id=%s", arch_state_baseline_id)
+
+    # Backfill: tag ALL existing apps without Architecture State tag → "Baseline"
+    # This ensures workspace-wide Architecture State coverage (needed for KPI ≥ 90%)
+    _QUERY_ALL_APPS_BASIC = """
+    query {
+      allFactSheets(filter: { facetFilters: [{ facetKey: "FactSheetTypes", keys: ["Application"] }] }) {
+        edges { node { id displayName
+          tags { id name tagGroup { id name } }
+        }}
+      }
+    }
+    """
+    try:
+        all_apps_result = _gql(_QUERY_ALL_APPS_BASIC, {})
+        for edge in all_apps_result["data"]["allFactSheets"]["edges"]:
+            app_node = edge["node"]
+            has_arch_state = any(
+                (t.get("tagGroup") or {}).get("name") == "Architecture State"
+                for t in app_node.get("tags", [])
+            )
+            if not has_arch_state:
+                _tag_fs(app_node["id"], arch_state_baseline_id)
+                logger.debug("LeanIX: backfilled Architecture State 'Baseline' on app '%s'", app_node["displayName"])
+        logger.info("LeanIX: Architecture State backfill complete")
+    except Exception as exc:
+        logger.warning("LeanIX: Architecture State backfill failed — %s", exc)
+
+    # Backfill: same for BCs
+    try:
+        _QUERY_ALL_BCS_BASIC = """
+        query {
+          allFactSheets(filter: { facetFilters: [{ facetKey: "FactSheetTypes", keys: ["BusinessCapability"] }] }) {
+            edges { node { id displayName
+              tags { id name tagGroup { id name } }
+            }}
+          }
+        }
+        """
+        all_bcs_result = _gql(_QUERY_ALL_BCS_BASIC, {})
+        for edge in all_bcs_result["data"]["allFactSheets"]["edges"]:
+            bc_node = edge["node"]
+            has_arch_state = any(
+                (t.get("tagGroup") or {}).get("name") == "Architecture State"
+                for t in bc_node.get("tags", [])
+            )
+            if not has_arch_state:
+                _tag_fs(bc_node["id"], arch_state_baseline_id)
+        logger.info("LeanIX: BC Architecture State backfill complete")
+    except Exception as exc:
+        logger.warning("LeanIX: BC Architecture State backfill failed — %s", exc)
+
+    # 0. Upsert Objectives (if sheet present)
+    obj_id_cache: dict[str, str] = {}
+    for row in obj_rows:
+        name = str(row.get("name", "")).strip()
+        if not name:
+            continue
+        obj_id, created = _upsert("Objective", name)
+        obj_id_cache[name] = obj_id
+        extra_tags = _resolve_extra_tags(row, skip=client_tag)
+        all_tags = list(dict.fromkeys([tag_id] + extra_tags)) if created else extra_tags
+        if all_tags:
+            _tag_fs_multi(obj_id, all_tags)
+        logger.debug("LeanIX Obj %s '%s'", "created" if created else "found", name)
+
     # 1. Upsert BusinessCapabilities
     bc_id_cache: dict[str, str] = {}
     for row in bc_rows:
-        name = str(row["name"]).strip()
+        name = str(row.get("name", "")).strip()
         if not name:
             continue
         bc_id, created = _upsert("BusinessCapability", name)
         bc_id_cache[name] = bc_id
+        extra_tags = _resolve_extra_tags(row, skip=client_tag)
         if created:
-            _tag_fs(bc_id, tag_id)
+            _tag_fs_multi(bc_id, list(dict.fromkeys([tag_id, arch_state_baseline_id] + extra_tags)))
+        else:
+            all_extra = list(dict.fromkeys([arch_state_baseline_id] + extra_tags))
+            _tag_fs_multi(bc_id, all_extra)
+        # Write optional BC fields
+        catalog_status = str(row.get("lxCatalogStatus") or "").strip()
+        if catalog_status:
+            _set_field(bc_id, "lxCatalogStatus", catalog_status)
+        scope_bc = str(row.get("scopeBC") or "").strip()
+        if scope_bc:
+            _set_field(bc_id, "scopeBC", scope_bc)
         logger.debug("LeanIX BC %s '%s'", "created" if created else "found", name)
 
     # 2. Upsert Applications
     app_id_cache: dict[str, str] = {}
     for row in app_rows:
-        name = str(row["name"]).strip()
+        name = str(row.get("name", "")).strip()
         if not name:
             continue
         app_id, created = _upsert("Application", name)
         app_id_cache[name] = app_id
+        extra_tags = _resolve_extra_tags(row, skip=client_tag)
         if created:
-            _tag_fs(app_id, tag_id)
-        # Set lifecycle if present
-        lc = row.get("lifecycle_phase") or row.get("lifecycle")
-        if lc:
-            _set_lifecycle(app_id, str(lc).strip())
-        # Link → BCs
+            _tag_fs_multi(app_id, list(dict.fromkeys([tag_id, arch_state_baseline_id] + extra_tags)))
+        else:
+            all_extra = list(dict.fromkeys([arch_state_baseline_id] + extra_tags))
+            _tag_fs_multi(app_id, all_extra)
+        # Set lifecycle (with optional start/end dates)
+        lc_phase = str(row.get("lifecycle_phase") or row.get("lifecycle") or "").strip()
+        if lc_phase:
+            lc_start = str(row.get("lifecycle_startDate") or "").strip()
+            lc_end   = str(row.get("lifecycle_endDate") or "").strip()
+            _set_lifecycle_full(app_id, lc_phase, lc_start, lc_end)
+        # Functional suitability (accepts both TIME labels and API enum values)
+        func_raw = str(row.get("functionalSuitability") or "").strip().lower()
+        func_val = _TIME_TO_FUNCTIONAL.get(func_raw)
+        if func_val:
+            _set_field(app_id, "functionalSuitability", func_val)
+        # 6R classification (values match API enum directly)
+        six_r = str(row.get("lxSixRClassification") or "").strip()
+        if six_r:
+            _set_field(app_id, "lxSixRClassification", six_r)
+        # Technical suitability
+        tech = str(row.get("technicalSuitability") or "").strip()
+        if tech:
+            _set_field(app_id, "technicalSuitability", tech)
+        # Business criticality
+        biz_crit = str(row.get("businessCriticality") or "").strip()
+        if biz_crit:
+            _set_field(app_id, "businessCriticality", biz_crit)
+        # Link → BCs (semicolon or comma separated)
         bc_rel_raw = row.get("relApplicationToBusinessCapability") or ""
-        for bc_name in str(bc_rel_raw).split(","):
+        for bc_name in re.split(r"[;,]", str(bc_rel_raw)):
             bc_name = bc_name.strip()
             if bc_name and bc_name in bc_id_cache:
                 _create_relation(app_id, bc_id_cache[bc_name],
@@ -844,30 +1074,41 @@ def write_leanix(
                 desc=str(row.get("description", "")),
             )
             if created:
-                _tag_fs(initiative_id, tag_id)
+                extra_tags = _resolve_extra_tags(row, skip=client_tag)
+                all_tags = list(dict.fromkeys([tag_id] + extra_tags))
+                _tag_fs_multi(initiative_id, all_tags)
 
-            # lifecycle — accept both column names
-            lifecycle_val = (
+            # lifecycle with optional start/end dates
+            lifecycle_val = str(
                 row.get("lifecycle_phase") or row.get("lifecycle") or "plan"
-            )
-            _set_lifecycle(initiative_id, str(lifecycle_val).strip())
+            ).strip()
+            lc_start = str(row.get("lifecycle_startDate") or "").strip()
+            lc_end   = str(row.get("lifecycle_endDate") or "").strip()
+            _set_lifecycle_full(initiative_id, lifecycle_val, lc_start, lc_end)
 
-            # Link → BCs — accept both column names
+            # Link → BCs — accept both column names, semicolon or comma separated
             bcs_raw = row.get("relInitiativeToBusinessCapability") or row.get("bcs") or ""
-            for bc_name in str(bcs_raw).split(","):
+            for bc_name in re.split(r"[;,]", str(bcs_raw)):
                 bc_name = bc_name.strip()
                 if bc_name and bc_name in bc_id_cache:
                     _create_relation(initiative_id, bc_id_cache[bc_name],
                                      "relInitiativeToBusinessCapability")
 
-            # Link → Application — accept both column names
-            rsa_name = (
-                row.get("relInitiativeToApplication") or row.get("rsa") or ""
-            )
-            rsa_name = str(rsa_name).strip()
-            if rsa_name and rsa_name in app_id_cache:
-                _create_relation(initiative_id, app_id_cache[rsa_name],
-                                 "relInitiativeToApplication")
+            # Link → Applications — accept both column names, semicolon or comma separated
+            apps_raw = row.get("relInitiativeToApplication") or row.get("rsa") or ""
+            for app_name in re.split(r"[;,]", str(apps_raw)):
+                app_name = app_name.strip()
+                if app_name and app_name in app_id_cache:
+                    _create_relation(initiative_id, app_id_cache[app_name],
+                                     "relInitiativeToApplication")
+
+            # Link → Objectives
+            obj_raw = row.get("relInitiativeToObjective") or ""
+            for obj_name in re.split(r"[;,]", str(obj_raw)):
+                obj_name = obj_name.strip()
+                if obj_name and obj_name in obj_id_cache:
+                    _create_relation(initiative_id, obj_id_cache[obj_name],
+                                     "relInitiativeToObjective")
 
             logger.info("LeanIX: %s initiative '%s'", "created" if created else "updated", init_name)
             pushed += 1

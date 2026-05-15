@@ -2131,7 +2131,7 @@ async function runKpiImport() {
       rc.className = 'result-card success show';
       rc.innerHTML = `
         <div class="result-header">✅ ${t('kpi_ok')}</div>
-        <div class="result-summary">${t('kpi_ok_hint')}</div>
+        <div class="result-summary">${t('kpi_ok_hint', s)}</div>
         <div class="kpi-stats" style="margin-top:10px">
           <div class="kpi-stat"><strong>${s.objectives || 5}</strong>Objectives</div>
           <div class="kpi-stat"><strong>${s.business_capabilities || 91}</strong>BCs</div>
