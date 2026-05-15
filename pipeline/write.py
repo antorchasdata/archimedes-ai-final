@@ -477,7 +477,7 @@ def write_leanix_excel(
                 len(supp_initiatives),
             )
 
-    tags = f"Target;{client_name}"
+    tags = "Target"
     wb = openpyxl.Workbook()
 
     # ── Sheet: Application ─────────────────────────────────────────────────────
@@ -494,7 +494,7 @@ def write_leanix_excel(
             "id": "", "type": "Application", "name": app_name,
             "description": f"TO-BE application derived from requirements analysis. Client: {client_name}.",
             "alias": "", "externalId": "",
-            "lifecycle_phase": app["lifecycle"], "lifecycle_startDate": "", "lifecycle_endDate": "",
+            "lifecycle_phase": "plan", "lifecycle_startDate": "", "lifecycle_endDate": "",
             "businessCriticality": "businessCritical", "functionalSuitability": "",
             "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
             "tags": tags,

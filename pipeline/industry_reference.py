@@ -17,6 +17,8 @@ from typing import Optional
 
 logger = logging.getLogger("archimedes.industry_reference")
 
+_KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
+
 # ── SAP Business Accelerator Hub OData ────────────────────────────────────────
 _API_BASE = "https://api.sap.com/odata/1.0/catalog.svc/ContentPackages"
 _FIELDS   = "DisplayName,Industries,Products"
@@ -266,39 +268,158 @@ def compute_whitespace(
     return result
 
 
+def derive_relations_for_products(
+    products: list[str],
+    industry_label: str,
+    anthropic_client,
+    model: str = "claude-sonnet-4-6",
+) -> dict[str, dict]:
+    """
+    Use Claude API to derive BCs and ITCs for each reference product.
+
+    Returns dict: product_name → {"bcs": ["BC leaf / full path", ...], "itcs": ["ITC name", ...]}
+    """
+    # Load RBA catalog (short_name_index: short_name → full_path)
+    rba = json.loads((_KNOWLEDGE_DIR / "sap_rba_catalog.json").read_text())
+    short_name_index = rba.get("short_name_index", {})  # short → full_path
+    # Build a compact catalog string (short_name: full_path)
+    rba_lines = [f'"{sn}": "{fp}"' for sn, fp in list(short_name_index.items())[:400]]
+    rba_str = "\n".join(rba_lines)
+
+    # Load RSA catalog for ITC domain hints
+    rsa = json.loads((_KNOWLEDGE_DIR / "sap_rsa_catalog.json").read_text())
+    rsa_domains = {a["name"].lower(): a["domain"] for a in rsa.get("applications", [])}
+
+    products_str = "\n".join(f"- {p}" for p in products)
+
+    prompt = f"""You are a senior SAP Enterprise Architect expert in SAP Reference Business Architecture (RBA).
+
+For each of the following SAP products recommended for the {industry_label} industry, identify:
+1. The 2 most relevant RBA Business Capabilities (BCs) — use EXACT short names from the catalog below
+2. The main IT Component type (e.g. "SAP S/4HANA", "SAP Integration Suite", etc.)
+
+## SAP Products to map:
+{products_str}
+
+## RBA Business Capabilities catalog (short_name: full_path):
+{rba_str}
+
+## Output format — return ONLY valid JSON, no markdown, no explanation:
+{{
+  "mappings": [
+    {{
+      "product": "exact product name",
+      "bcs": ["BC short name 1", "BC short name 2"],
+      "itc": "IT Component name or empty string"
+    }}
+  ]
+}}
+
+Rules:
+- bcs: exactly 2 distinct BC short names from the catalog above
+- itc: use the SAP product itself as ITC name, or empty string if not applicable
+- Return mappings for ALL {len(products)} products
+"""
+
+    resp = anthropic_client.messages.create(
+        model=model,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = resp.content[0].text.strip()
+
+    # Parse JSON
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Try to extract JSON block
+        import re
+        m = re.search(r'\{.*\}', raw, re.DOTALL)
+        if m:
+            data = json.loads(m.group())
+        else:
+            logger.warning("Could not parse Claude response for relations: %s", raw[:200])
+            return {}
+
+    # Build result dict: product → {bcs_full_paths, itcs}
+    result: dict[str, dict] = {}
+    for item in data.get("mappings", []):
+        prod  = item.get("product", "")
+        bcs   = item.get("bcs", [])
+        itc   = item.get("itc", "")
+
+        # Resolve BC short names to full paths
+        bcs_full = []
+        for bc_short in bcs:
+            full = short_name_index.get(bc_short)
+            if full:
+                bcs_full.append(full)
+            else:
+                # Try case-insensitive
+                for k, v in short_name_index.items():
+                    if k.lower() == bc_short.lower():
+                        bcs_full.append(v)
+                        break
+
+        result[prod] = {
+            "bcs":  bcs_full,
+            "itcs": [itc] if itc else [],
+        }
+
+    logger.info("Derived relations for %d/%d products", len(result), len(products))
+    return result
+
+
 def add_reference_to_target_excel(
     target_path: Path,
     selected_products: list[str],
     industry_label: str,
     client_name: str = "",
+    relations: dict | None = None,
 ) -> Path:
     """
     Adds selected reference products to the Target LeanIX Excel.
-    Appends rows to the Application sheet with the full LeanIX column format
-    and tag: "Target Reference".
+    Appends rows to the Application sheet with the full LeanIX column format,
+    tag "Target Reference", and derived BC/ITC relations.
     Returns the modified path (same file, modified in-place).
     """
     import openpyxl as xl
-    from pipeline.write import _COLS_APPLICATION, _sheet_header, _sheet_row
+    from pipeline.write import _COLS_APPLICATION, _COLS_BC, _sheet_header, _sheet_row
 
     tag = "Target Reference"
-    description = f"SAP recommended product for {industry_label} — from SAP Reference Architecture."
-    if client_name:
-        description += f" Client: {client_name}."
+    description = f"SAP recommended product for {industry_label} — SAP Reference Architecture."
 
     wb = xl.load_workbook(str(target_path))
 
+    # ── Application sheet ─────────────────────────────────────────────────────
     if "Application" not in wb.sheetnames:
-        ws = wb.create_sheet("Application")
-        _sheet_header(ws, _COLS_APPLICATION)
+        ws_app = wb.create_sheet("Application")
+        _sheet_header(ws_app, _COLS_APPLICATION)
         next_row = 3
     else:
-        ws = wb["Application"]
-        next_row = ws.max_row + 1
+        ws_app = wb["Application"]
+        next_row = ws_app.max_row + 1
 
     keys_app = [c[0] for c in _COLS_APPLICATION]
 
+    # Track new BCs to add to BusinessCapability sheet
+    new_bcs: dict[str, str] = {}  # leaf → full_path
+
     for prod in selected_products:
+        rel = (relations or {}).get(prod, {})
+        bcs_full  = rel.get("bcs", [])
+        itcs_list = rel.get("itcs", [])
+
+        # Build BC leaf names for the relation column (LeanIX uses leaf name)
+        bc_leaves = []
+        for fp in bcs_full:
+            leaf = fp.split("/")[-1].strip()
+            bc_leaves.append(leaf)
+            new_bcs[leaf] = fp
+
+        bcs_str  = ";".join(bc_leaves)
+        itcs_str = ";".join(itcs_list)
+
         vals = {
             "id": "", "type": "Application", "name": prod,
             "description": description,
@@ -307,13 +428,41 @@ def add_reference_to_target_excel(
             "businessCriticality": "", "functionalSuitability": "",
             "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
             "tags": tag,
-            "relApplicationToBusinessCapability": "",
-            "relApplicationToITComponent": "", "relToParent": "",
+            "relApplicationToBusinessCapability": bcs_str,
+            "relApplicationToITComponent": itcs_str, "relToParent": "",
         }
-        _sheet_row(ws, next_row, [vals.get(k, "") for k in keys_app])
+        _sheet_row(ws_app, next_row, [vals.get(k, "") for k in keys_app])
         next_row += 1
 
-    wb.save(str(target_path))
-    logger.info("Added %d reference products to %s", len(selected_products), target_path.name)
+    # ── BusinessCapability sheet — add new BCs if not already present ─────────
+    if new_bcs:
+        if "BusinessCapability" not in wb.sheetnames:
+            ws_bc = wb.create_sheet("BusinessCapability")
+            _sheet_header(ws_bc, _COLS_BC)
+            bc_next = 3
+            existing_bc_names: set[str] = set()
+        else:
+            ws_bc = wb["BusinessCapability"]
+            bc_next = ws_bc.max_row + 1
+            existing_bc_names = {
+                str(ws_bc.cell(r, 3).value or "").strip().lower()
+                for r in range(3, ws_bc.max_row + 1)
+            }
 
+        keys_bc = [c[0] for c in _COLS_BC]
+        for leaf, full_path in new_bcs.items():
+            if leaf.lower() in existing_bc_names:
+                continue
+            parts  = [s.strip() for s in full_path.split("/")]
+            parent = " / ".join(parts[:-1]) if len(parts) > 1 else ""
+            bc_vals = {
+                "id": "", "type": "BusinessCapability", "name": leaf,
+                "description": full_path,
+                "lxState": "DRAFT", "tags": tag, "relToParent": parent,
+            }
+            _sheet_row(ws_bc, bc_next, [bc_vals.get(k, "") for k in keys_bc])
+            bc_next += 1
+
+    wb.save(str(target_path))
+    logger.info("Added %d reference products + %d BCs to %s", len(selected_products), len(new_bcs), target_path.name)
     return target_path

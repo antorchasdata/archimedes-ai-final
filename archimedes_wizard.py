@@ -56,7 +56,10 @@ from pipeline.write         import write, write_leanix_excel_from_xlsx, push_lea
 from pipeline.pdf_extract   import extract_pdf_factsheets
 from pipeline.image_extract import extract_image_factsheets
 from pipeline.help_contrast      import run_contrast, print_contrast_summary
-from pipeline.industry_reference import get_industry_reference, compute_whitespace, add_reference_to_target_excel, INDUSTRIES
+from pipeline.industry_reference import (
+    get_industry_reference, compute_whitespace,
+    add_reference_to_target_excel, derive_relations_for_products, INDUSTRIES
+)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(name)s — %(message)s")
@@ -402,8 +405,13 @@ async def apply_industry_reference(session_id: str, body: dict):
         sess["out_target"] = out_target
 
     try:
+        # Derive BC/ITC relations via Claude API
+        relations = await asyncio.to_thread(
+            derive_relations_for_products,
+            selected, industry_label, _get_anthropic(), MODEL,
+        )
         await asyncio.to_thread(
-            add_reference_to_target_excel, out_target, selected, industry_label, client_name
+            add_reference_to_target_excel, out_target, selected, industry_label, client_name, relations
         )
     except Exception as exc:
         logger.exception("Apply industry reference error")

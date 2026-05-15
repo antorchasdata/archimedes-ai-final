@@ -657,8 +657,10 @@ const LANGS = {
     s6_desc_target: 'Fact sheets derived from requirements — import into LeanIX',
     s6_label_supp: 'Additional fact sheets (PDF + images)',
     s6_desc_supp: 'Review manually before importing into LeanIX',
-    // step 7
-    s7_eye: (n, total) => `Step 8 of ${total}`,
+    // step 7 — industry reference
+    s7ref_eye: (n, total) => `Step ${n} of ${total}`,
+    // step 8 — import
+    s7_eye: (n, total) => `Step ${n} of ${total}`,
     s7_title: 'Import into LeanIX',
     s7_no_creds: 'LeanIX credentials not configured',
     s7_no_creds_hint: 'Configure <strong>LEANIX_API_TOKEN</strong> and <strong>LEANIX_BASE_URL</strong> in the <code>.env</code> file to import automatically.',
@@ -772,7 +774,8 @@ const LANGS = {
     s6_desc_target: 'Fact sheets derivados de requerimientos — importar en LeanIX',
     s6_label_supp: 'Fact sheets adicionales (PDF + imágenes)',
     s6_desc_supp: 'Revisar manualmente antes de importar en LeanIX',
-    s7_eye: (n, total) => `Paso 8 de ${total}`,
+    s7ref_eye: (n, total) => `Paso ${n} de ${total}`,
+    s7_eye: (n, total) => `Paso ${n} de ${total}`,
     s7_title: 'Importar en LeanIX',
     s7_no_creds: 'Credenciales LeanIX no configuradas',
     s7_no_creds_hint: 'Configura <strong>LEANIX_API_TOKEN</strong> y <strong>LEANIX_BASE_URL</strong> en el fichero <code>.env</code> para importar automáticamente.',
@@ -882,7 +885,8 @@ const LANGS = {
     s6_desc_target: 'Fact sheets dérivées des exigences — importer dans LeanIX',
     s6_label_supp: 'Fact sheets supplémentaires (PDF + images)',
     s6_desc_supp: 'À vérifier manuellement avant d\'importer dans LeanIX',
-    s7_eye: (n, total) => `Étape 8 sur ${total}`,
+    s7ref_eye: (n, total) => `Étape ${n} sur ${total}`,
+    s7_eye: (n, total) => `Étape ${n} sur ${total}`,
     s7_title: 'Importer dans LeanIX',
     s7_no_creds: 'Identifiants LeanIX non configurés',
     s7_no_creds_hint: 'Configurez <strong>LEANIX_API_TOKEN</strong> et <strong>LEANIX_BASE_URL</strong> dans le fichier <code>.env</code> pour importer automatiquement.',
@@ -991,7 +995,8 @@ const LANGS = {
     s6_desc_target: 'Fact sheet derivati dai requisiti — importare in LeanIX',
     s6_label_supp: 'Fact sheet aggiuntivi (PDF + immagini)',
     s6_desc_supp: 'Verificare manualmente prima di importare in LeanIX',
-    s7_eye: (n, total) => `Passo 8 di ${total}`,
+    s7ref_eye: (n, total) => `Passo ${n} di ${total}`,
+    s7_eye: (n, total) => `Passo ${n} di ${total}`,
     s7_title: 'Importa in LeanIX',
     s7_no_creds: 'Credenziali LeanIX non configurate',
     s7_no_creds_hint: 'Configura <strong>LEANIX_API_TOKEN</strong> e <strong>LEANIX_BASE_URL</strong> nel file <code>.env</code> per importare automaticamente.',
@@ -1100,7 +1105,8 @@ const LANGS = {
     s6_desc_target: 'Vaatimuksista johdetut fact sheetit — tuo LeanIX:ään',
     s6_label_supp: 'Lisä-fact sheetit (PDF + kuvat)',
     s6_desc_supp: 'Tarkista manuaalisesti ennen LeanIX:ään tuomista',
-    s7_eye: (n, total) => `Vaihe 8 / ${total}`,
+    s7ref_eye: (n, total) => `Vaihe ${n} / ${total}`,
+    s7_eye: (n, total) => `Vaihe ${n} / ${total}`,
     s7_title: 'Tuo LeanIX:ään',
     s7_no_creds: 'LeanIX-tunnistetietoja ei ole määritetty',
     s7_no_creds_hint: 'Määritä <strong>LEANIX_API_TOKEN</strong> ja <strong>LEANIX_BASE_URL</strong> tiedostossa <code>.env</code> automaattista tuontia varten.',
@@ -1135,6 +1141,7 @@ const STEPS = [
   { id: 'pdf',       skippable: true  },
   { id: 'images',    skippable: true  },
   { id: 'generate',  skippable: false },
+  { id: 'reference', skippable: true  },
   { id: 'import',    skippable: true  },
 ];
 
@@ -1272,7 +1279,8 @@ async function runStep(step) {
   if (step === 4) return runStepPdf();
   if (step === 5) return runStepImages();
   if (step === 6) return runStepGenerate();
-  if (step === 7) return runStepPush();
+  if (step === 7) return;   // Industry Reference — user-driven, no auto-run
+  if (step === 8) return runStepPush();
 }
 
 // ── Step 0 — Client name ──────────────────────────────────────────────────────
@@ -1757,7 +1765,6 @@ function renderStep6() {
       <div class="spinner"></div><span class="spinner-text">${t('s6_busy')}</span>
     </div>
     <div id="step6-outputs"></div>
-    ${renderIndustryReference()}
   `;
 }
 
@@ -1809,11 +1816,21 @@ async function runStepGenerate() {
   `;
 }
 
-// ── Step 7 — Import ──────────────────────────────────────────────────────────
+// ── Step 7 — Industry Reference Architecture ──────────────────────────────────
 function renderStep7() {
+  return `
+    <div class="step-eyebrow">${t('s7ref_eye', 8, STEPS.length)}</div>
+    <h1 class="step-title">${t('s3c_title')}</h1>
+    <p class="step-desc">${t('s3c_desc')}</p>
+    ${renderIndustryReference()}
+  `;
+}
+
+// ── Step 8 — Import ──────────────────────────────────────────────────────────
+function renderStep8() {
   if (!leanixOk) {
     return `
-      <div class="step-eyebrow">${t('s7_eye', 8, STEPS.length)}</div>
+      <div class="step-eyebrow">${t('s7_eye', 9, STEPS.length)}</div>
       <h1 class="step-title">${t('s7_title')}</h1>
       <div class="result-card info show" style="margin-top:0;margin-bottom:0">
         <div class="result-header">ℹ️ ${t('s7_no_creds')}</div>
@@ -1922,7 +1939,7 @@ function showDone() {
 function renderStep(n) {
   pendingImages = [];
   const renderers = [renderStep0, renderStep1, renderStep2, renderStep3,
-                     renderStep4, renderStep5, renderStep6, renderStep7];
+                     renderStep4, renderStep5, renderStep6, renderStep7, renderStep8];
   const html = renderers[n] ? renderers[n]() : '';
   document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
   showNav();
