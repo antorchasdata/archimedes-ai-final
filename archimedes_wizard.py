@@ -353,10 +353,11 @@ async def run_industry_reference(session_id: str, body: dict):
         logger.exception("Industry reference fetch error")
         raise HTTPException(status_code=500, detail=str(exc))
 
-    # Compute whitespace against baseline
+    # Compute whitespace against baseline AND target
     baseline_path = sess.get("out_baseline")
+    target_path   = sess.get("out_target")
     whitespace = await asyncio.to_thread(
-        compute_whitespace, reference["products"], baseline_path
+        compute_whitespace, reference["products"], baseline_path, target_path
     )
 
     sess["industry_reference"] = {
@@ -402,7 +403,7 @@ async def apply_industry_reference(session_id: str, body: dict):
 
     try:
         await asyncio.to_thread(
-            add_reference_to_target_excel, out_target, selected, industry_label
+            add_reference_to_target_excel, out_target, selected, industry_label, client_name
         )
     except Exception as exc:
         logger.exception("Apply industry reference error")

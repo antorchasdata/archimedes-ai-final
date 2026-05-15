@@ -211,42 +211,55 @@ def get_industry_reference(industry_key: str) -> dict:
     }
 
 
+def _load_app_names_from_excel(path: Path) -> set[str]:
+    """Read Application sheet col C (Name, row 3+) from a LeanIX-format Excel."""
+    names: set[str] = set()
+    if not path or not path.exists():
+        return names
+    try:
+        import openpyxl as xl
+        wb = xl.load_workbook(str(path), read_only=True, data_only=True)
+        if "Application" not in wb.sheetnames:
+            return names
+        ws = wb["Application"]
+        for row in ws.iter_rows(min_row=3, values_only=True):
+            # col C = index 2 = Name
+            name = row[2] if len(row) > 2 else None
+            if name:
+                names.add(str(name).strip().lower())
+    except Exception as exc:
+        logger.warning("Could not read %s: %s", path, exc)
+    return names
+
+
 def compute_whitespace(
     reference_products: list[str],
     baseline_path: Optional[Path],
+    target_path: Optional[Path] = None,
 ) -> list[dict]:
     """
-    Compare reference products against the client's Baseline Excel.
+    Compare reference products against the client's Baseline AND Target Excels.
 
     Returns list of dicts:
         {
             "name": "SAP Signavio Process Manager",
             "in_baseline": False,
-            "include": False,   # default unchecked
+            "in_target": False,
+            "include": False,
         }
     """
-    # Load baseline app names if available
-    baseline_names: set[str] = set()
-    if baseline_path and baseline_path.exists():
-        try:
-            import openpyxl as xl
-            wb = xl.load_workbook(str(baseline_path), read_only=True, data_only=True)
-            # Application sheet: column B = displayName (row 3+)
-            if "Application" in wb.sheetnames:
-                ws = wb["Application"]
-                for row in ws.iter_rows(min_row=3, values_only=True):
-                    name = row[1] if len(row) > 1 else None
-                    if name:
-                        baseline_names.add(str(name).strip().lower())
-        except Exception as exc:
-            logger.warning("Could not read baseline: %s", exc)
+    baseline_names = _load_app_names_from_excel(baseline_path)
+    target_names   = _load_app_names_from_excel(target_path)
+    known_names    = baseline_names | target_names
 
     result = []
     for prod in reference_products:
-        in_baseline = prod.strip().lower() in baseline_names
+        key = prod.strip().lower()
         result.append({
             "name":        prod,
-            "in_baseline": in_baseline,
+            "in_baseline": key in baseline_names,
+            "in_target":   key in target_names,
+            "in_client":   key in known_names,   # already covered (baseline OR target)
             "include":     False,
         })
 
@@ -257,27 +270,48 @@ def add_reference_to_target_excel(
     target_path: Path,
     selected_products: list[str],
     industry_label: str,
+    client_name: str = "",
 ) -> Path:
     """
     Adds selected reference products to the Target LeanIX Excel.
-    Appends rows to the Application sheet with tags: Target;Reference;{industry}.
+    Appends rows to the Application sheet with the full LeanIX column format
+    and tag: "Target Reference".
     Returns the modified path (same file, modified in-place).
     """
     import openpyxl as xl
+    from pipeline.write import _COLS_APPLICATION, _sheet_header, _sheet_row
+
+    tag = "Target Reference"
+    description = f"SAP recommended product for {industry_label} — from SAP Reference Architecture."
+    if client_name:
+        description += f" Client: {client_name}."
 
     wb = xl.load_workbook(str(target_path))
 
     if "Application" not in wb.sheetnames:
         ws = wb.create_sheet("Application")
-        # Write header row (simplified)
-        ws.append(["type", "displayName", "description", "tags"])
+        _sheet_header(ws, _COLS_APPLICATION)
+        next_row = 3
     else:
         ws = wb["Application"]
+        next_row = ws.max_row + 1
 
-    tag = f"Target;Reference;{industry_label}"
+    keys_app = [c[0] for c in _COLS_APPLICATION]
 
     for prod in selected_products:
-        ws.append(["Application", prod, f"SAP Reference Architecture — {industry_label}", tag])
+        vals = {
+            "id": "", "type": "Application", "name": prod,
+            "description": description,
+            "alias": "", "externalId": "",
+            "lifecycle_phase": "plan", "lifecycle_startDate": "", "lifecycle_endDate": "",
+            "businessCriticality": "", "functionalSuitability": "",
+            "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
+            "tags": tag,
+            "relApplicationToBusinessCapability": "",
+            "relApplicationToITComponent": "", "relToParent": "",
+        }
+        _sheet_row(ws, next_row, [vals.get(k, "") for k in keys_app])
+        next_row += 1
 
     wb.save(str(target_path))
     logger.info("Added %d reference products to %s", len(selected_products), target_path.name)
