@@ -334,6 +334,7 @@ def write_leanix_excel(
     output_path: Path,
     client_name: str,
     supplementary: dict | None = None,
+    lift_shift: list[dict] | None = None,
 ) -> None:
     """
     Write a LeanIX-importable multi-sheet Excel with proper format:
@@ -352,6 +353,10 @@ def write_leanix_excel(
       keys "from_pdf" and/or "from_images", each with lists "applications",
       "business_capabilities", "initiatives", "it_components". These are merged
       into the respective sheets (deduplicated by name).
+
+    lift_shift: optional list of selected conversion dicts from lift_shift.convert_to_rise().
+      Each dict has: target_matnr, target_desc, status, deployment, prereq_resolved, source_app.
+      These are added as Applications with lifecycle="plan", tag="Target;LiftShift;<client>".
     """
     import openpyxl
 
@@ -477,6 +482,41 @@ def write_leanix_excel(
                 len(supp_initiatives),
             )
 
+    # ── Merge Lift & Shift conversions ─────────────────────────────────────────
+    ls_tag = f"Target;LiftShift;{client_name}"
+    seen_prereqs: dict[str, dict] = {}   # prereq_name → {matnr, for_app, maktx}
+    if lift_shift:
+        for conv in lift_shift:
+            name = conv.get("target_desc") or conv.get("target_matnr", "")
+            if not name:
+                continue
+            name = name.strip()
+            if name not in seen_apps:
+                seen_apps[name] = {
+                    "name":       name,
+                    "lifecycle":  "plan",
+                    "bcs":        set(),
+                    "itcs":       set(),
+                    "extra_tags": ls_tag,
+                    "description": (
+                        f"RISE target for {conv.get('source_app','')}. "
+                        f"Material: {conv.get('target_matnr','')} | "
+                        f"Deployment: {conv.get('deployment','')} | "
+                        f"Status: {conv.get('status','')} — {conv.get('status_desc','')}"
+                    )[:2000],
+                }
+            # Collect prerequisite apps separately (NOT in seen_apps)
+            for prereq in conv.get("prereq_resolved", []):
+                prereq_name = prereq.get("maktx") or prereq.get("matnr", "")
+                prereq_name = prereq_name.strip()
+                if prereq_name and prereq_name not in seen_prereqs:
+                    seen_prereqs[prereq_name] = {
+                        "matnr":   prereq.get("matnr", ""),
+                        "maktx":   prereq_name,
+                        "for_app": name,
+                    }
+        logger.info("Lift & Shift merged: +%d target apps, +%d prerequisites", len(lift_shift), len(seen_prereqs))
+
     tags = "Target"
     wb = openpyxl.Workbook()
 
@@ -490,22 +530,45 @@ def write_leanix_excel(
     for row_idx, (app_name, app) in enumerate(sorted(seen_apps.items()), start=3):
         bcs_str  = ";".join(sorted(app["bcs"]))
         itcs_str = ";".join(sorted(app.get("itcs", set())))
+        app_tags = app.get("extra_tags") or tags
+        app_desc = app.get("description") or f"TO-BE application derived from requirements analysis. Client: {client_name}."
+        app_lifecycle = app.get("lifecycle", "plan")
         vals = {
             "id": "", "type": "Application", "name": app_name,
-            "description": f"TO-BE application derived from requirements analysis. Client: {client_name}.",
+            "description": app_desc,
             "alias": "", "externalId": "",
-            "lifecycle_phase": "plan", "lifecycle_startDate": "", "lifecycle_endDate": "",
+            "lifecycle_phase": app_lifecycle, "lifecycle_startDate": "", "lifecycle_endDate": "",
             "businessCriticality": "businessCritical", "functionalSuitability": "",
             "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
-            "tags": tags,
+            "tags": app_tags,
             "relApplicationToBusinessCapability": bcs_str,
             "relApplicationToITComponent": itcs_str, "relToParent": "",
         }
         _sheet_row(ws_app, row_idx, [vals.get(k, "") for k in keys_app])
 
+    # ── Sheet: Prerequisites (Lift & Shift only — reference, not for import) ───
+    if seen_prereqs:
+        ws_pre = wb.create_sheet("Prerequisites")
+        ws_pre.freeze_panes = "A2"
+        pre_headers = ["Material Number", "Description", "Required by (Target App)"]
+        pre_widths   = [18, 55, 55]
+        from openpyxl.styles import PatternFill, Font as _Font, Alignment as _Align
+        hdr_fill = PatternFill("solid", fgColor="E76500")
+        for col_idx, (hdr, width) in enumerate(zip(pre_headers, pre_widths), start=1):
+            cell = ws_pre.cell(row=1, column=col_idx, value=hdr)
+            cell.fill = hdr_fill
+            cell.font = _Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+            cell.alignment = _Align(horizontal="center", vertical="center")
+            ws_pre.column_dimensions[cell.column_letter].width = width
+        ws_pre.row_dimensions[1].height = 22
+        for row_idx, (prereq_name, prereq) in enumerate(sorted(seen_prereqs.items()), start=2):
+            ws_pre.cell(row=row_idx, column=1, value=prereq.get("matnr", ""))
+            ws_pre.cell(row=row_idx, column=2, value=prereq_name)
+            ws_pre.cell(row=row_idx, column=3, value=prereq.get("for_app", ""))
+        ws_pre.sheet_properties.tabColor = "E76500"
+
     # ── Sheet: BusinessCapability ──────────────────────────────────────────────
     ws_bc = wb.create_sheet("BusinessCapability")
-    ws_bc.freeze_panes = "C3"
     _sheet_header(ws_bc, _COLS_BC)
     keys_bc = [c[0] for c in _COLS_BC]
 

@@ -7,6 +7,8 @@ Endpoints:
   POST /api/session                       → create session (Step 0: client name)
   GET  /api/session/{id}/catalog          → catalog status (Step 1)
   POST /api/session/{id}/baseline         → baseline generation (Step 2)
+  POST /api/session/{id}/lift-shift/resolve → Lift & Shift: resolve app names → Material Numbers (Step 2b)
+  POST /api/session/{id}/lift-shift/convert → Lift & Shift: convert SKUs to RISE targets (Step 2b)
   POST /api/session/{id}/requirements     → requirements Excel (Step 3)
   POST /api/session/{id}/contrast         → SAP Help Portal contrast (Step 3b, optional)
   POST /api/session/{id}/pdf              → PDF extraction (Step 4)
@@ -57,6 +59,11 @@ from pipeline.write         import write, write_leanix_excel_from_xlsx, push_lea
 from pipeline.pdf_extract   import extract_pdf_factsheets
 from pipeline.image_extract import extract_image_factsheets
 from pipeline.help_contrast      import run_contrast, print_contrast_summary
+from pipeline.lift_shift    import (
+    get_material_session, check_session,
+    resolve_app_to_skus, get_deployment_modes,
+    convert_to_rise, resolve_prerequisites,
+)
 from pipeline.industry_reference import (
     get_industry_reference, compute_whitespace,
     add_reference_to_target_excel, derive_relations_for_products, INDUSTRIES
@@ -138,6 +145,7 @@ async def create_session(body: dict):
         "out_baseline":      None,
         "out_target":        None,
         "out_supplementary": None,
+        "lift_shift_result": None,
     }
 
     logger.info("Session created: %s  client=%s", session_id, client_name)
@@ -212,6 +220,135 @@ async def run_baseline(
         "n_cloud":      result["n_cloud"],
         "n_total":      result["n_total"],
         "download_url": f"/api/session/{session_id}/download/baseline",
+    }
+
+
+# ── Step 2b — Lift & Shift: Resolve ───────────────────────────────────────────
+
+@app.post("/api/session/{session_id}/lift-shift/resolve")
+async def lift_shift_resolve(session_id: str):
+    """
+    Phase 1: Read app names from the baseline Excel, resolve each to a Material Number
+    via the SAP Material Mapping API (Claude picks best candidate when multiple exist).
+    Also returns the union of available deployment modes across all resolved SKUs.
+    """
+    sess = _session(session_id)
+    baseline_path = sess.get("out_baseline")
+    if not baseline_path or not Path(baseline_path).exists():
+        raise HTTPException(status_code=400, detail="Baseline not generated yet — complete Step 2 first.")
+
+    # Extract app names from baseline Excel (col C = name, starting row 3)
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(baseline_path)
+        ws = wb["Applications"]
+        app_names = [
+            row[2] for row in ws.iter_rows(min_row=3, values_only=True)
+            if row[2] and str(row[2]).strip()
+        ]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read baseline Excel: {exc}")
+
+    if not app_names:
+        raise HTTPException(status_code=400, detail="No applications found in the baseline Excel.")
+
+    # Build material session (Chrome cookies)
+    mat_session = get_material_session()
+    if not check_session(mat_session):
+        raise HTTPException(
+            status_code=503,
+            detail="SAP Material Mapping Tool session expired — open Chrome with the app and retry."
+        )
+
+    # Resolve names → SKUs (Claude picks best candidate)
+    try:
+        resolved = await asyncio.to_thread(resolve_app_to_skus, app_names, mat_session)
+    except Exception as exc:
+        logger.exception("Lift & Shift resolve error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    # Get deployment modes across all resolved SKUs
+    skus = [r["selected"] for r in resolved if r["selected"]]
+    try:
+        modes = await asyncio.to_thread(get_deployment_modes, skus, mat_session)
+    except Exception as exc:
+        logger.exception("Lift & Shift deployment modes error")
+        modes = []
+
+    # Store mat_session is not serialisable; store resolved list in session
+    sess["lift_shift_resolved"] = resolved
+    sess["lift_shift_modes"]    = modes
+
+    return {
+        "ok":       True,
+        "resolved": resolved,
+        "modes":    modes,
+        "n_apps":   len(app_names),
+        "n_found":  sum(1 for r in resolved if r["selected"]),
+        "n_not_found": sum(1 for r in resolved if not r["selected"]),
+    }
+
+
+# ── Step 2b — Lift & Shift: Convert ───────────────────────────────────────────
+
+@app.post("/api/session/{session_id}/lift-shift/convert")
+async def lift_shift_convert(session_id: str, body: dict):
+    """
+    Phase 2: Given user-confirmed mappings and chosen deployment mode,
+    run the conversion and return target materials + prerequisites.
+
+    Body: {
+      "mappings": [{"app_name": str, "selected": str (matnr)}],
+      "deployment_mode": str
+    }
+    """
+    sess = _session(session_id)
+    mappings        = body.get("mappings", [])
+    deployment_mode = body.get("deployment_mode", "").strip()
+
+    if not mappings:
+        raise HTTPException(status_code=400, detail="mappings is required.")
+    if not deployment_mode:
+        raise HTTPException(status_code=400, detail="deployment_mode is required.")
+
+    mat_session = get_material_session()
+    if not check_session(mat_session):
+        raise HTTPException(
+            status_code=503,
+            detail="SAP Material Mapping Tool session expired — open Chrome with the app and retry."
+        )
+
+    try:
+        conversions = await asyncio.to_thread(convert_to_rise, mappings, deployment_mode, mat_session)
+    except Exception as exc:
+        logger.exception("Lift & Shift convert error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    # Resolve all unique prerequisite SKUs to names
+    all_prereq_skus = list({sku for c in conversions for sku in c["prereq_list"]})
+    try:
+        prereq_names = await asyncio.to_thread(resolve_prerequisites, all_prereq_skus, mat_session)
+        prereq_map   = {p["matnr"]: p["maktx"] for p in prereq_names}
+    except Exception:
+        prereq_map = {}
+
+    # Enrich conversions with resolved prereq names
+    for c in conversions:
+        c["prereq_resolved"] = [
+            {"matnr": sku, "maktx": prereq_map.get(sku, sku)}
+            for sku in c["prereq_list"]
+        ]
+
+    sess["lift_shift_result"] = {
+        "deployment_mode": deployment_mode,
+        "conversions":     conversions,
+    }
+
+    return {
+        "ok":          True,
+        "conversions": conversions,
+        "n_converted": len(conversions),
+        "deployment_mode": deployment_mode,
     }
 
 
@@ -598,6 +735,36 @@ async def run_generate(session_id: str):
             "stats":        f"{n_apps} apps identificadas",
         })
 
+    # Lift & Shift Target Excel (written as the main Target file)
+    ls_result = sess.get("lift_shift_result")
+    if ls_result and ls_result.get("conversions"):
+        try:
+            from pipeline.write import write_leanix_excel
+            ls_convs    = ls_result["conversions"]
+            ls_out_path = out_dir / f"{client_name}_target_leanix.xlsx"
+            await asyncio.to_thread(
+                write_leanix_excel,
+                [],        # no enriched requirements — apps come from lift_shift param
+                {},        # no bcs_index
+                ls_out_path,
+                client_name,
+                lift_shift=ls_convs,
+            )
+            sess["out_target"]    = ls_out_path
+            sess["out_liftshift"] = ls_out_path
+            n_ls = len({c.get("target_matnr") for c in ls_convs})
+            n_prereqs = len({p["matnr"] for c in ls_convs for p in c.get("prereq_resolved", [])})
+            outputs.append({
+                "key":          "target",
+                "label":        "Target TO-BE (Lift & Shift)",
+                "description":  f"RISE conversion targets ({ls_result.get('deployment_mode','')}) — importar en LeanIX como TO-BE",
+                "filename":     ls_out_path.name,
+                "download_url": f"/api/session/{session_id}/download/target",
+                "stats":        f"{n_ls} targets · {n_prereqs} prerequisites",
+            })
+        except Exception as exc:
+            logger.exception("Lift & Shift generate error")
+
     if not outputs:
         raise HTTPException(status_code=400, detail="No hay datos para generar. Completa al menos el Paso 2 o el Paso 3.")
 
@@ -701,6 +868,7 @@ _DOWNLOAD_KEYS = {
     "target":        "out_target",
     "supplementary": "out_supplementary",
     "contrast":      "out_contrast",
+    "liftshift":     "out_liftshift",
 }
 
 @app.get("/api/session/{session_id}/download/{key}")

@@ -1255,6 +1255,8 @@ let stepDone       = new Array(STEPS.length).fill(false);
 let pendingFiles   = {};   // key → File or File[]
 let generateOutputs = [];
 let currentLang    = 'en';
+let liftShiftEnabled = false;
+let liftShiftData    = { resolved: [], modes: [], conversions: [], selectedConversions: [] };
 
 // ── i18n ─────────────────────────────────────────────────────────────────────
 function t(key, ...args) {
@@ -1371,17 +1373,33 @@ function goBack() {
   }
 }
 
+function toggleLiftShift(enabled) {
+  liftShiftEnabled = enabled;
+  const already = STEPS.findIndex(s => s.id === 'liftshift');
+  if (enabled && already === -1) {
+    // Insert after 'baseline' (index 2)
+    STEPS.splice(3, 0, { id: 'liftshift', skippable: true });
+    stepDone.splice(3, 0, false);
+  } else if (!enabled && already !== -1) {
+    STEPS.splice(already, 1);
+    stepDone.splice(already, 1);
+  }
+  renderProgress();
+}
+
 // ── Step runner (API calls) ───────────────────────────────────────────────────
 async function runStep(step) {
-  if (step === 0) return runStepClient();
-  if (step === 1) return;   // catalog already auto-loaded
-  if (step === 2) return runStepBaseline();
-  if (step === 3) { await runStepRequirements(); return runHelpContrast(); }
-  if (step === 4) return runStepPdf();
-  if (step === 5) return runStepImages();
-  if (step === 6) return runStepGenerate();
-  if (step === 7) return;   // Industry Reference — user-driven, no auto-run
-  if (step === 8) return runStepPush();
+  const id = STEPS[step]?.id;
+  if (id === 'client')    return runStepClient();
+  if (id === 'catalog')   return;   // auto-loaded
+  if (id === 'baseline')  return runStepBaseline();
+  if (id === 'liftshift') return runStepLiftShift();
+  if (id === 'reqs')      { await runStepRequirements(); return runHelpContrast(); }
+  if (id === 'pdf')       return runStepPdf();
+  if (id === 'images')    return runStepImages();
+  if (id === 'generate')  return runStepGenerate();
+  if (id === 'reference') return;   // user-driven
+  if (id === 'import')    return runStepPush();
 }
 
 // ── Step 0 — Client name ──────────────────────────────────────────────────────
@@ -1488,6 +1506,16 @@ function renderStep2() {
       <div class="spinner"></div><span class="spinner-text">${t('s2_busy')}</span>
     </div>
     <div class="result-card" id="step2-result"></div>
+    <div style="margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+      <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer">
+        <input type="checkbox" id="liftshift-toggle" style="margin-top:3px;accent-color:var(--sap-blue)"
+          onchange="toggleLiftShift(this.checked)" ${liftShiftEnabled ? 'checked' : ''}>
+        <span>
+          <strong>Lift &amp; Shift</strong>
+          <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:2px">Convert baseline applications to RISE deployment targets using the SAP Material Mapping Tool</span>
+        </span>
+      </label>
+    </div>
   `;
 }
 
@@ -1517,6 +1545,203 @@ async function runStepBaseline() {
       <a href="${data.download_url}" download class="btn-download" style="display:inline-block;margin-top:4px;text-decoration:none">${t('s2_download')}</a>
     `;
   }
+}
+
+// ── Step 2b — Lift & Shift ────────────────────────────────────────────────────
+
+function renderStepLiftShift() {
+  const lsIdx = STEPS.findIndex(s => s.id === 'liftshift') + 1;
+  return `
+    <div class="step-eyebrow">Step ${lsIdx} of ${STEPS.length} — Lift &amp; Shift</div>
+    <h1 class="step-title">Lift &amp; Shift Conversion</h1>
+    <p class="step-desc">Map your baseline applications to RISE deployment targets via the SAP Material Mapping Tool. Review the suggested Material Numbers, choose a deployment mode, then select the converted targets to include in the output.</p>
+
+    <!-- Phase 1: Resolve -->
+    <div id="ls-phase1">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <strong style="font-size:14px">Step 1 — Resolve Material Numbers</strong>
+        <button class="btn-secondary" style="padding:6px 14px;font-size:13px" onclick="lsRunResolve()">Resolve</button>
+      </div>
+      <div class="spinner-wrap" id="ls-spinner1"><div class="spinner"></div><span class="spinner-text">Resolving via SAP Material Mapping Tool + Claude…</span></div>
+      <div id="ls-resolve-table"></div>
+    </div>
+
+    <!-- Phase 2: Deployment mode + Convert (hidden until resolve done) -->
+    <div id="ls-phase2" style="display:none;margin-top:20px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <strong style="font-size:14px">Step 2 — Choose Deployment Mode</strong>
+        <select id="ls-mode-select" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface)">
+          <option value="">— Select deployment mode —</option>
+        </select>
+        <button class="btn-primary" style="padding:7px 18px;font-size:13px" onclick="lsRunConvert()">Convert</button>
+      </div>
+      <div class="spinner-wrap" id="ls-spinner2"><div class="spinner"></div><span class="spinner-text">Converting to RISE targets…</span></div>
+    </div>
+
+    <!-- Phase 3: Conversion results + selection (hidden until convert done) -->
+    <div id="ls-phase3" style="display:none;margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <strong style="font-size:14px">Step 3 — Select Targets to Include</strong>
+        <label style="font-size:12px;color:var(--text-secondary);cursor:pointer">
+          <input type="checkbox" onchange="lsToggleAll(this.checked)" style="accent-color:var(--sap-blue)"> Select all
+        </label>
+      </div>
+      <div id="ls-convert-table"></div>
+      <div class="result-card" id="ls-result" style="margin-top:8px"></div>
+    </div>
+  `;
+}
+
+async function lsRunResolve() {
+  const spinner = document.getElementById('ls-spinner1');
+  const tableEl = document.getElementById('ls-resolve-table');
+  spinner.classList.add('show');
+  tableEl.innerHTML = '';
+
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/lift-shift/resolve`, {method:'POST'});
+    liftShiftData.resolved = data.resolved;
+    liftShiftData.modes    = data.modes;
+    spinner.classList.remove('show');
+
+    // Build editable resolve table
+    tableEl.innerHTML = `
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">${data.n_found} of ${data.n_apps} resolved · ${data.n_not_found} not found (enter Material Number manually)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">Application</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">Material Number</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">Description</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">Resolved by</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.resolved.map((r, i) => `
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 8px">${esc(r.app_name)}</td>
+              <td style="padding:6px 8px">
+                <input type="text" id="ls-matnr-${i}" value="${esc(r.selected)}"
+                  style="width:90px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:monospace"
+                  oninput="liftShiftData.resolved[${i}].selected=this.value">
+                ${r.candidates.length > 1 ? `<select onchange="document.getElementById('ls-matnr-${i}').value=this.value;liftShiftData.resolved[${i}].selected=this.value" style="margin-left:4px;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:11px">
+                  <option value="">candidates</option>
+                  ${r.candidates.map(c => `<option value="${esc(c.matnr)}" ${c.matnr===r.selected?'selected':''}>${esc(c.matnr)} — ${esc(c.maktx.substring(0,35))}</option>`).join('')}
+                </select>` : ''}
+              </td>
+              <td style="padding:6px 8px;color:var(--text-secondary);font-size:12px">${esc(r.selected_maktx)}</td>
+              <td style="padding:6px 8px">
+                <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:${r.resolved_by==='exact'?'#e8f5e9':r.resolved_by==='claude'?'#e3f2fd':r.resolved_by==='not_found'?'#fce4ec':'#fff3e0'};color:#333">${r.resolved_by}</span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Show phase 2 and populate mode dropdown
+    const phase2 = document.getElementById('ls-phase2');
+    phase2.style.display = '';
+    const sel = document.getElementById('ls-mode-select');
+    sel.innerHTML = '<option value="">— Select deployment mode —</option>' +
+      data.modes.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+
+  } catch(e) {
+    spinner.classList.remove('show');
+    tableEl.innerHTML = `<div style="color:var(--error,#c0392b);padding:12px">${esc(e.message)}</div>`;
+  }
+}
+
+async function lsRunConvert() {
+  const mode = document.getElementById('ls-mode-select')?.value;
+  if (!mode) { showStepError('Please select a deployment mode first.'); return; }
+
+  const spinner = document.getElementById('ls-spinner2');
+  spinner.classList.add('show');
+
+  const mappings = liftShiftData.resolved
+    .filter(r => r.selected)
+    .map(r => ({ app_name: r.app_name, selected: r.selected }));
+
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/lift-shift/convert`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ mappings, deployment_mode: mode })
+    });
+    liftShiftData.conversions = data.conversions;
+    spinner.classList.remove('show');
+
+    // Show phase 3
+    const phase3 = document.getElementById('ls-phase3');
+    phase3.style.display = '';
+
+    const tableEl = document.getElementById('ls-convert-table');
+    if (data.conversions.length === 0) {
+      tableEl.innerHTML = `<div style="color:var(--text-secondary);padding:12px">No conversion targets found for mode <strong>${esc(mode)}</strong>. Try a different deployment mode.</div>`;
+      return;
+    }
+
+    tableEl.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:5px 6px;width:28px"></th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Source App</th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Target Mat. ID</th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Description</th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Status</th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Deployment</th>
+            <th style="text-align:left;padding:5px 6px;color:var(--text-secondary)">Prerequisites</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.conversions.map((c, i) => `
+            <tr style="border-bottom:1px solid var(--border)" class="ls-conv-row">
+              <td style="padding:5px 6px;text-align:center">
+                <input type="checkbox" class="ls-conv-check" data-idx="${i}"
+                  style="accent-color:var(--sap-blue)" checked>
+              </td>
+              <td style="padding:5px 6px;color:var(--text-secondary);font-size:11px">${esc(c.source_app)}</td>
+              <td style="padding:5px 6px;font-family:monospace;font-weight:600;color:var(--sap-blue)">${esc(c.target_matnr)}</td>
+              <td style="padding:5px 6px">${esc(c.target_desc)}</td>
+              <td style="padding:5px 6px">
+                <span title="${esc(c.status_desc)}" style="font-size:11px;padding:2px 6px;border-radius:8px;background:var(--surface);border:1px solid var(--border)">${esc(c.status)}</span>
+              </td>
+              <td style="padding:5px 6px;font-size:11px">${esc(c.deployment)}</td>
+              <td style="padding:5px 6px;font-size:11px;color:var(--text-secondary)">
+                ${c.prereq_resolved.length > 0
+                  ? c.prereq_resolved.map(p => `<span title="${esc(p.maktx)}" style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin:1px;cursor:help;font-family:monospace">${esc(p.matnr)}</span>`).join('')
+                  : '<span style="color:#aaa">—</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    const rc = document.getElementById('ls-result');
+    rc.className = 'result-card success show';
+    rc.innerHTML = `<div class="result-header">✅ ${data.n_converted} conversion target${data.n_converted!==1?'s':''} found for <strong>${esc(mode)}</strong></div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Check the targets to include in the LeanIX output. Hover over prerequisite IDs to see their names.</div>`;
+
+  } catch(e) {
+    spinner.classList.remove('show');
+    showStepError(e.message);
+  }
+}
+
+function lsToggleAll(checked) {
+  document.querySelectorAll('.ls-conv-check').forEach(cb => cb.checked = checked);
+}
+
+async function runStepLiftShift() {
+  // Collect selected conversions
+  const selected = [...document.querySelectorAll('.ls-conv-check:checked')]
+    .map(cb => liftShiftData.conversions[parseInt(cb.dataset.idx)])
+    .filter(Boolean);
+  liftShiftData.selectedConversions = selected;
+  // Nothing to await — selection is captured; generation uses it from state
 }
 
 // ── Step 3 — Requirements ────────────────────────────────────────────────────
@@ -2181,18 +2406,30 @@ function showDone() {
 function renderStep(n) {
   pendingImages = [];
   // Remove Cookie Monster from viewport when leaving step 8
-  if (n !== 8) {
+  const importIdx = STEPS.findIndex(s => s.id === 'import');
+  if (n !== importIdx) {
     const cw = document.getElementById('cookie-wrap');
     if (cw) cw.remove();
   }
-  const renderers = [renderStep0, renderStep1, renderStep2, renderStep3,
-                     renderStep4, renderStep5, renderStep6, renderStep7, renderStep8];
-  const html = renderers[n] ? renderers[n]() : '';
+  const id = STEPS[n]?.id;
+  const rendererMap = {
+    client:    renderStep0,
+    catalog:   renderStep1,
+    baseline:  renderStep2,
+    liftshift: renderStepLiftShift,
+    reqs:      renderStep3,
+    pdf:       renderStep4,
+    images:    renderStep5,
+    generate:  renderStep6,
+    reference: renderStep7,
+    import:    renderStep8,
+  };
+  const html = (rendererMap[id] || (() => ''))();
   document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
   showNav();
 
-  if (n === 1 && sessionId) loadCatalog();
-  if (n === 6 && sessionId) {
+  if (id === 'catalog' && sessionId) loadCatalog();
+  if (id === 'generate' && sessionId) {
     setBusy(true, t('generating'));
     runStepGenerate().then(() => setBusy(false)).catch(e => {
       setBusy(false);
