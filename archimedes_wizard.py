@@ -56,6 +56,7 @@ from pipeline.extract       import extract
 from pipeline.enrich        import enrich
 from pipeline.validate      import validate
 from pipeline.write         import write, write_leanix_excel_from_xlsx, push_leanix
+from pipeline.push_ldif    import push_leanix_ldif
 from pipeline.pdf_extract   import extract_pdf_factsheets
 from pipeline.image_extract import extract_image_factsheets
 from pipeline.help_contrast      import run_contrast, print_contrast_summary
@@ -104,6 +105,12 @@ app = FastAPI(title="Archimedes Wizard", docs_url=None, redoc_url=None)
 @app.get("/", response_class=HTMLResponse)
 async def serve_wizard():
     return WIZARD_HTML.read_text(encoding="utf-8")
+
+
+@app.get("/pro", response_class=HTMLResponse)
+async def serve_wizard_pro():
+    p = BASE_DIR / "archimedes_wizard_pro.html"
+    return p.read_text(encoding="utf-8")
 
 
 @app.get("/cookie_monster.png")
@@ -166,6 +173,20 @@ async def catalog_status(session_id: str):
             result[label] = _catalog_info(path)
 
     return {"ok": True, **result}
+
+
+@app.get("/api/catalog/rba")
+async def catalog_rba_full():
+    if not RBA_PATH.exists():
+        raise HTTPException(status_code=404, detail="RBA catalog not found")
+    return json.loads(RBA_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/api/catalog/rsa")
+async def catalog_rsa_full():
+    if not RSA_PATH.exists():
+        raise HTTPException(status_code=404, detail="RSA catalog not found")
+    return json.loads(RSA_PATH.read_text(encoding="utf-8"))
 
 
 # ── Step 2 — Baseline / Footprint ─────────────────────────────────────────────
@@ -555,7 +576,9 @@ async def apply_industry_reference(session_id: str, body: dict):
             selected, industry_label, _get_anthropic(), MODEL,
         )
         await asyncio.to_thread(
-            add_reference_to_target_excel, out_target, selected, industry_label, client_name, relations
+            add_reference_to_target_excel,
+            out_target, selected, industry_label, client_name, relations,
+            os.environ.get("LEANIX_BASE_URL"), os.environ.get("LEANIX_API_TOKEN"),
         )
     except Exception as exc:
         logger.exception("Apply industry reference error")
@@ -781,8 +804,9 @@ async def run_push(session_id: str, body: dict):
         raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
 
     client_name    = sess["client_name"]
-    push_baseline  = body.get("push_baseline", False)
-    push_target    = body.get("push_target", False)
+    # Accept both naming conventions (wizard.html uses push_*, wizard_pro uses import_*)
+    push_baseline  = body.get("push_baseline") or body.get("import_baseline") or False
+    push_target    = body.get("push_target")   or body.get("import_target")   or False
     pushed = []
     errors = []
 
@@ -795,7 +819,8 @@ async def run_push(session_id: str, body: dict):
 
     if push_target and sess.get("out_target"):
         try:
-            await asyncio.to_thread(push_leanix, sess["out_target"], client_name)
+            ls_map = (sess.get("lift_shift_result") or {}).get("conversions") or None
+            await asyncio.to_thread(push_leanix, sess["out_target"], client_name, ls_map)
             pushed.append("target")
         except Exception as exc:
             errors.append(f"Target: {exc}")
@@ -805,6 +830,307 @@ async def run_push(session_id: str, body: dict):
         "pushed": pushed,
         "errors": errors,
     }
+
+
+@app.post("/api/session/{session_id}/push-ldif")
+async def run_push_ldif(session_id: str, body: dict):
+    """
+    Alternative push via Integration API (LDIF) — single HTTP call, built-in synclog.
+
+    Body: { push_target: bool, mode: "partial"|"full" }
+    Recommended for large datasets (>100 apps) or when synclog visibility is needed.
+    """
+    sess = _session(session_id)
+
+    if not os.environ.get("LEANIX_API_TOKEN") or not os.environ.get("LEANIX_BASE_URL"):
+        raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
+
+    client_name  = sess["client_name"]
+    push_target  = body.get("push_target", True)
+    mode         = body.get("mode", "partial")
+    errors: list[str] = []
+    results: list[dict] = []
+
+    if push_target and sess.get("out_target"):
+        try:
+            result = await asyncio.to_thread(
+                push_leanix_ldif,
+                sess["out_target"], client_name, mode,
+            )
+            results.append({"sheet": "target", **result})
+            if not result.get("ok"):
+                errors.append(f"Target LDIF: {result.get('detail', 'unknown error')}")
+        except Exception as exc:
+            errors.append(f"Target LDIF: {exc}")
+
+    return {
+        "ok":      not errors,
+        "results": results,
+        "errors":  errors,
+    }
+
+
+@app.get("/api/session/{session_id}/transformations")
+async def get_transformations(session_id: str):
+    """
+    Return Transformations created in LeanIX for this session's client.
+
+    Queries all Initiatives via GraphQL, then fan-outs to the Transformations
+    REST API for each one. EN/ES labels included for the frontend.
+    """
+    sess = _session(session_id)
+    base_url  = os.environ.get("LEANIX_BASE_URL", "")
+    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    if not base_url or not api_token:
+        return {"ok": True, "transformations": [], "warning": "LeanIX not configured"}
+
+    import requests as _req
+    from pipeline.write import _get_bearer
+
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        return {"ok": False, "transformations": [], "error": str(exc)}
+
+    hdrs     = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    gql_url  = f"{base_url}/services/pathfinder/v1/graphql"
+    trans_url = f"{base_url}/services/transformations/v1/transformations"
+
+    # 1. Get all Initiatives
+    q = """
+    query {
+      allFactSheets(filter: {facetFilters: [{facetKey:"FactSheetTypes", keys:["Initiative"]}]}) {
+        edges { node { id displayName } }
+      }
+    }
+    """
+    try:
+        gr = await asyncio.to_thread(
+            lambda: _req.post(gql_url, json={"query": q}, headers=hdrs, timeout=30)
+        )
+        gr.raise_for_status()
+        edges = gr.json().get("data", {}).get("allFactSheets", {}).get("edges", [])
+    except Exception as exc:
+        return {"ok": False, "transformations": [], "error": f"GraphQL error: {exc}"}
+
+    initiatives = [e["node"] for e in edges if e.get("node")]
+
+    # 2. Fan-out: GET /transformations?factSheetId=<initiative_id>
+    transformations: list[dict] = []
+    for init in initiatives:
+        try:
+            tr = await asyncio.to_thread(
+                lambda iid=init["id"]: _req.get(
+                    trans_url, params={"factSheetId": iid}, headers=hdrs, timeout=30
+                )
+            )
+            if tr.status_code != 200:
+                continue
+            items = tr.json() if isinstance(tr.json(), list) else tr.json().get("data", [])
+            for item in items:
+                # Resolve application name from factSheets
+                app_name = ""
+                fs = item.get("factSheets") or {}
+                app_fs = fs.get("application") or {}
+                if isinstance(app_fs, dict):
+                    app_name = app_fs.get("displayName") or app_fs.get("name") or ""
+
+                transformations.append({
+                    "initiative_name": init["displayName"],
+                    "app_name":        app_name,
+                    "type":            item.get("type", ""),
+                    "name":            item.get("name", ""),
+                    "status":          item.get("execution", item.get("status", "")),
+                    "completion_date": (item.get("completionDate") or {}).get("date", ""),
+                })
+        except Exception as exc:
+            logger.warning("Transformations fetch for initiative %s failed: %s", init["id"], exc)
+
+    return {"ok": True, "transformations": transformations}
+
+
+@app.get("/api/session/{session_id}/projections")
+async def get_projections(session_id: str, date: str | None = None):
+    """
+    Return a TO-BE scenario projection using the LeanIX Impacts API.
+
+    Queries all Initiatives, collects all Transformation IDs attached to them,
+    then calls POST /services/impacts/v1/projections with those transformations
+    and a target date to show the projected landscape.
+
+    Query params:
+        date (optional): ISO date YYYY-MM-DD for projection. Defaults to end of next year.
+
+    Returns:
+        { ok, date, impacts: [ { factSheetId, factSheetName, factSheetType, field, from, to } ] }
+    """
+    sess = _session(session_id)
+    base_url  = os.environ.get("LEANIX_BASE_URL", "")
+    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    if not base_url or not api_token:
+        return {"ok": True, "impacts": [], "warning": "LeanIX not configured"}
+
+    import requests as _req
+    from pipeline.write import _get_bearer
+
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        return {"ok": False, "impacts": [], "error": str(exc)}
+
+    hdrs      = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    gql_url   = f"{base_url}/services/pathfinder/v1/graphql"
+    trans_url = f"{base_url}/services/transformations/v1/transformations"
+    proj_url  = f"{base_url}/services/impacts/v1/projections"
+
+    # Default date: last day of next calendar year
+    if not date:
+        import time as _time
+        date = f"{int(_time.strftime('%Y')) + 1}-12-31"
+
+    # 1. Get all Initiatives
+    q = """
+    query {
+      allFactSheets(filter: {facetFilters: [{facetKey:"FactSheetTypes", keys:["Initiative"]}]}) {
+        edges { node { id displayName } }
+      }
+    }
+    """
+    try:
+        gr = await asyncio.to_thread(
+            lambda: _req.post(gql_url, json={"query": q}, headers=hdrs, timeout=30)
+        )
+        gr.raise_for_status()
+        edges = gr.json().get("data", {}).get("allFactSheets", {}).get("edges", [])
+    except Exception as exc:
+        return {"ok": False, "impacts": [], "error": f"GraphQL error: {exc}"}
+
+    initiatives = [e["node"] for e in edges if e.get("node")]
+    if not initiatives:
+        return {"ok": True, "date": date, "impacts": [], "note": "No initiatives found"}
+
+    # 2. Fan-out: collect all transformation IDs
+    transformation_ids: list[str] = []
+    fact_sheet_ids: list[str] = []
+    for init in initiatives:
+        try:
+            tr = await asyncio.to_thread(
+                lambda iid=init["id"]: _req.get(
+                    trans_url, params={"factSheetId": iid}, headers=hdrs, timeout=30
+                )
+            )
+            if tr.status_code != 200:
+                continue
+            items = tr.json() if isinstance(tr.json(), list) else tr.json().get("data", [])
+            for item in items:
+                tid = item.get("id")
+                if tid:
+                    transformation_ids.append(tid)
+                # Collect affected application IDs
+                fs = item.get("factSheets") or {}
+                app_fs = fs.get("application") or {}
+                if isinstance(app_fs, dict) and app_fs.get("id"):
+                    fact_sheet_ids.append(app_fs["id"])
+        except Exception as exc:
+            logger.warning("Projections: transformations fetch for %s failed: %s", init["id"], exc)
+
+    if not transformation_ids:
+        return {"ok": True, "date": date, "impacts": [], "note": "No transformations found"}
+
+    # Deduplicate
+    transformation_ids = list(dict.fromkeys(transformation_ids))
+    fact_sheet_ids     = list(dict.fromkeys(fact_sheet_ids))
+
+    # 3. Call Impacts API projections
+    proj_body = {
+        "factSheetIds":     fact_sheet_ids[:100],  # cap to avoid huge requests
+        "date":             date,
+        "transformationIds": transformation_ids[:50],
+    }
+    try:
+        pr = await asyncio.to_thread(
+            lambda: _req.post(proj_url, json=proj_body, headers=hdrs, timeout=60)
+        )
+        if pr.status_code in (403, 404):
+            return {"ok": True, "date": date, "impacts": [], "note": f"Impacts API not available ({pr.status_code})"}
+        pr.raise_for_status()
+        proj_data = pr.json()
+    except Exception as exc:
+        return {"ok": False, "impacts": [], "error": f"Impacts API error: {exc}"}
+
+    # Normalize response — API returns list of impact objects
+    raw_impacts = proj_data if isinstance(proj_data, list) else proj_data.get("data", proj_data.get("impacts", []))
+    impacts: list[dict] = []
+    for impact in raw_impacts:
+        impacts.append({
+            "factSheetId":   impact.get("factSheetId", ""),
+            "factSheetName": impact.get("factSheetName", impact.get("displayName", "")),
+            "factSheetType": impact.get("factSheetType", "Application"),
+            "field":         impact.get("fieldName", impact.get("field", "")),
+            "from":          impact.get("currentValue", impact.get("from", "")),
+            "to":            impact.get("projectedValue", impact.get("to", "")),
+        })
+
+    return {
+        "ok":                 True,
+        "date":               date,
+        "transformation_count": len(transformation_ids),
+        "impacts":            impacts,
+    }
+async def get_synclog(session_id: str):
+    """
+    Return recent synchronization runs from LeanIX Integration Hub (synclog).
+
+    Calls GET /services/synclog/v1/synchronizations.
+    Useful for debugging push failures — shows status, timestamps and warnings
+    for the most recent integrations in this workspace.
+    """
+    _session(session_id)  # validate session exists
+    base_url  = os.environ.get("LEANIX_BASE_URL", "")
+    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    if not base_url or not api_token:
+        return {"ok": True, "synchronizations": [], "warning": "LeanIX not configured"}
+
+    import requests as _req
+    from pipeline.write import _get_bearer
+
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        return {"ok": False, "synchronizations": [], "error": str(exc)}
+
+    hdrs     = {"Authorization": f"Bearer {bearer}"}
+    sync_url = f"{base_url}/services/synclog/v1/synchronizations"
+
+    try:
+        resp = await asyncio.to_thread(
+            lambda: _req.get(sync_url, params={"pageSize": 20}, headers=hdrs, timeout=30)
+        )
+        if resp.status_code in (403, 404):
+            return {"ok": True, "synchronizations": [], "warning": "Synclog not available (insufficient permissions or endpoint not found)"}
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception as exc:
+        return {"ok": False, "synchronizations": [], "error": str(exc)}
+
+    # Normalise: the endpoint may return a list or {data: [...]}
+    items = raw if isinstance(raw, list) else raw.get("data", raw.get("synchronizations", []))
+
+    syncs = []
+    for item in items[:20]:
+        syncs.append({
+            "id":           item.get("id", ""),
+            "connector":    item.get("connectorType") or item.get("connector") or "",
+            "status":       item.get("status", ""),
+            "started_at":   item.get("startedAt") or item.get("createdAt") or "",
+            "finished_at":  item.get("finishedAt") or item.get("updatedAt") or "",
+            "fact_sheets_created":  item.get("factSheetsCreated") or item.get("created") or 0,
+            "fact_sheets_updated":  item.get("factSheetsUpdated") or item.get("updated") or 0,
+            "warnings":     len(item.get("warnings") or []),
+            "errors":       len(item.get("errors")   or []),
+        })
+
+    return {"ok": True, "synchronizations": syncs}
 
 
 # ── Step 9 Easter Egg — KPI Achievement Import ────────────────────────────────

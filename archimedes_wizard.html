@@ -308,6 +308,12 @@ input[type="file"] { display: none; }
 .stat-pill .stat-lbl  { font-size: 10px; color: var(--grey-4); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .result-summary { font-size: 13px; color: var(--grey-7); line-height: 1.55; }
 
+/* Transformations table */
+.trans-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+.trans-table th { text-align:left; padding:5px 8px; background:var(--blue-1); color:var(--blue-10); font-weight:600; border-bottom:2px solid var(--blue-2); white-space:nowrap; }
+.trans-table td { padding:5px 8px; border-bottom:1px solid var(--grey-1); vertical-align:top; }
+.trans-table tr:hover td { background:var(--blue-1); }
+
 /* Download buttons */
 .download-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .download-item {
@@ -372,6 +378,15 @@ input[type="file"] { display: none; }
   padding: 3px 8px;
   color: var(--grey-7);
   font-weight: 600;
+}
+.cc-stat.clickable {
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cc-stat.clickable:hover {
+  background: var(--sap-blue);
+  border-color: var(--sap-blue);
+  color: #fff;
 }
 
 /* ── LeanIX toggle ──────────────────────────────────────────── */
@@ -737,6 +752,30 @@ const LANGS = {
     s7_imported: (list) => `Files imported: ${list}`,
     s7_err: 'Errors during import',
     s7_none: 'Select at least one file to import',
+    s7_trans_title: 'Transformations created',
+    s7_trans_empty: 'No transformations found in LeanIX.',
+    s7_trans_initiative: 'Initiative',
+    s7_trans_app: 'Application',
+    s7_trans_type: 'Type',
+    s7_trans_status: 'Status',
+    s7_trans_date: 'Completion',
+    s7_synclog_btn: 'Show sync history',
+    s7_synclog_title: 'Sync history (last 20)',
+    s7_synclog_empty: 'No synchronization runs found.',
+    s7_synclog_connector: 'Connector',
+    s7_synclog_status: 'Status',
+    s7_synclog_started: 'Started',
+    s7_synclog_created: 'Created',
+    s7_synclog_updated: 'Updated',
+    s7_synclog_warns: 'Warns',
+    s7_synclog_errors: 'Errors',
+    s7_proj_btn: 'Preview TO-BE landscape',
+    s7_proj_title: 'TO-BE projection',
+    s7_proj_empty: 'No projected impacts found.',
+    s7_proj_fs: 'Fact Sheet',
+    s7_proj_field: 'Field',
+    s7_proj_from: 'Current',
+    s7_proj_to: 'Projected',
     kpi_panel_title: '🍪 KPI Achievement Mode',
     kpi_panel_hint: 'Generates and imports fictional fact sheets to maximize EA Engagement Dashboard Best Practice Metrics. All tagged <code>KPI_Achievement</code> for easy exclusion.',
     kpi_chk: 'Generate + Import KPI Achievement Excel',
@@ -860,6 +899,30 @@ const LANGS = {
     s7_imported: (list) => `Ficheros importados: ${list}`,
     s7_err: 'Errores en la importación',
     s7_none: 'Selecciona al menos un fichero para importar',
+    s7_trans_title: 'Transformaciones creadas',
+    s7_trans_empty: 'No se encontraron transformaciones en LeanIX.',
+    s7_trans_initiative: 'Iniciativa',
+    s7_trans_app: 'Aplicación',
+    s7_trans_type: 'Tipo',
+    s7_trans_status: 'Estado',
+    s7_trans_date: 'Fecha finalización',
+    s7_synclog_btn: 'Ver historial de sincronizaciones',
+    s7_synclog_title: 'Historial sincronizaciones (últimas 20)',
+    s7_synclog_empty: 'No se encontraron sincronizaciones.',
+    s7_synclog_connector: 'Conector',
+    s7_synclog_status: 'Estado',
+    s7_synclog_started: 'Inicio',
+    s7_synclog_created: 'Creadas',
+    s7_synclog_updated: 'Actualizadas',
+    s7_synclog_warns: 'Avisos',
+    s7_synclog_errors: 'Errores',
+    s7_proj_btn: 'Vista previa TO-BE',
+    s7_proj_title: 'Proyección TO-BE',
+    s7_proj_empty: 'No se encontraron impactos proyectados.',
+    s7_proj_fs: 'Fact Sheet',
+    s7_proj_field: 'Campo',
+    s7_proj_from: 'Actual',
+    s7_proj_to: 'Proyectado',
     kpi_panel_title: '🍪 Modo KPI Achievement',
     kpi_panel_hint: 'Genera e importa fact sheets ficticias para maximizar las Best Practice Metrics del EA Engagement Dashboard. Todas etiquetadas <code>KPI_Achievement</code> para excluirlas fácilmente.',
     kpi_chk: 'Generar + Importar Excel KPI Achievement',
@@ -1479,8 +1542,17 @@ async function loadCatalog() {
 function catalogCard(cls, badge, title, info) {
   const versionLabel = t('s1_version');
   const sourceLabel  = t('s1_source');
+  const viewMap = {
+    business_capabilities: 'bcs',
+    business_domains:      'domains',
+    total_products:        'products',
+  };
   const stats = Object.entries(info.stats || {})
-    .map(([k,v]) => `<span class="cc-stat">${k}: ${v}</span>`).join('');
+    .map(([k,v]) => {
+      const view = viewMap[k];
+      if (view) return `<span class="cc-stat clickable" onclick="openCatalog('${cls}','${view}')">${k.replace(/_/g,' ')}: ${v}</span>`;
+      return `<span class="cc-stat">${k.replace(/_/g,' ')}: ${v}</span>`;
+    }).join('');
   return `<div class="catalog-card ${cls}">
     <div class="cc-badge">${badge}</div>
     <div class="cc-title">${title}</div>
@@ -2298,6 +2370,10 @@ function renderStep8() {
         <div class="spinner"></div><span class="spinner-text">${t('s7_busy')}</span>
       </div>
       <div class="result-card" id="step7-result"></div>
+      ${leanixOk ? `<button class="btn-secondary" style="margin-top:12px;width:100%" onclick="runSynclog()">${t('s7_synclog_btn')}</button>
+      <div id="step7-synclog"></div>
+      <button class="btn-secondary" style="margin-top:8px;width:100%" onclick="runProjections()">${t('s7_proj_btn')}</button>
+      <div id="step7-projections"></div>` : ''}
     </div>
   `;
 }
@@ -2332,6 +2408,11 @@ async function runStepPush() {
       <div class="result-header">✅ ${t('s7_ok')}</div>
       <div class="result-summary">${t('s7_imported', data.pushed.join(', '))}</div>
     `;
+    // Fetch and render transformations
+    try {
+      const tr = await apiFetch(`/api/session/${sessionId}/transformations`);
+      rc.innerHTML += _renderTransformationsTable(tr.transformations || []);
+    } catch(e) { /* non-fatal */ }
   } else {
     rc.className = 'result-card error show';
     rc.innerHTML = `
@@ -2339,6 +2420,78 @@ async function runStepPush() {
       <div class="result-summary">${data.errors.map(esc).join('<br>')}</div>
     `;
   }
+}
+
+function _renderTransformationsTable(rows) {
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;">${t('s7_trans_title')} (${rows.length})</div>`;
+  if (!rows.length) return title + `<div style="color:var(--muted)">${t('s7_trans_empty')}</div>`;
+  const header = `<tr>
+    <th>${t('s7_trans_initiative')}</th><th>${t('s7_trans_app')}</th>
+    <th>${t('s7_trans_type')}</th><th>${t('s7_trans_status')}</th><th>${t('s7_trans_date')}</th>
+  </tr>`;
+  const body = rows.map(r => `<tr>
+    <td>${esc(r.initiative_name)}</td><td>${esc(r.app_name)}</td>
+    <td><code>${esc(r.type)}</code></td><td>${esc(r.status)}</td><td>${esc(r.completion_date)}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+async function runSynclog() {
+  const el = document.getElementById('step7-synclog');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner-wrap show" style="margin-top:8px"><div class="spinner"></div></div>';
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/synclog`);
+    el.innerHTML = _renderSynclogTable(data.synchronizations || []);
+  } catch(e) {
+    el.innerHTML = `<div class="result-card error show" style="margin-top:8px"><div class="result-summary">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderSynclogTable(rows) {
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;">${t('s7_synclog_title')}</div>`;
+  if (!rows.length) return title + `<div style="color:var(--muted)">${t('s7_synclog_empty')}</div>`;
+  const header = `<tr>
+    <th>${t('s7_synclog_connector')}</th><th>${t('s7_synclog_status')}</th>
+    <th>${t('s7_synclog_started')}</th><th>${t('s7_synclog_created')}</th>
+    <th>${t('s7_synclog_updated')}</th><th>${t('s7_synclog_warns')}</th><th>${t('s7_synclog_errors')}</th>
+  </tr>`;
+  const statusColor = s => s === 'SUCCESS' ? 'var(--green-7)' : s === 'FAILED' || s === 'ERROR' ? 'var(--red-7)' : 'var(--mango-7)';
+  const body = rows.map(r => `<tr>
+    <td><code>${esc(r.connector)}</code></td>
+    <td style="color:${statusColor(r.status)};font-weight:600">${esc(r.status)}</td>
+    <td style="white-space:nowrap">${esc((r.started_at||'').replace('T',' ').slice(0,16))}</td>
+    <td>${r.fact_sheets_created}</td><td>${r.fact_sheets_updated}</td>
+    <td>${r.warnings > 0 ? `<span style="color:var(--mango-7)">${r.warnings}</span>` : r.warnings}</td>
+    <td>${r.errors > 0 ? `<span style="color:var(--red-7)">${r.errors}</span>` : r.errors}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+async function runProjections() {
+  const el = document.getElementById('step7-projections');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner-wrap show" style="margin-top:8px"><div class="spinner"></div></div>';
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/projections`);
+    el.innerHTML = _renderProjectionsTable(data.impacts || [], data.date, data.transformation_count);
+  } catch(e) {
+    el.innerHTML = `<div class="result-card error show" style="margin-top:8px"><div class="result-summary">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderProjectionsTable(impacts, date, transCount) {
+  const subtitle = date ? ` <span style="color:var(--muted);font-size:12px">(${esc(date)}${transCount ? `, ${transCount} transformations` : ''})</span>` : '';
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;">${t('s7_proj_title')}${subtitle}</div>`;
+  if (!impacts.length) return title + `<div style="color:var(--muted)">${t('s7_proj_empty')}</div>`;
+  const header = `<tr><th>${t('s7_proj_fs')}</th><th>${t('s7_proj_field')}</th><th>${t('s7_proj_from')}</th><th>${t('s7_proj_to')}</th></tr>`;
+  const body = impacts.map(r => `<tr>
+    <td><span style="font-size:11px;color:var(--muted)">${esc(r.factSheetType)}</span><br><strong>${esc(r.factSheetName)}</strong></td>
+    <td><code>${esc(r.field)}</code></td>
+    <td style="color:var(--muted)">${esc(r.from)}</td>
+    <td style="color:var(--green-7);font-weight:600">${esc(r.to)}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
 }
 
 async function runKpiImport() {
@@ -2528,6 +2681,113 @@ function showStepError(msg) {
   }
   rc.className = 'result-card error show';
   rc.innerHTML = `<div class="result-header">⚠ Error</div><div class="result-summary">${esc(msg)}</div>`;
+}
+
+// ── Catalog viewer ───────────────────────────────────────────────────────────
+async function openCatalog(type, view) {
+  const data = await apiFetch(`/api/catalog/${type}`);
+  let html = '';
+
+  if (type === 'rba' && view === 'bcs') {
+    const rows = [];
+    for (const [entDomain, bizDomains] of Object.entries(data.catalog || {})) {
+      for (const [bizDomain, areas] of Object.entries(bizDomains)) {
+        for (const [area, bcs] of Object.entries(areas)) {
+          for (const bc of bcs) {
+            rows.push({ entDomain, bizDomain, area, id: bc.id, name: bc.name });
+          }
+        }
+      }
+    }
+    html = buildCatalogPage(
+      `RBA — Business Capabilities (${rows.length})`,
+      `<table>
+        <thead><tr><th>ID</th><th>Name</th><th>Business Area</th><th>Business Domain</th><th>Enterprise Domain</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><code>${r.id}</code></td><td>${r.name}</td><td>${r.area}</td><td>${r.bizDomain}</td><td>${r.entDomain}</td></tr>`).join('')}</tbody>
+      </table>`
+    );
+  } else if (type === 'rba' && view === 'domains') {
+    const rows = [];
+    for (const [entDomain, bizDomains] of Object.entries(data.catalog || {})) {
+      for (const [bizDomain, areas] of Object.entries(bizDomains)) {
+        const bcCount = Object.values(areas).reduce((s, bcs) => s + bcs.length, 0);
+        rows.push({ entDomain, bizDomain, areas: Object.keys(areas).length, bcs: bcCount });
+      }
+    }
+    html = buildCatalogPage(
+      `RBA — Business Domains (${rows.length})`,
+      `<table>
+        <thead><tr><th>Business Domain</th><th>Enterprise Domain</th><th>Business Areas</th><th>BCs</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><strong>${r.bizDomain}</strong></td><td>${r.entDomain}</td><td>${r.areas}</td><td>${r.bcs}</td></tr>`).join('')}</tbody>
+      </table>`
+    );
+  } else if (type === 'rsa' && view === 'products') {
+    const apps = data.applications || [];
+    const byDomain = {};
+    apps.forEach(a => { (byDomain[a.domain] = byDomain[a.domain] || []).push(a.name); });
+    const domainSections = Object.entries(byDomain).sort(([a],[b]) => a.localeCompare(b))
+      .map(([domain, names]) => `
+        <tr class="domain-row"><td colspan="2"><strong>${domain}</strong> <span class="badge">${names.length}</span></td></tr>
+        ${names.sort().map(n => `<tr><td></td><td>${n}</td></tr>`).join('')}
+      `).join('');
+    html = buildCatalogPage(
+      `RSA — Products (${apps.length})`,
+      `<table>
+        <thead><tr><th>Domain</th><th>Product</th></tr></thead>
+        <tbody>${domainSections}</tbody>
+      </table>`
+    );
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+function buildCatalogPage(title, tableHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6f8;color:#1a1a2e;padding:24px}
+  h1{font-size:20px;font-weight:700;margin-bottom:16px;color:#0070f2}
+  input{width:100%;max-width:400px;padding:8px 12px;background:#fff;border:1px solid #d1d5db;border-radius:8px;color:#1a1a2e;font-size:13px;margin-bottom:16px;outline:none}
+  input:focus{border-color:#0070f2;box-shadow:0 0 0 2px rgba(0,112,242,0.15)}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+  thead tr{background:#0070f2}
+  th{text-align:left;padding:9px 12px;font-weight:600;color:#fff;white-space:nowrap}
+  td{padding:7px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+  tr:hover td{background:#f0f7ff}
+  code{font-family:monospace;font-size:12px;color:#0070f2;background:#e8f0fe;padding:2px 5px;border-radius:3px}
+  .domain-row td{background:#f0f7ff;padding:10px 12px;border-top:2px solid #d0e4ff;font-weight:600}
+  .badge{font-size:11px;background:#0070f2;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:600}
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<input type="text" placeholder="Filter…" oninput="filterTable(this.value)">
+<div id="table-wrap">${tableHtml}</div>
+<script>
+function filterTable(q) {
+  const s = q.toLowerCase();
+  document.querySelectorAll('tbody tr:not(.domain-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(s) ? '' : 'none';
+  });
+  document.querySelectorAll('tbody tr.domain-row').forEach(dr => {
+    let sib = dr.nextElementSibling, anyVisible = false;
+    while (sib && !sib.classList.contains('domain-row')) {
+      if (sib.style.display !== 'none') anyVisible = true;
+      sib = sib.nextElementSibling;
+    }
+    dr.style.display = anyVisible || !q ? '' : 'none';
+  });
+}
+<\/script>
+</body>
+</html>`;
 }
 </script>
 </body>

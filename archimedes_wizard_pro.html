@@ -1,0 +1,2132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archimedes AI — Wizard Pro</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:             #0a0a1a;
+  --bg-card:        rgba(255,255,255,0.06);
+  --bg-card-hover:  rgba(255,255,255,0.09);
+  --border:         rgba(255,255,255,0.12);
+  --border-active:  rgba(79,195,247,0.5);
+  --cyan:           #4fc3f7;
+  --blue:           #0070f2;
+  --blue-dark:      #002A86;
+  --green:          #22c55e;
+  --orange:         #f97316;
+  --red:            #ef4444;
+  --text-primary:   #ffffff;
+  --text-secondary: rgba(255,255,255,0.55);
+  --text-muted:     rgba(255,255,255,0.3);
+  --glow-cyan:      0 0 12px rgba(79,195,247,0.4);
+  --glow-blue:      0 0 12px rgba(0,112,242,0.4);
+  --radius:         12px;
+  --radius-l:       18px;
+  --font: "72 Brand","72",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono: "SFMono-Regular","Consolas","Liberation Mono",Menlo,monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -20%;
+  right: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(0,112,242,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -10%;
+  left: -10%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, rgba(79,195,247,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 58px;
+  background: rgba(10,10,26,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 16px;
+  z-index: 100;
+}
+.header-logo {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+.header-logo span { color: var(--cyan); }
+.header-client {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.header-sep { flex: 1; }
+
+/* Progress pills */
+.header-pills {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.pill {
+  height: 5px;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+.pill.done    { width: 20px; background: var(--blue); }
+.pill.active  { width: 28px; background: var(--cyan); box-shadow: var(--glow-cyan); }
+.pill.pending { width: 10px; background: rgba(255,255,255,0.15); }
+
+.header-step-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+/* Language selector */
+.lang-select {
+  appearance: none;
+  background: rgba(255,255,255,0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  padding: 5px 28px 5px 10px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.lang-select:hover { background-color: rgba(255,255,255,0.1); }
+.lang-select option { background: #0d1b3e; color: #fff; }
+
+/* ── Layout ──────────────────────────────────────────────── */
+.main {
+  min-height: 100vh;
+  padding: 90px 24px 100px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Step card ───────────────────────────────────────────── */
+.step-card {
+  width: 100%;
+  max-width: 640px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 40px 44px;
+  animation: fadeUp 0.3s ease;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.step-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 10px;
+}
+.step-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+.step-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+/* ── Form elements ───────────────────────────────────────── */
+.field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+input[type="text"] {
+  width: 100%;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input[type="text"]:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(79,195,247,0.12);
+}
+input[type="text"]::placeholder { color: var(--text-muted); }
+
+/* ── Drop zones ──────────────────────────────────────────── */
+.drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 4px; }
+.drop-grid.single { grid-template-columns: 1fr; }
+.drop-zone {
+  border: 2px dashed rgba(255,255,255,0.15);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.03);
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--cyan);
+  background: rgba(79,195,247,0.06);
+}
+.drop-zone.has-file {
+  border-color: var(--blue);
+  border-style: solid;
+  background: rgba(0,112,242,0.08);
+}
+.drop-zone.has-file.is-image {
+  border-color: var(--green);
+  background: rgba(34,197,94,0.08);
+}
+.drop-icon  { font-size: 28px; margin-bottom: 8px; }
+.drop-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.drop-hint  { font-size: 11px; color: var(--text-muted); }
+.drop-filename {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan);
+  margin-top: 6px;
+  word-break: break-all;
+}
+.drop-zone.is-image .drop-filename { color: var(--green); }
+.drop-remove {
+  position: absolute;
+  top: 8px; right: 10px;
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.drop-remove:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+input[type="file"] { display: none; }
+
+/* Multi-image thumbnails */
+.img-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.img-thumb {
+  position: relative;
+  width: 70px; height: 70px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+}
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.img-thumb-remove {
+  position: absolute;
+  top: 2px; right: 2px;
+  background: rgba(0,0,0,0.65);
+  color: white;
+  border-radius: 50%;
+  width: 16px; height: 16px;
+  font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+/* ── Result / info cards ─────────────────────────────────── */
+.result-card {
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-top: 20px;
+  display: none;
+}
+.result-card.show { display: block; animation: fadeUp 0.2s ease; }
+.result-card.success { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.3); }
+.result-card.info    { background: rgba(79,195,247,0.08); border: 1px solid rgba(79,195,247,0.25); }
+.result-card.warning { background: rgba(249,115,22,0.1);  border: 1px solid rgba(249,115,22,0.3); }
+.result-card.error   { background: rgba(239,68,68,0.1);   border: 1px solid rgba(239,68,68,0.3); }
+
+.result-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; margin-bottom: 10px;
+}
+.result-card.success .result-header { color: var(--green); }
+.result-card.info    .result-header { color: var(--cyan); }
+.result-card.warning .result-header { color: var(--orange); }
+.result-card.error   .result-header { color: var(--red); }
+
+.result-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.stat-pill {
+  display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-width: 70px;
+}
+.stat-pill .stat-n   { font-size: 20px; font-weight: 800; color: var(--cyan); line-height: 1; }
+.stat-pill .stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.result-summary { font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+
+/* Transformations table */
+.trans-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+.trans-table th { text-align:left; padding:5px 8px; background:rgba(79,195,247,0.12); color:var(--cyan); font-weight:600; border-bottom:1px solid rgba(79,195,247,0.3); white-space:nowrap; }
+.trans-table td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.06); vertical-align:top; color:var(--text-secondary); }
+.trans-table tr:hover td { background:rgba(255,255,255,0.04); }
+
+/* Download items */
+.download-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.download-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.download-item .di-icon  { font-size: 24px; flex-shrink: 0; }
+.download-item .di-info  { flex: 1; }
+.download-item .di-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.download-item .di-desc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.download-item .di-stats { font-size: 11px; color: var(--text-secondary); margin-top: 3px; font-family: var(--mono); }
+.btn-download {
+  padding: 8px 16px;
+  background: rgba(0,112,242,0.2);
+  color: var(--cyan);
+  border: 1px solid rgba(79,195,247,0.3);
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.btn-download:hover { background: rgba(79,195,247,0.15); border-color: var(--cyan); }
+
+/* Catalog cards */
+.catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.catalog-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.catalog-card .cc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.catalog-card.rba .cc-badge { background: rgba(0,42,134,0.6); color: var(--cyan); border: 1px solid rgba(79,195,247,0.3); }
+.catalog-card.rsa .cc-badge { background: rgba(0,112,242,0.3); color: var(--cyan); border: 1px solid rgba(79,195,247,0.3); }
+.catalog-card .cc-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.catalog-card .cc-meta  { font-size: 11px; color: var(--text-secondary); line-height: 1.7; font-family: var(--mono); }
+.catalog-card .cc-stats { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-stat {
+  font-size: 11px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.cc-stat.clickable {
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cc-stat.clickable:hover {
+  background: rgba(79,195,247,0.15);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* Toggle rows */
+.push-options { display: flex; flex-direction: column; gap: 12px; }
+.toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.toggle-row:hover { border-color: var(--cyan); }
+.toggle-row.active { border-color: var(--cyan); background: rgba(79,195,247,0.07); }
+.toggle-row input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--cyan); }
+.toggle-row .tr-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); flex: 1; }
+.toggle-row .tr-file  { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+/* Info box */
+.info-box {
+  background: rgba(79,195,247,0.07);
+  border: 1px solid rgba(79,195,247,0.2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.info-box strong { color: var(--cyan); }
+
+/* Spinner */
+.spinner-wrap { display: none; align-items: center; gap: 12px; padding: 16px 0; color: var(--cyan); font-size: 13px; font-weight: 600; }
+.spinner-wrap.show { display: flex; }
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid rgba(79,195,247,0.2);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Done screen */
+.done-screen { text-align: center; padding: 40px 0; }
+.done-icon  { font-size: 56px; margin-bottom: 16px; }
+.done-title { font-size: 26px; font-weight: 800; color: var(--green); margin-bottom: 8px; }
+.done-sub   { font-size: 14px; color: var(--text-secondary); line-height: 1.65; max-width: 440px; margin: 0 auto 24px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* ── Bottom nav ──────────────────────────────────────────── */
+.nav-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(10,10,26,0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 100;
+}
+.nav-bar-inner { max-width: 640px; margin: 0 auto; width: 100%; display: flex; gap: 12px; align-items: center; }
+.nav-spacer { flex: 1; }
+
+.btn-primary {
+  padding: 11px 30px;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, box-shadow 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-primary:hover:not(:disabled) { opacity: 0.88; box-shadow: var(--glow-blue); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-secondary {
+  padding: 11px 20px;
+  background: rgba(255,255,255,0.06);
+  color: var(--cyan);
+  border: 1.5px solid rgba(79,195,247,0.35);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-secondary:hover { background: rgba(79,195,247,0.1); border-color: var(--cyan); }
+
+.btn-ghost {
+  padding: 11px 16px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.15s, color 0.15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+
+/* ── KPI Easter Egg ──────────────────────────────────────── */
+.kpi-cookie-wrap {
+  position: fixed;
+  width: 60px; height: 60px;
+  cursor: pointer;
+  z-index: 9999;
+  user-select: none;
+  transition: transform 0.15s ease;
+}
+.kpi-cookie-wrap:hover { transform: scale(1.15) rotate(-8deg); }
+.kpi-cookie-wrap img   { width: 100%; height: 100%; border-radius: 50%; opacity: 0.5; transition: opacity 0.2s; object-fit: cover; }
+.kpi-cookie-wrap:hover img { opacity: 0.85; }
+.kpi-cookie-wrap.active img { opacity: 1; animation: cookiePulse 0.4s ease; }
+@keyframes cookiePulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.3) rotate(15deg); }
+  100% { transform: scale(1); }
+}
+.kpi-cookie-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--cyan); color: #fff;
+  font-size: 9px; font-weight: 700;
+  border-radius: 50%; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+}
+.kpi-cookie-badge.show { opacity: 1; }
+
+#kpi-panel {
+  display: none;
+  margin-top: 20px;
+  border: 2px dashed rgba(79,195,247,0.4);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  background: rgba(79,195,247,0.06);
+  animation: fadeUp 0.3s ease;
+}
+#kpi-panel.show { display: block; }
+.kpi-panel-header {
+  font-size: 13px; font-weight: 700;
+  color: var(--cyan);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.kpi-panel-hint {
+  font-size: 11px; color: var(--text-muted);
+  margin-bottom: 14px; line-height: 1.5;
+}
+.kpi-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.kpi-stat {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 11px; color: var(--text-secondary);
+  text-align: center; min-width: 80px;
+}
+.kpi-stat strong { display: block; font-size: 18px; color: var(--cyan); }
+
+/* Industry Reference select */
+select.industry-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 0.2s;
+}
+select.industry-select:focus { border-color: var(--cyan); }
+select.industry-select option { background: #0d1b3e; color: #fff; }
+
+/* Whitespace product list */
+.ws-product-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ws-product-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.ws-product-item:hover { border-color: var(--cyan); }
+.ws-product-item.selected { border-color: var(--cyan); background: rgba(79,195,247,0.07); }
+.ws-product-item input[type="checkbox"] { accent-color: var(--cyan); width: 16px; height: 16px; flex-shrink: 0; }
+.ws-product-name { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.ws-select-bar { display: flex; gap: 10px; margin-bottom: 10px; }
+.ws-select-bar button {
+  font-size: 11px; font-weight: 700; padding: 4px 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-secondary); cursor: pointer;
+}
+.ws-select-bar button:hover { border-color: var(--cyan); color: var(--cyan); }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-logo">Archimedes <span>AI</span></div>
+  <div class="header-client" id="header-client"></div>
+  <div class="header-sep"></div>
+  <div class="header-pills" id="header-pills"></div>
+  <div class="header-step-name" id="header-step-name"></div>
+  <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
+    <option value="en">🇬🇧 EN</option>
+    <option value="es">🇪🇸 ES</option>
+    <option value="fr">🇫🇷 FR</option>
+    <option value="it">🇮🇹 IT</option>
+    <option value="fi">🇫🇮 FI</option>
+  </select>
+</header>
+
+<!-- Main content -->
+<div class="main" id="main-content"></div>
+
+<!-- Nav bar -->
+<div class="nav-bar">
+  <div class="nav-bar-inner">
+    <button class="btn-ghost" id="btn-back" onclick="goBack()" style="display:none" data-t="back"></button>
+    <div class="nav-spacer"></div>
+    <button class="btn-secondary" id="btn-skip" onclick="skipStep()" style="display:none" data-t="skip"></button>
+    <button class="btn-primary" id="btn-next" onclick="nextStep()" data-t="continue"></button>
+  </div>
+</div>
+
+<script>
+const LANGS = {
+  en: {
+    back: '← Back', skip: 'Skip step', continue: 'Continue →',
+    import_btn: 'Import to LeanIX →', finish: 'Finish',
+    step_of: (n, total) => `Step ${n} of ${total}`,
+    pipeline_done: 'Pipeline complete',
+    new_pipeline: 'New pipeline',
+    steps: ['Client','Catalogs','Baseline','Requirements','PDF','Images','Generate','Reference','Import'],
+    s0_eye: (n, total) => `Step ${n} of ${total}`,
+    s0_title: 'Client name',
+    s0_desc: 'Enter the client name. It will be used as a prefix for generated files and as a tag in LeanIX.',
+    s0_label: 'Client name *',
+    s0_placeholder: 'E.g. Acme Corp, Contoso…',
+    s0_err: 'Enter the client name',
+    s0_busy: 'Creating session…',
+    s1_eye: (n, total) => `Step ${n} of ${total}`,
+    s1_title: 'SAP RBA / RSA Catalogs',
+    s1_desc: 'Status of the reference catalogs. The pipeline uses them to map Business Capabilities and Applications to canonical SAP nomenclature.',
+    s1_loading: 'Loading catalogs…',
+    s1_loaded: 'Catalogs loaded successfully',
+    s1_update_hint: 'To update the catalogs do it manually via Value Experience Hub and replace the JSON files in <code>knowledge/</code>.',
+    s1_version: 'Version',
+    s1_source: 'Source',
+    s1_err: 'Error loading catalogs',
+    s2_eye: (n, total) => `Step ${n} of ${total}`,
+    s2_title: 'Footprint / AS-IS Baseline',
+    s2_desc: 'Upload system inventory files to generate the Baseline (current architecture). Both files are optional — upload one or both, or skip this step.',
+    s2_onprem_hint: 'On-premise systems',
+    s2_cloud_hint: 'Cloud / SaaS systems',
+    s2_busy: 'Generating baseline…',
+    s2_ok: 'Baseline generated',
+    s2_download: '⬇ Download baseline.xlsx',
+    s2_ls_toggle: 'Lift & Shift',
+    s2_ls_toggle_hint: 'Convert baseline applications to RISE deployment targets using the SAP Material Mapping Tool',
+    s2b_title: 'Lift & Shift',
+    s2b_desc: 'Map your baseline applications to RISE deployment targets via the SAP Material Mapping Tool. Review the suggested Material Numbers, choose a deployment mode, then select the converted targets to include in the output.',
+    s2b_resolve_btn: 'Resolve Material Numbers',
+    s2b_resolving: 'Resolving…',
+    s2b_app: 'Application',
+    s2b_matnr: 'Material Nr',
+    s2b_convert_btn: 'Convert',
+    s2b_converting: 'Converting…',
+    s2b_mode_label: 'Deployment mode',
+    s2b_select_all: 'Select all',
+    s2b_deselect_all: 'Deselect all',
+    s2b_app_col: 'Application',
+    s2b_target_col: 'RISE Target',
+    s2b_ok: 'Lift & Shift ready',
+    s3_eye: (n, total) => `Step ${n} of ${total}`,
+    s3_title: 'Requirements Excel',
+    s3_desc: 'Upload the client requirements Excel file. If already enriched (columns O/P filled) it will be used directly. Otherwise it will be processed with Claude API + RBA/RSA catalogs.',
+    s3_hint: 'Client requirements Excel',
+    s3_busy: 'Analysing requirements with Claude API…',
+    s3_ok: 'Requirements processed',
+    s3_already: '✓ Excel already enriched — using columns O/P directly.',
+    s3_enriched: (ok) => `✓ Enriched with Claude API. Validation: ${ok ? 'OK' : '⚠ with warnings'}`,
+    s3b_toggle: 'Contrast RSA mapping with SAP Help Portal',
+    s3b_toggle_hint: 'Validates each RSA product against official SAP documentation (help.sap.com)',
+    s3b_busy: 'Contrasting with SAP Help Portal…',
+    s3b_ok: (v, u) => `✓ SAP Help contrast complete: ${v} validated · ${u} to review`,
+    s3b_download: '⬇ Download contrast report',
+    s3b_skipped: 'Contrast skipped (no enriched requirements)',
+    s3c_title: 'Industry Reference Architecture',
+    s3c_desc: 'Compare the client\'s Baseline against SAP\'s recommended products for the selected industry. Products not yet in the Baseline are shown as whitespace gaps.',
+    s3c_label: 'Industry',
+    s3c_fetch: 'Load reference architecture…',
+    s3c_busy: 'Fetching SAP Industry Reference Architecture…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} products not in Baseline`,
+    s3c_covered: (n) => `${n} products already in Baseline`,
+    s3c_select_all: 'Select all',
+    s3c_deselect_all: 'Deselect all',
+    s3c_apply: 'Add selected to Target →',
+    s3c_apply_busy: 'Adding to Target Excel…',
+    s3c_apply_ok: (n) => `✓ ${n} products added to Target with tag Reference`,
+    s3c_none_selected: 'Select at least one product',
+    s4_eye: (n, total) => `Step ${n} of ${total}`,
+    s4_title: 'Client PDF document',
+    s4_desc: 'Upload additional client documentation in PDF. Claude API will extract fact sheets (Applications, BCs, Organizations, Initiatives, ITCs) mapping them against the RBA/RSA catalogs.',
+    s4_hint: 'Client documentation (.pdf)',
+    s4_hint2: 'Brief, proposal, RFP…',
+    s4_busy: 'Analysing PDF with Claude API…',
+    s4_ok: 'PDF processed',
+    s5_eye: (n, total) => `Step ${n} of ${total}`,
+    s5_title: 'Architecture diagrams',
+    s5_desc: 'Upload images or screenshots of architecture diagrams. Claude API (vision) will identify applications, domains, relationships and ITCs visible in the diagrams.',
+    s5_dz_title: 'Drag images here or click',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Multiple files',
+    s5_busy: 'Analysing diagrams with Claude API…',
+    s5_ok: (n) => `${n} diagram(s) analysed`,
+    s6_eye: (n, total) => `Step ${n} of ${total}`,
+    s6_title: 'Generate LeanIX files',
+    s6_desc: 'Files will be generated from all the collected information.',
+    s6_busy: 'Generating LeanIX files…',
+    s6_ok: 'Files generated',
+    s6_none: 'No files generated',
+    s6_none_hint: 'Complete at least Step 3 (Baseline) or Step 4 (Requirements).',
+    s6_download: '⬇ Download',
+    s6_label_baseline: 'AS-IS Baseline',
+    s6_desc_baseline: 'Current applications (on-premise + cloud) — import into LeanIX',
+    s6_label_target: 'TO-BE Target',
+    s6_desc_target: 'Fact sheets derived from requirements — import into LeanIX',
+    s6_label_supp: 'Additional fact sheets (PDF + images)',
+    s6_desc_supp: 'Review manually before importing into LeanIX',
+    s7ref_eye: (n, total) => `Step ${n} of ${total}`,
+    s7_eye: (n, total) => `Step ${n} of ${total}`,
+    s7_title: 'Import into LeanIX',
+    s7_no_creds: 'LeanIX credentials not configured',
+    s7_no_creds_hint: 'Configure <strong>LEANIX_API_TOKEN</strong> and <strong>LEANIX_BASE_URL</strong> in the <code>.env</code> file to import automatically.',
+    s7_manual: '<strong>Manual import:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Order:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Select which files to import into your LeanIX workspace via API.',
+    s7_warn: 'Review files before importing',
+    s7_warn_hint: 'Download them in the previous step and verify the content before importing into LeanIX.',
+    s7_chk_baseline: 'Import AS-IS Baseline',
+    s7_chk_target: 'Import TO-BE Target',
+    s7_busy: 'Importing into LeanIX…',
+    s7_ok: 'Imported successfully',
+    s7_imported: (list) => `Files imported: ${list}`,
+    s7_err: 'Errors during import',
+    s7_none: 'Select at least one file to import',
+    s7_trans_title: 'Transformations created',
+    s7_trans_empty: 'No transformations found in LeanIX.',
+    s7_trans_initiative: 'Initiative',
+    s7_trans_app: 'Application',
+    s7_trans_type: 'Type',
+    s7_trans_status: 'Status',
+    s7_trans_date: 'Completion',
+    s7_synclog_btn: 'Show sync history',
+    s7_synclog_title: 'Sync history (last 20)',
+    s7_synclog_empty: 'No synchronization runs found.',
+    s7_synclog_connector: 'Connector',
+    s7_synclog_status: 'Status',
+    s7_synclog_started: 'Started',
+    s7_synclog_created: 'Created',
+    s7_synclog_updated: 'Updated',
+    s7_synclog_warns: 'Warns',
+    s7_synclog_errors: 'Errors',
+    s7_proj_btn: 'Preview TO-BE landscape',
+    s7_proj_title: 'TO-BE projection',
+    s7_proj_empty: 'No projected impacts found.',
+    s7_proj_fs: 'Fact Sheet',
+    s7_proj_field: 'Field',
+    s7_proj_from: 'Current',
+    s7_proj_to: 'Projected',
+    kpi_panel_title: '🍪 KPI Achievement Mode',
+    kpi_panel_hint: 'Generates and imports fictional fact sheets to maximize EA Engagement Dashboard Best Practice Metrics. All tagged <code>KPI_Achievement</code> for easy exclusion.',
+    kpi_chk: 'Generate + Import KPI Achievement Excel',
+    kpi_busy: 'Generating KPI data and importing…',
+    kpi_ok: 'KPI Achievement imported successfully',
+    kpi_ok_hint: (s) => `Imported: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--orange)">⚠ Create ≥3 Transformations manually in LeanIX to complete KPI 5.</span>`,
+    kpi_err: 'Error importing KPI data',
+    kpi_warn: 'Transformations must be created manually in LeanIX after import.',
+    done_title: 'Pipeline complete',
+    done_sub: (n, client) => `${n} file${n !== 1 ? 's' : ''} generated for client <strong>${client}</strong>.<br>Download them from the previous step and import into LeanIX.`,
+    processing: 'Processing…',
+    generating: 'Generating files…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+  es: {
+    back: '← Atrás', skip: 'Omitir paso', continue: 'Continuar →',
+    import_btn: 'Importar en LeanIX →', finish: 'Finalizar',
+    step_of: (n, total) => `Paso ${n} de ${total}`,
+    pipeline_done: 'Pipeline completado',
+    new_pipeline: 'Nuevo pipeline',
+    steps: ['Cliente','Catálogos','Baseline','Reqs','PDF','Imágenes','Generar','Referencia','Importar'],
+    s0_eye: (n, total) => `Paso ${n} de ${total}`,
+    s0_title: 'Nombre del cliente',
+    s0_desc: 'Introduce el nombre del cliente. Se usará como prefijo en los ficheros generados y como tag en LeanIX.',
+    s0_label: 'Nombre del cliente *',
+    s0_placeholder: 'Ej: Acme Corp, Acciona, N3C…',
+    s0_err: 'Introduce el nombre del cliente',
+    s0_busy: 'Creando sesión…',
+    s1_eye: (n, total) => `Paso ${n} de ${total}`,
+    s1_title: 'Catálogos SAP RBA / RSA',
+    s1_desc: 'Estado de los catálogos de referencia. El pipeline los usa para mapear Business Capabilities y Applications a nomenclatura SAP canónica.',
+    s1_loading: 'Leyendo catálogos…',
+    s1_loaded: 'Catálogos cargados correctamente',
+    s1_update_hint: 'Para actualizar los catálogos hazlo manualmente vía Value Experience Hub y sustituye los ficheros JSON en <code>knowledge/</code>.',
+    s1_version: 'Versión',
+    s1_source: 'Fuente',
+    s1_err: 'Error cargando catálogos',
+    s2_eye: (n, total) => `Paso ${n} de ${total}`,
+    s2_title: 'Footprint / Baseline AS-IS',
+    s2_desc: 'Sube los ficheros de inventario de sistemas para generar el Baseline (arquitectura actual). Ambos ficheros son opcionales — puedes subir uno o los dos, o saltar este paso.',
+    s2_onprem_hint: 'Sistemas on-premise',
+    s2_cloud_hint: 'Sistemas cloud / SaaS',
+    s2_busy: 'Generando baseline…',
+    s2_ok: 'Baseline generado',
+    s2_download: '⬇ Descargar baseline.xlsx',
+    s2_ls_toggle: 'Lift & Shift',
+    s2_ls_toggle_hint: 'Convierte las aplicaciones del baseline en targets de despliegue RISE usando el SAP Material Mapping Tool',
+    s2b_title: 'Lift & Shift',
+    s2b_desc: 'Mapea las aplicaciones del baseline a targets de despliegue RISE. Revisa los Material Numbers sugeridos, elige el modo de despliegue y selecciona los targets a incluir en el output.',
+    s2b_resolve_btn: 'Resolver Material Numbers',
+    s2b_resolving: 'Resolviendo…',
+    s2b_app: 'Aplicación',
+    s2b_matnr: 'Material Nr',
+    s2b_convert_btn: 'Convertir',
+    s2b_converting: 'Convirtiendo…',
+    s2b_mode_label: 'Modo de despliegue',
+    s2b_select_all: 'Seleccionar todo',
+    s2b_deselect_all: 'Deseleccionar todo',
+    s2b_app_col: 'Aplicación',
+    s2b_target_col: 'Target RISE',
+    s2b_ok: 'Lift & Shift listo',
+    s3_eye: (n, total) => `Paso ${n} de ${total}`,
+    s3_title: 'Excel de Requerimientos',
+    s3_desc: 'Sube el fichero Excel con los requerimientos del cliente. Si ya está enriquecido (columnas O/P rellenas) se usará directamente. Si no, se procesará con Claude API + catálogos RBA/RSA.',
+    s3_hint: 'Excel de requerimientos del cliente',
+    s3_busy: 'Analizando requerimientos con Claude API…',
+    s3_ok: 'Requerimientos procesados',
+    s3_already: '✓ Excel ya enriquecido — usando columnas O/P directamente.',
+    s3_enriched: (ok) => `✓ Enriquecido con Claude API. Validación: ${ok ? 'OK' : '⚠ con advertencias'}`,
+    s3b_toggle: 'Contrastar mapeo RSA con SAP Help Portal',
+    s3b_toggle_hint: 'Valida cada producto RSA contra la documentación oficial SAP (help.sap.com)',
+    s3b_busy: 'Contrastando con SAP Help Portal…',
+    s3b_ok: (v, u) => `✓ Contraste completado: ${v} validados · ${u} a revisar`,
+    s3b_download: '⬇ Descargar informe de contraste',
+    s3b_skipped: 'Contraste omitido (no hay requerimientos enriquecidos)',
+    s3c_title: 'Arquitectura de Referencia por Industria',
+    s3c_desc: 'Compara el Baseline del cliente con los productos SAP recomendados para la industria seleccionada. Los productos que no están en el Baseline se muestran como whitespace.',
+    s3c_label: 'Industria',
+    s3c_fetch: 'Cargar arquitectura de referencia…',
+    s3c_busy: 'Obteniendo Arquitectura de Referencia SAP…',
+    s3c_whitespace_title: (n) => `Whitespace — ${n} productos no están en el Baseline`,
+    s3c_covered: (n) => `${n} productos ya están en el Baseline`,
+    s3c_select_all: 'Seleccionar todo',
+    s3c_deselect_all: 'Deseleccionar todo',
+    s3c_apply: 'Añadir seleccionados al Target →',
+    s3c_apply_busy: 'Añadiendo al Excel Target…',
+    s3c_apply_ok: (n) => `✓ ${n} productos añadidos al Target con etiqueta Reference`,
+    s3c_none_selected: 'Selecciona al menos un producto',
+    s4_eye: (n, total) => `Paso ${n} de ${total}`,
+    s4_title: 'Documento PDF del cliente',
+    s4_desc: 'Sube documentación adicional del cliente en PDF. Claude API extraerá fact sheets (Applications, BCs, Organizaciones, Iniciativas, ITCs) mapeándolas contra los catálogos RBA/RSA.',
+    s4_hint: 'Documentación cliente (.pdf)',
+    s4_hint2: 'Memoria, propuesta, RFP…',
+    s4_busy: 'Extrayendo fact sheets del PDF…',
+    s4_ok: 'PDF procesado',
+    s5_eye: (n, total) => `Paso ${n} de ${total}`,
+    s5_title: 'Diagramas de arquitectura',
+    s5_desc: 'Sube imágenes o capturas de diagramas de arquitectura. Claude API (visión) identificará aplicaciones, dominios, relaciones e ITCs visibles en los diagramas.',
+    s5_dz_title: 'Arrastra imágenes aquí o haz clic',
+    s5_dz_hint: 'PNG, JPG, JPEG, GIF, WEBP · Múltiples ficheros',
+    s5_busy: 'Analizando diagramas con Claude AI…',
+    s5_ok: (n) => `${n} diagrama(s) analizados`,
+    s6_eye: (n, total) => `Paso ${n} de ${total}`,
+    s6_title: 'Generar ficheros LeanIX',
+    s6_desc: 'Se generarán los ficheros de importación a partir de toda la información recopilada.',
+    s6_busy: 'Generando ficheros LeanIX…',
+    s6_ok: 'Ficheros generados',
+    s6_none: 'No se generaron ficheros',
+    s6_none_hint: 'Completa al menos el Paso 3 (Baseline) o el Paso 4 (Requerimientos).',
+    s6_download: '⬇ Descargar',
+    s6_label_baseline: 'Baseline AS-IS',
+    s6_desc_baseline: 'Applications actuales (on-premise + cloud) — importar en LeanIX',
+    s6_label_target: 'Target TO-BE',
+    s6_desc_target: 'Fact sheets derivados de requerimientos — importar en LeanIX',
+    s6_label_supp: 'Fact sheets adicionales (PDF + imágenes)',
+    s6_desc_supp: 'Revisar manualmente antes de importar en LeanIX',
+    s7ref_eye: (n, total) => `Paso ${n} de ${total}`,
+    s7_eye: (n, total) => `Paso ${n} de ${total}`,
+    s7_title: 'Importar en LeanIX',
+    s7_no_creds: 'Credenciales LeanIX no configuradas',
+    s7_no_creds_hint: 'Configura <strong>LEANIX_API_TOKEN</strong> y <strong>LEANIX_BASE_URL</strong> en el fichero <code>.env</code> para importar automáticamente.',
+    s7_manual: '<strong>Importación manual:</strong><br>LeanIX → Settings → Import/Export → Import from Excel',
+    s7_order: '<strong>Orden:</strong> BusinessCapability → ITComponent → Application → Initiative',
+    s7_desc: 'Selecciona qué ficheros importar en tu workspace LeanIX vía API.',
+    s7_warn: 'Revisa los ficheros antes de importar',
+    s7_warn_hint: 'Descárgalos en el paso anterior y verifica el contenido antes de importar en LeanIX.',
+    s7_chk_baseline: 'Importar Baseline AS-IS',
+    s7_chk_target: 'Importar Target TO-BE',
+    s7_busy: 'Importando en LeanIX…',
+    s7_ok: 'Importado correctamente',
+    s7_imported: (list) => `Ficheros importados: ${list}`,
+    s7_err: 'Errores en la importación',
+    s7_none: 'Selecciona al menos un fichero para importar',
+    s7_trans_title: 'Transformaciones creadas',
+    s7_trans_empty: 'No se encontraron transformaciones en LeanIX.',
+    s7_trans_initiative: 'Iniciativa',
+    s7_trans_app: 'Aplicación',
+    s7_trans_type: 'Tipo',
+    s7_trans_status: 'Estado',
+    s7_trans_date: 'Fecha finalización',
+    s7_synclog_btn: 'Ver historial de sincronizaciones',
+    s7_synclog_title: 'Historial sincronizaciones (últimas 20)',
+    s7_synclog_empty: 'No se encontraron sincronizaciones.',
+    s7_synclog_connector: 'Conector',
+    s7_synclog_status: 'Estado',
+    s7_synclog_started: 'Inicio',
+    s7_synclog_created: 'Creadas',
+    s7_synclog_updated: 'Actualizadas',
+    s7_synclog_warns: 'Avisos',
+    s7_synclog_errors: 'Errores',
+    s7_proj_btn: 'Vista previa TO-BE',
+    s7_proj_title: 'Proyección TO-BE',
+    s7_proj_empty: 'No se encontraron impactos proyectados.',
+    s7_proj_fs: 'Fact Sheet',
+    s7_proj_field: 'Campo',
+    s7_proj_from: 'Actual',
+    s7_proj_to: 'Proyectado',
+    kpi_panel_title: '🍪 Modo KPI Achievement',
+    kpi_panel_hint: 'Genera e importa fact sheets ficticias para maximizar las Best Practice Metrics del EA Engagement Dashboard. Todas etiquetadas <code>KPI_Achievement</code> para excluirlas fácilmente.',
+    kpi_chk: 'Generar + Importar Excel KPI Achievement',
+    kpi_busy: 'Generando datos KPI e importando…',
+    kpi_ok: 'KPI Achievement importado correctamente',
+    kpi_ok_hint: (s) => `Importado: ${s.objectives} Objectives · ${s.business_capabilities} BCs · ${s.applications} Apps · ${s.initiatives} Initiatives.<br><span style="color:var(--orange)">⚠ Crea ≥3 Transformations manualmente en LeanIX para completar el KPI 5.</span>`,
+    kpi_err: 'Error al importar datos KPI',
+    kpi_warn: 'Las Transformations deben crearse manualmente en LeanIX tras el import.',
+    done_title: 'Pipeline completado',
+    done_sub: (n, client) => `Se han generado ${n} fichero${n !== 1 ? 's' : ''} para el cliente <strong>${client}</strong>.<br>Descárgalos desde el paso anterior e impórtalos en LeanIX.`,
+    processing: 'Procesando…',
+    generating: 'Generando ficheros…',
+    cat_rba_title: 'Reference Business Architecture',
+    cat_rsa_title: 'Reference Solution Architecture',
+  },
+};
+
+// ── State ───────────────────────────────────────────────────────────────────
+let _lang = 'en';
+let _step = 0;
+let _sessionId = null;
+let _clientName = '';
+let _baselineFile = null;
+let _cloudFile = null;
+let _reqsFile = null;
+let _pdfFile = null;
+let _images = [];
+let _contrastEnabled = false;
+let _liftShiftEnabled = false;
+let _liftShiftMappings = null;
+let _liftShiftMode = null;
+let _baselineDone = false;
+let _reqsDone = false;
+let _pdfDone = false;
+let _imgDone = false;
+let _generateDone = false;
+let _refDone = false;
+let _generateFiles = {};
+let _generateOutputs = [];
+let _lxConfigured = false;
+let _cookieClicks = 0;
+let _kpiUnlocked = false;
+let _cookieEl = null;
+
+const BASE = 'http://localhost:8767';
+function totalSteps() { return 9 + (_liftShiftEnabled ? 1 : 0); }
+
+function t(key, ...args) {
+  const L = LANGS[_lang] || LANGS.en;
+  const val = L[key] ?? (LANGS.en[key]);
+  if (typeof val === 'function') return val(...args);
+  return val ?? key;
+}
+
+function setLang(lang) {
+  _lang = lang;
+  renderStep(_step);
+  renderPills();
+}
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(BASE + path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.json();
+}
+
+function showResult(id, type, header, body = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `result-card ${type} show`;
+  el.innerHTML = `<div class="result-header">${header}</div>${body ? `<div class="result-summary">${body}</div>` : ''}`;
+}
+
+// ── Pills + navigation ──────────────────────────────────────────────────────
+function renderPills() {
+  const L = LANGS[_lang] || LANGS.en;
+  const baseSteps = L.steps || LANGS.en.steps;
+  const lsLabel = L.s2b_title || LANGS.en.s2b_title || 'Lift & Shift';
+  const steps = _liftShiftEnabled
+    ? [...baseSteps.slice(0, 3), lsLabel, ...baseSteps.slice(3)]
+    : baseSteps;
+  const container = document.getElementById('header-pills');
+  const nameEl = document.getElementById('header-step-name');
+  if (!container) return;
+  container.innerHTML = steps.map((_, i) => {
+    const cls = i < _step ? 'done' : i === _step ? 'active' : 'pending';
+    return `<div class="pill ${cls}"></div>`;
+  }).join('');
+  if (nameEl) nameEl.textContent = steps[_step] || '';
+}
+
+function updateHeaderClient() {
+  const el = document.getElementById('header-client');
+  if (el) el.textContent = _clientName ? `· ${_clientName}` : '';
+}
+
+function goBack() {
+  if (_step > 0) { _step--; renderStep(_step); renderPills(); }
+}
+
+function skipStep() {
+  if (_step < totalSteps() - 1) { _step++; renderStep(_step); renderPills(); }
+}
+
+async function nextStep() {
+  const btn = document.getElementById('btn-next');
+
+  if (_step === 0) {
+    const val = document.getElementById('s0-input')?.value.trim();
+    if (!val) { document.getElementById('s0-input').focus(); return; }
+    btn.disabled = true;
+    try {
+      const r = await apiFetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_name: val })
+      });
+      _sessionId = r.session_id;
+      _clientName = val;
+      updateHeaderClient();
+      // Check LeanIX credentials
+      try { const cfg = await apiFetch('/api/config'); _lxConfigured = cfg.leanix_configured || false; } catch(_) {}
+    } catch(e) {
+      showResult('s0-result', 'error', '✗ Error', e.message);
+      btn.disabled = false;
+      return;
+    }
+    btn.disabled = false;
+  }
+
+  // Offset for lift & shift: steps >= 3 shift by 1 when LS enabled
+  const off = _liftShiftEnabled ? 1 : 0;
+
+  if (_step === 2 && !_baselineDone && (_baselineFile || _cloudFile)) {
+    await runBaseline(); return;
+  }
+  if (_liftShiftEnabled && _step === 3) {
+    await runLiftShift(); return;
+  }
+  if (_step === 3 + off && !_reqsDone && _reqsFile) {
+    await runRequirements(); return;
+  }
+  if (_step === 4 + off && !_pdfDone && _pdfFile) {
+    await runPdf(); return;
+  }
+  if (_step === 5 + off && !_imgDone && _images.length > 0) {
+    await runImages(); return;
+  }
+  if (_step === 6 + off && !_generateDone) {
+    await runGenerate(); return;
+  }
+  if (_step === 8 + off) {
+    await runImport(); return;
+  }
+
+  if (_step < totalSteps() - 1) {
+    _step++;
+    renderStep(_step);
+    renderPills();
+  }
+}
+
+function renderNavButtons() {
+  const back = document.getElementById('btn-back');
+  const skip = document.getElementById('btn-skip');
+  const next = document.getElementById('btn-next');
+  if (!back || !skip || !next) return;
+
+  back.style.display = _step > 0 ? '' : 'none';
+  back.textContent = t('back');
+
+  const skippableBase = [2, 3, 4, 5, 7];
+  const skippable = _liftShiftEnabled
+    ? skippableBase.map(s => s >= 3 ? s + 1 : s)
+    : skippableBase;
+  skip.style.display = skippable.includes(_step) ? '' : 'none';
+  skip.textContent = t('skip');
+
+  if (_step === totalSteps() - 1) {
+    next.textContent = t('import_btn');
+  } else if (_step >= totalSteps()) {
+    next.style.display = 'none';
+  } else {
+    next.style.display = '';
+    next.textContent = t('continue');
+  }
+}
+
+// ── Step renderer ───────────────────────────────────────────────────────────
+function renderStep(n) {
+  const main = document.getElementById('main-content');
+  const base = [renderS0, renderS1, renderS2, renderS3, renderS4, renderS5, renderS6, renderS7ref, renderS7, renderDone];
+  const fns = _liftShiftEnabled
+    ? [renderS0, renderS1, renderS2, renderS2b, renderS3, renderS4, renderS5, renderS6, renderS7ref, renderS7, renderDone]
+    : base;
+  main.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'step-card';
+  main.appendChild(card);
+  if (fns[n]) fns[n](card);
+  renderNavButtons();
+}
+
+function renderS0(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s0_eye', 1, totalSteps())}</div>
+    <div class="step-title">${t('s0_title')}</div>
+    <div class="step-desc">${t('s0_desc')}</div>
+    <label class="field-label" for="s0-input">${t('s0_label')}</label>
+    <input type="text" id="s0-input" placeholder="${t('s0_placeholder')}" value="${_clientName}"
+      onkeydown="if(event.key==='Enter') nextStep()">
+    <div id="s0-result" class="result-card"></div>
+  `;
+  document.getElementById('s0-input').focus();
+}
+
+function renderS1(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s1_eye', 2, totalSteps())}</div>
+    <div class="step-title">${t('s1_title')}</div>
+    <div class="step-desc">${t('s1_desc')}</div>
+    <div id="s1-spinner" class="spinner-wrap"><div class="spinner"></div><span class="spin-msg">${t('s1_loading')}</span></div>
+    <div id="s1-result" class="result-card"></div>
+    <div id="s1-catalogs" class="catalog-grid" style="margin-top:16px;"></div>
+    <div id="s1-hint" style="margin-top:14px;font-size:12px;color:var(--text-muted);display:none;">${t('s1_update_hint')}</div>
+  `;
+  loadCatalogs();
+}
+
+async function loadCatalogs() {
+  document.getElementById('s1-spinner').classList.add('show');
+  try {
+    const d = await apiFetch(`/api/session/${_sessionId}/catalog`);
+    document.getElementById('s1-spinner').classList.remove('show');
+    showResult('s1-result', 'success', `✓ ${t('s1_loaded')}`);
+    const grid = document.getElementById('s1-catalogs');
+    grid.innerHTML = `
+      <div class="catalog-card rba">
+        <div class="cc-badge">RBA</div>
+        <div class="cc-title">${t('cat_rba_title')}</div>
+        <div class="cc-meta">${t('s1_version')}: ${d.rba?.version || '—'}<br>${t('s1_source')}: ${d.rba?.source || '—'}</div>
+        <div class="cc-stats"><span class="cc-stat clickable" onclick="openCatalog('rba','bcs')">${d.rba?.stats?.business_capabilities || 0} BCs</span><span class="cc-stat clickable" onclick="openCatalog('rba','domains')">${d.rba?.stats?.business_domains || 0} dominios</span></div>
+      </div>
+      <div class="catalog-card rsa">
+        <div class="cc-badge">RSA</div>
+        <div class="cc-title">${t('cat_rsa_title')}</div>
+        <div class="cc-meta">${t('s1_version')}: ${d.rsa?.version || '—'}<br>${t('s1_source')}: ${d.rsa?.source || '—'}</div>
+        <div class="cc-stats"><span class="cc-stat clickable" onclick="openCatalog('rsa','products')">${d.rsa?.stats?.total_products || 0} productos</span></div>
+      </div>
+    `;
+    document.getElementById('s1-hint').style.display = '';
+  } catch(e) {
+    document.getElementById('s1-spinner').classList.remove('show');
+    showResult('s1-result', 'error', `✗ ${t('s1_err')}`, e.message);
+  }
+}
+
+function renderS2(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s2_eye', 3, totalSteps())}</div>
+    <div class="step-title">${t('s2_title')}</div>
+    <div class="step-desc">${t('s2_desc')}</div>
+    <div class="drop-grid">
+      <div class="drop-zone${_baselineFile ? ' has-file' : ''}" id="dz-onprem"
+        onclick="document.getElementById('f-onprem').click()"
+        ondragover="dzDragOver(event,'dz-onprem')" ondragleave="dzDragLeave('dz-onprem')"
+        ondrop="dzDrop(event,'dz-onprem','f-onprem')">
+        ${_baselineFile ? `<span class="drop-remove" onclick="clearFile('baseline',event)">✕</span>` : ''}
+        <div class="drop-icon">🖥️</div>
+        <div class="drop-title">${t('s2_onprem_hint')}</div>
+        <div class="drop-hint">.xlsx</div>
+        ${_baselineFile ? `<div class="drop-filename">${_baselineFile.name}</div>` : ''}
+      </div>
+      <div class="drop-zone${_cloudFile ? ' has-file' : ''}" id="dz-cloud"
+        onclick="document.getElementById('f-cloud').click()"
+        ondragover="dzDragOver(event,'dz-cloud')" ondragleave="dzDragLeave('dz-cloud')"
+        ondrop="dzDrop(event,'dz-cloud','f-cloud')">
+        ${_cloudFile ? `<span class="drop-remove" onclick="clearFile('cloud',event)">✕</span>` : ''}
+        <div class="drop-icon">☁️</div>
+        <div class="drop-title">${t('s2_cloud_hint')}</div>
+        <div class="drop-hint">.xlsx</div>
+        ${_cloudFile ? `<div class="drop-filename">${_cloudFile.name}</div>` : ''}
+      </div>
+    </div>
+    <input type="file" id="f-onprem" accept=".xlsx" onchange="fileSelected('baseline',this)">
+    <input type="file" id="f-cloud"  accept=".xlsx" onchange="fileSelected('cloud',this)">
+    <div class="toggle-row${_liftShiftEnabled ? ' active' : ''}" onclick="toggleLiftShift(this)" id="tr-liftshift" style="margin-top:16px;">
+      <input type="checkbox" ${_liftShiftEnabled ? 'checked' : ''} onchange="toggleLiftShift(document.getElementById('tr-liftshift'))">
+      <div><div class="tr-label">${t('s2_ls_toggle')}</div><div class="tr-file">${t('s2_ls_toggle_hint')}</div></div>
+    </div>
+    <div id="s2-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s2_busy')}</span></div>
+    <div id="s2-result" class="result-card" style="margin-top:16px;"></div>
+  `;
+  if (_baselineDone) showResult('s2-result', 'success', `✓ ${t('s2_ok')}`,
+    `<a href="${BASE}/api/session/${_sessionId}/download/baseline" class="btn-download" download>${t('s2_download')}</a>`);
+}
+
+async function runBaseline() {
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  document.getElementById('s2-spinner').classList.add('show');
+  try {
+    const fd = new FormData();
+    if (_baselineFile) fd.append('onprem_file', _baselineFile);
+    if (_cloudFile)    fd.append('cloud_file', _cloudFile);
+    const r = await apiFetch(`/api/session/${_sessionId}/baseline`, { method: 'POST', body: fd });
+    document.getElementById('s2-spinner').classList.remove('show');
+    _baselineDone = true;
+    _generateFiles.baseline = r.download_url;
+    showResult('s2-result', 'success', `✓ ${t('s2_ok')}`,
+      `<div class="result-stats">${r.n_onprem != null ? `<div class="stat-pill"><div class="stat-n">${r.n_onprem}</div><div class="stat-lbl">OnPrem</div></div>` : ''}${r.n_cloud != null ? `<div class="stat-pill"><div class="stat-n">${r.n_cloud}</div><div class="stat-lbl">Cloud</div></div>` : ''}</div><a href="${BASE}/api/session/${_sessionId}/download/baseline" class="btn-download" download>${t('s2_download')}</a>`
+    );
+    btn.disabled = false;
+    setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 1200);
+  } catch(e) {
+    document.getElementById('s2-spinner').classList.remove('show');
+    showResult('s2-result', 'error', '✗ Error', e.message);
+    btn.disabled = false;
+  }
+}
+
+// ── Step 2b — Lift & Shift ───────────────────────────────────────────────────
+function toggleLiftShift(row) {
+  _liftShiftEnabled = !_liftShiftEnabled;
+  row.classList.toggle('active', _liftShiftEnabled);
+  row.querySelector('input').checked = _liftShiftEnabled;
+  renderPills();
+}
+
+let _lsData = { resolved: [], modes: [], conversions: [], selected: [] };
+
+function renderS2b(el) {
+  const off = _liftShiftEnabled ? 1 : 0;
+  const stepN = 3 + off;
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s2_eye', stepN, totalSteps())}</div>
+    <div class="step-title">${t('s2b_title')}</div>
+    <div class="step-desc">${t('s2b_desc')}</div>
+    <div id="ls-phase1">
+      <button class="btn-primary" style="margin-top:12px;" onclick="runLiftShiftResolve()">${t('s2b_resolve_btn')}</button>
+    </div>
+    <div id="ls-spinner1" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s2b_resolving')}</span></div>
+    <div id="ls-resolve-table" style="margin-top:16px;overflow-x:auto;"></div>
+    <div id="ls-phase2" style="display:none;margin-top:16px;">
+      <label class="field-label">${t('s2b_mode_label')}</label>
+      <select id="ls-mode-select" style="margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:14px;"></select>
+      <button class="btn-primary" onclick="runLiftShiftConvert()">${t('s2b_convert_btn')}</button>
+    </div>
+    <div id="ls-spinner2" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s2b_converting')}</span></div>
+    <div id="ls-conv-table" style="margin-top:16px;overflow-x:auto;"></div>
+    <div id="s2b-result" class="result-card" style="margin-top:16px;"></div>
+  `;
+  // If already resolved, re-render table
+  if (_lsData.resolved.length) renderLsResolveTable();
+  if (_lsData.conversions.length) renderLsConvTable();
+}
+
+async function runLiftShiftResolve() {
+  document.getElementById('ls-spinner1').classList.add('show');
+  document.querySelector('#ls-phase1 button').disabled = true;
+  try {
+    const d = await apiFetch(`/api/session/${_sessionId}/lift-shift/resolve`, { method: 'POST' });
+    _lsData.resolved = d.resolved || [];
+    _lsData.modes = d.modes || [];
+    document.getElementById('ls-spinner1').classList.remove('show');
+    renderLsResolveTable();
+    // Populate mode selector
+    const sel = document.getElementById('ls-mode-select');
+    if (sel) {
+      sel.innerHTML = _lsData.modes.map(m => `<option value="${m}">${m}</option>`).join('');
+      document.getElementById('ls-phase2').style.display = '';
+    }
+  } catch(e) {
+    document.getElementById('ls-spinner1').classList.remove('show');
+    showResult('s2b-result', 'error', '✗ Error', e.message);
+    document.querySelector('#ls-phase1 button').disabled = false;
+  }
+}
+
+function renderLsResolveTable() {
+  const wrap = document.getElementById('ls-resolve-table');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="color:var(--text-secondary);">
+        <th style="text-align:left;padding:6px 8px;">${t('s2b_app')}</th>
+        <th style="text-align:left;padding:6px 8px;">${t('s2b_matnr')}</th>
+      </tr></thead>
+      <tbody>
+        ${_lsData.resolved.map((r, i) => `
+          <tr style="border-top:1px solid rgba(255,255,255,0.06);">
+            <td style="padding:6px 8px;">${r.app_name}</td>
+            <td style="padding:6px 8px;">
+              <input type="text" id="ls-matnr-${i}" value="${r.selected || ''}"
+                style="width:110px;padding:4px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;font-family:monospace;"
+                oninput="_lsData.resolved[${i}].selected=this.value">
+              ${r.candidates && r.candidates.length > 1 ? `<select onchange="document.getElementById('ls-matnr-${i}').value=this.value;_lsData.resolved[${i}].selected=this.value"
+                style="margin-left:6px;padding:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:11px;">
+                <option value="">candidates</option>
+                ${r.candidates.map(c => `<option value="${c.matnr}" ${c.matnr===r.selected?'selected':''}>${c.matnr} — ${c.maktx ? c.maktx.substring(0,35) : ''}</option>`).join('')}
+              </select>` : ''}
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function runLiftShiftConvert() {
+  const mode = document.getElementById('ls-mode-select')?.value;
+  document.getElementById('ls-spinner2').classList.add('show');
+  const mappings = _lsData.resolved.filter(r => r.selected).map(r => ({ app_name: r.app_name, selected: r.selected }));
+  try {
+    const d = await apiFetch(`/api/session/${_sessionId}/lift-shift/convert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings, deployment_mode: mode })
+    });
+    _lsData.conversions = d.conversions || [];
+    _lsData.selected = _lsData.conversions.map((_, i) => i);
+    document.getElementById('ls-spinner2').classList.remove('show');
+    renderLsConvTable();
+  } catch(e) {
+    document.getElementById('ls-spinner2').classList.remove('show');
+    showResult('s2b-result', 'error', '✗ Error', e.message);
+  }
+}
+
+function renderLsConvTable() {
+  const wrap = document.getElementById('ls-conv-table');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button class="btn-secondary" style="font-size:12px;padding:5px 10px;" onclick="lsSelectAll(true)">${t('s2b_select_all')}</button>
+      <button class="btn-secondary" style="font-size:12px;padding:5px 10px;" onclick="lsSelectAll(false)">${t('s2b_deselect_all')}</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="color:var(--text-secondary);">
+        <th style="padding:6px 8px;"></th>
+        <th style="text-align:left;padding:6px 8px;">${t('s2b_app_col')}</th>
+        <th style="text-align:left;padding:6px 8px;">${t('s2b_target_col')}</th>
+      </tr></thead>
+      <tbody>
+        ${_lsData.conversions.map((c, i) => `
+          <tr style="border-top:1px solid rgba(255,255,255,0.06);">
+            <td style="padding:6px 8px;"><input type="checkbox" class="ls-conv-check" data-idx="${i}" ${_lsData.selected.includes(i)?'checked':''} onchange="lsToggle(${i},this.checked)" style="accent-color:var(--cyan);"></td>
+            <td style="padding:6px 8px;">${c.app_name}</td>
+            <td style="padding:6px 8px;font-family:monospace;font-size:12px;">${c.rise_target || c.matnr || '—'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function lsSelectAll(checked) {
+  _lsData.selected = checked ? _lsData.conversions.map((_, i) => i) : [];
+  document.querySelectorAll('.ls-conv-check').forEach((cb, i) => { cb.checked = checked; });
+}
+
+function lsToggle(i, checked) {
+  if (checked && !_lsData.selected.includes(i)) _lsData.selected.push(i);
+  if (!checked) _lsData.selected = _lsData.selected.filter(x => x !== i);
+}
+
+async function runLiftShift() {
+  _liftShiftMappings = _lsData.selected.map(i => _lsData.conversions[i]).filter(Boolean);
+  _liftShiftMode = document.getElementById('ls-mode-select')?.value || null;
+  showResult('s2b-result', 'success', `✓ ${t('s2b_ok')}`);
+  setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 800);
+}
+
+// ── Steps 3–5 ───────────────────────────────────────────────────────────────
+function renderS3(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s3_eye', 4 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s3_title')}</div>
+    <div class="step-desc">${t('s3_desc')}</div>
+    <div class="drop-grid single">
+      <div class="drop-zone${_reqsFile ? ' has-file' : ''}" id="dz-reqs"
+        onclick="document.getElementById('f-reqs').click()"
+        ondragover="dzDragOver(event,'dz-reqs')" ondragleave="dzDragLeave('dz-reqs')"
+        ondrop="dzDrop(event,'dz-reqs','f-reqs')">
+        ${_reqsFile ? `<span class="drop-remove" onclick="clearFile('reqs',event)">✕</span>` : ''}
+        <div class="drop-icon">📊</div>
+        <div class="drop-title">${t('s3_hint')}</div>
+        <div class="drop-hint">.xlsx</div>
+        ${_reqsFile ? `<div class="drop-filename">${_reqsFile.name}</div>` : ''}
+      </div>
+    </div>
+    <input type="file" id="f-reqs" accept=".xlsx" onchange="fileSelected('reqs',this)">
+    <div style="margin-top:16px;">
+      <div class="toggle-row${_contrastEnabled ? ' active' : ''}" onclick="toggleContrast(this)" id="tr-contrast">
+        <input type="checkbox" ${_contrastEnabled ? 'checked' : ''} onchange="toggleContrast(document.getElementById('tr-contrast'))">
+        <div><div class="tr-label">${t('s3b_toggle')}</div><div class="tr-file">${t('s3b_toggle_hint')}</div></div>
+      </div>
+    </div>
+    <div id="s3-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s3_busy')}</span></div>
+    <div id="s3-result" class="result-card" style="margin-top:16px;"></div>
+  `;
+  if (_reqsDone) showResult('s3-result', 'success', `✓ ${t('s3_ok')}`);
+}
+
+function toggleContrast(row) {
+  _contrastEnabled = !_contrastEnabled;
+  row.classList.toggle('active', _contrastEnabled);
+  row.querySelector('input').checked = _contrastEnabled;
+}
+
+async function runRequirements() {
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  document.getElementById('s3-spinner').classList.add('show');
+  try {
+    const fd = new FormData();
+    fd.append('req_file', _reqsFile);
+    const r = await apiFetch(`/api/session/${_sessionId}/requirements`, { method: 'POST', body: fd });
+    let body = '';
+    if (r.already_enriched) body = `<div class="result-summary">${t('s3_already')}</div>`;
+    else body = `<div class="result-summary">${t('s3_enriched', r.validation_ok)}</div>`;
+    if (_contrastEnabled) {
+      document.getElementById('s3-spinner').querySelector('.spin-msg').textContent = t('s3b_busy');
+      try {
+        const rc = await apiFetch(`/api/session/${_sessionId}/contrast`, { method: 'POST' });
+        body += `<div class="result-summary" style="margin-top:8px;">${t('s3b_ok', rc.n_validated, rc.n_unvalidated)}</div>`;
+        if (rc.download_url) body += `<a href="${BASE}/api/session/${_sessionId}/download/contrast" class="btn-download" style="margin-top:8px;" download>${t('s3b_download')}</a>`;
+      } catch(ec) { body += `<div style="margin-top:8px;color:var(--orange);font-size:12px;">⚠ Contrast: ${ec.message}</div>`; }
+    }
+    document.getElementById('s3-spinner').classList.remove('show');
+    _reqsDone = true;
+    showResult('s3-result', 'success', `✓ ${t('s3_ok')}`, body);
+    btn.disabled = false;
+    setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 1200);
+  } catch(e) {
+    document.getElementById('s3-spinner').classList.remove('show');
+    showResult('s3-result', 'error', '✗ Error', e.message);
+    btn.disabled = false;
+  }
+}
+
+function renderS4(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s4_eye', 5 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s4_title')}</div>
+    <div class="step-desc">${t('s4_desc')}</div>
+    <div class="drop-grid single">
+      <div class="drop-zone${_pdfFile ? ' has-file' : ''}" id="dz-pdf"
+        onclick="document.getElementById('f-pdf').click()"
+        ondragover="dzDragOver(event,'dz-pdf')" ondragleave="dzDragLeave('dz-pdf')"
+        ondrop="dzDrop(event,'dz-pdf','f-pdf')">
+        ${_pdfFile ? `<span class="drop-remove" onclick="clearFile('pdf',event)">✕</span>` : ''}
+        <div class="drop-icon">📄</div>
+        <div class="drop-title">${t('s4_hint')}</div>
+        <div class="drop-hint">${t('s4_hint2')}</div>
+        ${_pdfFile ? `<div class="drop-filename">${_pdfFile.name}</div>` : ''}
+      </div>
+    </div>
+    <input type="file" id="f-pdf" accept=".pdf" onchange="fileSelected('pdf',this)">
+    <div id="s4-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s4_busy')}</span></div>
+    <div id="s4-result" class="result-card" style="margin-top:16px;"></div>
+  `;
+  if (_pdfDone) showResult('s4-result', 'success', `✓ ${t('s4_ok')}`);
+}
+
+async function runPdf() {
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  document.getElementById('s4-spinner').classList.add('show');
+  try {
+    const fd = new FormData();
+    fd.append('file', _pdfFile);
+    const r = await apiFetch(`/api/session/${_sessionId}/pdf`, { method: 'POST', body: fd });
+    document.getElementById('s4-spinner').classList.remove('show');
+    _pdfDone = true;
+    showResult('s4-result', 'success', `✓ ${t('s4_ok')}`,
+      `<div class="result-stats">${['applications','business_capabilities','initiatives','it_components'].map(k => r[k] ? `<div class="stat-pill"><div class="stat-n">${r[k]}</div><div class="stat-lbl">${k.split('_').map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')}</div></div>` : '').join('')}</div>`
+    );
+    btn.disabled = false;
+    setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 1200);
+  } catch(e) {
+    document.getElementById('s4-spinner').classList.remove('show');
+    showResult('s4-result', 'error', '✗ Error', e.message);
+    btn.disabled = false;
+  }
+}
+
+function renderS5(el) {
+  const thumbs = _images.map((f, i) => `
+    <div class="img-thumb">
+      <img src="${URL.createObjectURL(f)}">
+      <div class="img-thumb-remove" onclick="removeImage(${i})">✕</div>
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s5_eye', 6 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s5_title')}</div>
+    <div class="step-desc">${t('s5_desc')}</div>
+    <div class="drop-grid single">
+      <div class="drop-zone" id="dz-imgs"
+        onclick="document.getElementById('f-imgs').click()"
+        ondragover="dzDragOver(event,'dz-imgs')" ondragleave="dzDragLeave('dz-imgs')"
+        ondrop="dzDropImages(event)">
+        <div class="drop-icon">🖼️</div>
+        <div class="drop-title">${t('s5_dz_title')}</div>
+        <div class="drop-hint">${t('s5_dz_hint')}</div>
+      </div>
+    </div>
+    <input type="file" id="f-imgs" accept=".png,.jpg,.jpeg,.gif,.webp" multiple onchange="addImages(this.files)">
+    ${_images.length ? `<div class="img-thumbs">${thumbs}</div>` : ''}
+    <div id="s5-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s5_busy')}</span></div>
+    <div id="s5-result" class="result-card" style="margin-top:16px;"></div>
+  `;
+  if (_imgDone) showResult('s5-result', 'success', `✓ ${t('s5_ok', _images.length)}`);
+}
+
+function addImages(files) {
+  _images = [..._images, ...Array.from(files)];
+  renderStep(_step);
+}
+function removeImage(i) {
+  _images.splice(i, 1);
+  renderStep(_step);
+}
+function dzDropImages(e) {
+  e.preventDefault();
+  document.getElementById('dz-imgs').classList.remove('drag-over');
+  addImages(e.dataTransfer.files);
+}
+
+async function runImages() {
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  document.getElementById('s5-spinner').classList.add('show');
+  try {
+    const fd = new FormData();
+    _images.forEach(f => fd.append('files', f));
+    await apiFetch(`/api/session/${_sessionId}/images`, { method: 'POST', body: fd });
+    document.getElementById('s5-spinner').classList.remove('show');
+    _imgDone = true;
+    showResult('s5-result', 'success', `✓ ${t('s5_ok', _images.length)}`);
+    btn.disabled = false;
+    setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 1200);
+  } catch(e) {
+    document.getElementById('s5-spinner').classList.remove('show');
+    showResult('s5-result', 'error', '✗ Error', e.message);
+    btn.disabled = false;
+  }
+}
+
+// ── Steps 6–8 ───────────────────────────────────────────────────────────────
+function renderS6(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s6_eye', 7 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s6_title')}</div>
+    <div class="step-desc">${t('s6_desc')}</div>
+    <div id="s6-spinner" class="spinner-wrap"><div class="spinner"></div><span class="spin-msg">${t('s6_busy')}</span></div>
+    <div id="s6-result" class="result-card"></div>
+    <div id="s6-downloads" class="download-list" style="margin-top:16px;"></div>
+  `;
+  if (_generateDone) {
+    renderGenerateOutputs();
+  } else {
+    runGenerate();
+  }
+}
+
+function renderGenerateOutputs() {
+  const dl = document.getElementById('s6-downloads');
+  if (!dl) return;
+  if (_generateOutputs.length) {
+    const iconMap = { baseline:'📋', target:'🎯', supplementary:'📎' };
+    dl.innerHTML = _generateOutputs.map(o => `
+      <div class="download-item">
+        <div class="di-icon">${iconMap[o.key] || '📄'}</div>
+        <div class="di-info">
+          <div class="di-label">${o.label}</div>
+          <div class="di-desc">${o.description || ''}${o.stats ? ` · ${o.stats}` : ''}</div>
+        </div>
+        <a href="${BASE}${o.download_url}" class="btn-download" download>${t('s6_download')}</a>
+      </div>`).join('');
+    showResult('s6-result', 'success', `✓ ${t('s6_ok')}`);
+  } else {
+    showResult('s6-result', 'warning', t('s6_none'), t('s6_none_hint'));
+  }
+}
+
+async function runGenerate() {
+  const btn = document.getElementById('btn-next');
+  if (btn) btn.disabled = true;
+  const sp = document.getElementById('s6-spinner');
+  if (sp) sp.classList.add('show');
+  try {
+    const r = await apiFetch(`/api/session/${_sessionId}/generate`, { method: 'POST' });
+    if (sp) sp.classList.remove('show');
+    _generateDone = true;
+    // Backend returns { ok, outputs: [{key, label, description, download_url, stats}, ...] }
+    _generateOutputs = r.outputs || [];
+    // Also build _generateFiles map for Import step
+    _generateOutputs.forEach(o => { _generateFiles[o.key] = o.download_url; });
+    renderGenerateOutputs();
+    if (btn) btn.disabled = false;
+  } catch(e) {
+    if (sp) sp.classList.remove('show');
+    showResult('s6-result', 'error', '✗ Error', e.message);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderS7ref(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s7ref_eye', 8 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s3c_title')}</div>
+    <div class="step-desc">${t('s3c_desc')}</div>
+    <label class="field-label">${t('s3c_label')}</label>
+    <select class="industry-select" id="industry-sel"></select>
+    <button class="btn-secondary" style="margin-top:14px;width:100%;" onclick="loadIndustryRef()">${t('s3c_fetch')}</button>
+    <div id="s7ref-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s3c_busy')}</span></div>
+    <div id="s7ref-result" class="result-card" style="margin-top:16px;"></div>
+    <div id="s7ref-ws"></div>
+  `;
+  apiFetch('/api/industries').then(data => {
+    const sel = document.getElementById('industry-sel');
+    if (sel) sel.innerHTML = (data.industries || []).map(i => `<option value="${i.key}">${i.label}</option>`).join('');
+  }).catch(() => {});
+}
+
+async function loadIndustryRef() {
+  const ind = document.getElementById('industry-sel')?.value;
+  if (!ind) return;
+  document.getElementById('s7ref-spinner').classList.add('show');
+  document.getElementById('s7ref-result').className = 'result-card';
+  document.getElementById('s7ref-ws').innerHTML = '';
+  try {
+    const r = await apiFetch(`/api/session/${_sessionId}/industry-reference`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ industry_key: ind })
+    });
+    document.getElementById('s7ref-spinner').classList.remove('show');
+    const ws = r.whitespace || [];
+    const covered = r.covered_count || 0;
+    document.getElementById('s7ref-ws').innerHTML = `
+      <div style="margin-top:16px;">
+        <div class="step-eyebrow">${t('s3c_whitespace_title', ws.length)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">${t('s3c_covered', covered)}</div>
+        <div class="ws-select-bar">
+          <button onclick="wsSelectAll(true)">${t('s3c_select_all')}</button>
+          <button onclick="wsSelectAll(false)">${t('s3c_deselect_all')}</button>
+        </div>
+        <div class="ws-product-list" id="ws-list">
+          ${ws.map((p, i) => `
+            <div class="ws-product-item${p.include ? ' selected' : ''}" onclick="wsToggle(${i},this)" data-idx="${i}">
+              <input type="checkbox" ${p.include ? 'checked' : ''} onchange="wsToggle(${i},this.closest('.ws-product-item'))">
+              <span class="ws-product-name">${p.name}</span>
+            </div>`).join('')}
+        </div>
+        <button class="btn-primary" style="margin-top:14px;width:100%;" onclick="applyRef()">${t('s3c_apply')}</button>
+        <div id="s7ref-apply-result" class="result-card" style="margin-top:12px;"></div>
+      </div>`;
+    window._wsProducts = ws;
+  } catch(e) {
+    document.getElementById('s7ref-spinner').classList.remove('show');
+    showResult('s7ref-result', 'error', '✗ Error', e.message);
+  }
+}
+
+function wsToggle(i, row) {
+  if (!window._wsProducts) return;
+  window._wsProducts[i].include = !window._wsProducts[i].include;
+  row.classList.toggle('selected', window._wsProducts[i].include);
+  row.querySelector('input').checked = window._wsProducts[i].include;
+}
+function wsSelectAll(val) {
+  if (!window._wsProducts) return;
+  window._wsProducts.forEach((p, i) => {
+    p.include = val;
+    const row = document.querySelector(`.ws-product-item[data-idx="${i}"]`);
+    if (row) { row.classList.toggle('selected', val); row.querySelector('input').checked = val; }
+  });
+}
+async function applyRef() {
+  const selected = (window._wsProducts || []).filter(p => p.include).map(p => p.name);
+  if (!selected.length) { showResult('s7ref-apply-result', 'warning', t('s3c_none_selected')); return; }
+  const btn = document.querySelector('#s7ref-ws .btn-primary');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await apiFetch(`/api/session/${_sessionId}/industry-reference/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: selected })
+    });
+    showResult('s7ref-apply-result', 'success', `✓ ${t('s3c_apply_ok', r.added_count || selected.length)}`);
+    _refDone = true;
+  } catch(e) {
+    showResult('s7ref-apply-result', 'error', '✗ Error', e.message);
+  }
+  if (btn) btn.disabled = false;
+}
+
+function renderS7(el) {
+  el.innerHTML = `
+    <div class="step-eyebrow">${t('s7_eye', 9 + (_liftShiftEnabled?1:0), totalSteps())}</div>
+    <div class="step-title">${t('s7_title')}</div>
+    ${!_lxConfigured ? `
+      <div class="result-card info show" style="margin-bottom:20px;">
+        <div class="result-header">ℹ️ ${t('s7_no_creds')}</div>
+        <div class="result-summary">${t('s7_no_creds_hint')}</div>
+        <div class="result-summary" style="margin-top:8px;">${t('s7_manual')}</div>
+        <div class="result-summary" style="margin-top:6px;">${t('s7_order')}</div>
+      </div>` : `
+      <div class="step-desc">${t('s7_desc')}</div>
+      <div class="info-box"><strong>⚠</strong> ${t('s7_warn')} — ${t('s7_warn_hint')}</div>
+      <div class="push-options" id="push-opts">
+        ${_generateFiles.baseline ? `<label class="toggle-row" id="tr-baseline" onclick="trToggle('tr-baseline')"><input type="checkbox" id="chk-baseline"> <div><div class="tr-label">${t('s7_chk_baseline')}</div><div class="tr-file">${_clientName}_baseline.xlsx</div></div></label>` : ''}
+        ${_generateFiles.target   ? `<label class="toggle-row" id="tr-target"   onclick="trToggle('tr-target')"><input type="checkbox" id="chk-target">   <div><div class="tr-label">${t('s7_chk_target')}</div><div class="tr-file">${_clientName}_target_leanix.xlsx</div></div></label>` : ''}
+      </div>`}
+    <div id="s7-spinner" class="spinner-wrap" style="margin-top:16px;"><div class="spinner"></div><span class="spin-msg">${t('s7_busy')}</span></div>
+    <div id="s7-result" class="result-card" style="margin-top:16px;"></div>
+    ${_lxConfigured ? `<button class="btn-secondary" style="margin-top:12px;width:100%" onclick="runSynclog()">${t('s7_synclog_btn')}</button>
+    <div id="s7-synclog"></div>
+    <button class="btn-secondary" style="margin-top:8px;width:100%" onclick="runProjections()">${t('s7_proj_btn')}</button>
+    <div id="s7-projections"></div>` : ''}
+    <div id="kpi-panel"></div>
+  `;
+  spawnCookieMonster();
+}
+
+function trToggle(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const chk = row.querySelector('input');
+  chk.checked = !chk.checked;
+  row.classList.toggle('active', chk.checked);
+}
+
+async function runImport() {
+  if (!_lxConfigured) { _step++; renderStep(_step); renderPills(); return; }
+  const baseline = document.getElementById('chk-baseline')?.checked;
+  const target   = document.getElementById('chk-target')?.checked;
+  if (!baseline && !target) { showResult('s7-result', 'warning', t('s7_none')); return; }
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  document.getElementById('s7-spinner').classList.add('show');
+  try {
+    const r = await apiFetch(`/api/session/${_sessionId}/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ push_baseline: baseline, push_target: target })
+    });
+    document.getElementById('s7-spinner').classList.remove('show');
+    const imported = [baseline && 'baseline', target && 'target'].filter(Boolean).join(', ');
+    showResult('s7-result', 'success', `✓ ${t('s7_ok')}`, t('s7_imported', imported));
+    // Fetch and render transformations
+    try {
+      const tr = await apiFetch(`/api/session/${_sessionId}/transformations`);
+      const rc = document.getElementById('s7-result');
+      if (rc) rc.innerHTML += _renderTransformationsTable(tr.transformations || []);
+    } catch(e) { /* non-fatal */ }
+    btn.disabled = false;
+    setTimeout(() => { _step++; renderStep(_step); renderPills(); }, 2500);
+  } catch(e) {
+    document.getElementById('s7-spinner').classList.remove('show');
+    showResult('s7-result', 'error', `✗ ${t('s7_err')}`, e.message);
+    btn.disabled = false;
+  }
+}
+
+function _renderTransformationsTable(rows) {
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;color:var(--text-primary)">${t('s7_trans_title')} (${rows.length})</div>`;
+  if (!rows.length) return title + `<div style="color:var(--text-muted);font-size:13px">${t('s7_trans_empty')}</div>`;
+  const header = `<tr>
+    <th>${t('s7_trans_initiative')}</th><th>${t('s7_trans_app')}</th>
+    <th>${t('s7_trans_type')}</th><th>${t('s7_trans_status')}</th><th>${t('s7_trans_date')}</th>
+  </tr>`;
+  const body = rows.map(r => `<tr>
+    <td>${esc(r.initiative_name)}</td><td>${esc(r.app_name)}</td>
+    <td><code>${esc(r.type)}</code></td><td>${esc(r.status)}</td><td>${esc(r.completion_date)}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+async function runSynclog() {
+  const el = document.getElementById('s7-synclog');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner-wrap show" style="margin-top:8px"><div class="spinner"></div></div>';
+  try {
+    const data = await apiFetch(`/api/session/${_sessionId}/synclog`);
+    el.innerHTML = _renderSynclogTable(data.synchronizations || []);
+  } catch(e) {
+    el.innerHTML = `<div class="result-card error show" style="margin-top:8px"><div class="result-summary">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderSynclogTable(rows) {
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;color:var(--text-primary)">${t('s7_synclog_title')}</div>`;
+  if (!rows.length) return title + `<div style="color:var(--text-muted);font-size:13px">${t('s7_synclog_empty')}</div>`;
+  const header = `<tr>
+    <th>${t('s7_synclog_connector')}</th><th>${t('s7_synclog_status')}</th>
+    <th>${t('s7_synclog_started')}</th><th>${t('s7_synclog_created')}</th>
+    <th>${t('s7_synclog_updated')}</th><th>${t('s7_synclog_warns')}</th><th>${t('s7_synclog_errors')}</th>
+  </tr>`;
+  const statusColor = s => s === 'SUCCESS' ? 'var(--green)' : s === 'FAILED' || s === 'ERROR' ? '#ef4444' : 'var(--orange)';
+  const body = rows.map(r => `<tr>
+    <td><code>${esc(r.connector)}</code></td>
+    <td style="color:${statusColor(r.status)};font-weight:600">${esc(r.status)}</td>
+    <td style="white-space:nowrap">${esc((r.started_at||'').replace('T',' ').slice(0,16))}</td>
+    <td>${r.fact_sheets_created}</td><td>${r.fact_sheets_updated}</td>
+    <td>${r.warnings > 0 ? `<span style="color:var(--orange)">${r.warnings}</span>` : r.warnings}</td>
+    <td>${r.errors > 0 ? `<span style="color:#ef4444">${r.errors}</span>` : r.errors}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+async function runProjections() {
+  const el = document.getElementById('s7-projections');
+  if (!el) return;
+  el.innerHTML = '<div class="spinner-wrap show" style="margin-top:8px"><div class="spinner"></div></div>';
+  try {
+    const data = await apiFetch(`/api/session/${_sessionId}/projections`);
+    el.innerHTML = _renderProjectionsTable(data.impacts || [], data.date, data.transformation_count);
+  } catch(e) {
+    el.innerHTML = `<div class="result-card error show" style="margin-top:8px"><div class="result-summary">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderProjectionsTable(impacts, date, transCount) {
+  const subtitle = date ? ` <span style="color:var(--text-muted);font-size:12px">(${esc(date)}${transCount ? `, ${transCount} transformations` : ''})</span>` : '';
+  const title = `<div style="font-weight:600;margin-top:16px;margin-bottom:6px;color:var(--text-primary)">${t('s7_proj_title')}${subtitle}</div>`;
+  if (!impacts.length) return title + `<div style="color:var(--text-muted);font-size:13px">${t('s7_proj_empty')}</div>`;
+  const header = `<tr><th>${t('s7_proj_fs')}</th><th>${t('s7_proj_field')}</th><th>${t('s7_proj_from')}</th><th>${t('s7_proj_to')}</th></tr>`;
+  const body = impacts.map(r => `<tr>
+    <td><span style="font-size:11px;color:var(--text-muted)">${esc(r.factSheetType)}</span><br><strong>${esc(r.factSheetName)}</strong></td>
+    <td><code>${esc(r.field)}</code></td>
+    <td style="color:var(--text-muted)">${esc(r.from)}</td>
+    <td style="color:var(--green);font-weight:600">${esc(r.to)}</td>
+  </tr>`).join('');
+  return title + `<div style="overflow-x:auto"><table class="trans-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderDone(el) {
+  const n = Object.keys(_generateFiles).length;
+  el.innerHTML = `
+    <div class="done-screen">
+      <div class="done-icon">🚀</div>
+      <div class="done-title">${t('done_title')}</div>
+      <div class="done-sub">${t('done_sub', n, _clientName)}</div>
+      <button class="btn-primary" style="margin:0 auto;" onclick="location.reload()">${t('new_pipeline')}</button>
+    </div>
+  `;
+  destroyCookieMonster();
+}
+
+// ── KPI Easter Egg ───────────────────────────────────────────────────────────
+function spawnCookieMonster() {
+  destroyCookieMonster();
+  _cookieClicks = 0; _kpiUnlocked = false;
+  const corners = [
+    { bottom: '80px', left: '20px' }, { bottom: '80px', right: '20px' },
+    { top: '70px',   left: '20px' }, { top: '70px',    right: '20px' }
+  ];
+  const pos = corners[Math.floor(Math.random() * corners.length)];
+  const wrap = document.createElement('div');
+  wrap.className = 'kpi-cookie-wrap';
+  Object.assign(wrap.style, pos);
+  wrap.innerHTML = `<img src="${BASE}/cookie_monster.png" alt="🍪"><div class="kpi-cookie-badge" id="kpi-badge"></div>`;
+  wrap.addEventListener('click', onCookieClick);
+  document.body.appendChild(wrap);
+  _cookieEl = wrap;
+}
+function destroyCookieMonster() {
+  if (_cookieEl) { _cookieEl.remove(); _cookieEl = null; }
+}
+function onCookieClick() {
+  if (_kpiUnlocked) return;
+  _cookieClicks++;
+  const badge = document.getElementById('kpi-badge');
+  if (badge) { badge.textContent = _cookieClicks; badge.classList.add('show'); }
+  _cookieEl.classList.add('active');
+  setTimeout(() => _cookieEl && _cookieEl.classList.remove('active'), 400);
+  if (_cookieClicks >= 3) {
+    _kpiUnlocked = true;
+    if (badge) badge.classList.remove('show');
+    showKpiPanel();
+  }
+}
+function showKpiPanel() {
+  const panel = document.getElementById('kpi-panel');
+  if (!panel) return;
+  panel.className = 'show';
+  panel.innerHTML = `
+    <div class="kpi-panel-header">${t('kpi_panel_title')}</div>
+    <div class="kpi-panel-hint">${t('kpi_panel_hint')}</div>
+    <div class="kpi-stats">
+      <div class="kpi-stat"><strong>5</strong> Objectives</div>
+      <div class="kpi-stat"><strong>91</strong> BCs</div>
+      <div class="kpi-stat"><strong>100</strong> Apps</div>
+      <div class="kpi-stat"><strong>5</strong> Initiatives</div>
+    </div>
+    <div id="kpi-result" class="result-card"></div>
+    <button class="btn-primary" onclick="runKpiImport()">${t('kpi_chk')}</button>
+  `;
+}
+async function runKpiImport() {
+  const btn = document.querySelector('#kpi-panel .btn-primary');
+  if (btn) btn.disabled = true;
+  showResult('kpi-result', 'info', t('kpi_busy'));
+  try {
+    const r = await fetch(`${BASE}/api/session/${_sessionId}/push-kpi`, { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      showResult('kpi-result', 'success', `✓ ${t('kpi_ok')}`, t('kpi_ok_hint', data.stats));
+    } else {
+      showResult('kpi-result', 'error', `✗ ${t('kpi_err')}`, data.detail || '');
+    }
+  } catch(e) {
+    showResult('kpi-result', 'error', `✗ ${t('kpi_err')}`, e.message);
+  }
+  if (btn) btn.disabled = false;
+}
+
+// ── Drag & drop helpers ──────────────────────────────────────────────────────
+function dzDragOver(e, id) {
+  e.preventDefault();
+  document.getElementById(id).classList.add('drag-over');
+}
+function dzDragLeave(id) {
+  document.getElementById(id).classList.remove('drag-over');
+}
+function dzDrop(e, dzId, inputId) {
+  e.preventDefault();
+  document.getElementById(dzId).classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length) {
+    const inp = document.getElementById(inputId);
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    inp.files = dt.files;
+    inp.dispatchEvent(new Event('change'));
+  }
+}
+
+function fileSelected(key, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (key === 'baseline') _baselineFile = file;
+  else if (key === 'cloud') _cloudFile   = file;
+  else if (key === 'reqs')  _reqsFile    = file;
+  else if (key === 'pdf')   _pdfFile     = file;
+  renderStep(_step);
+}
+
+function clearFile(key, e) {
+  e.stopPropagation();
+  if (key === 'baseline') _baselineFile = null;
+  else if (key === 'cloud') _cloudFile  = null;
+  else if (key === 'reqs')  _reqsFile   = null;
+  else if (key === 'pdf')   _pdfFile    = null;
+  renderStep(_step);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  renderStep(0);
+  renderPills();
+});
+
+// ── Catalog viewer ───────────────────────────────────────────────────────────
+async function openCatalog(type, view) {
+  const data = await apiFetch(`/api/catalog/${type}`);
+  let html = '';
+
+  if (type === 'rba' && view === 'bcs') {
+    // All BCs flat, grouped by enterprise domain > business domain
+    const rows = [];
+    for (const [entDomain, bizDomains] of Object.entries(data.catalog || {})) {
+      for (const [bizDomain, areas] of Object.entries(bizDomains)) {
+        for (const [area, bcs] of Object.entries(areas)) {
+          for (const bc of bcs) {
+            rows.push({ entDomain, bizDomain, area, id: bc.id, name: bc.name });
+          }
+        }
+      }
+    }
+    html = buildCatalogPage(
+      `RBA — Business Capabilities (${rows.length})`,
+      `<table>
+        <thead><tr><th>ID</th><th>Name</th><th>Business Area</th><th>Business Domain</th><th>Enterprise Domain</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><code>${r.id}</code></td><td>${r.name}</td><td>${r.area}</td><td>${r.bizDomain}</td><td>${r.entDomain}</td></tr>`).join('')}</tbody>
+      </table>`
+    );
+  } else if (type === 'rba' && view === 'domains') {
+    // Business domains grouped by enterprise domain
+    const rows = [];
+    for (const [entDomain, bizDomains] of Object.entries(data.catalog || {})) {
+      for (const [bizDomain, areas] of Object.entries(bizDomains)) {
+        const bcCount = Object.values(areas).reduce((s, bcs) => s + bcs.length, 0);
+        rows.push({ entDomain, bizDomain, areas: Object.keys(areas).length, bcs: bcCount });
+      }
+    }
+    html = buildCatalogPage(
+      `RBA — Business Domains (${rows.length})`,
+      `<table>
+        <thead><tr><th>Business Domain</th><th>Enterprise Domain</th><th>Business Areas</th><th>BCs</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><strong>${r.bizDomain}</strong></td><td>${r.entDomain}</td><td>${r.areas}</td><td>${r.bcs}</td></tr>`).join('')}</tbody>
+      </table>`
+    );
+  } else if (type === 'rsa' && view === 'products') {
+    const apps = data.applications || [];
+    // Group by domain
+    const byDomain = {};
+    apps.forEach(a => { (byDomain[a.domain] = byDomain[a.domain] || []).push(a.name); });
+    const domainSections = Object.entries(byDomain).sort(([a],[b]) => a.localeCompare(b))
+      .map(([domain, names]) => `
+        <tr class="domain-row"><td colspan="2"><strong>${domain}</strong> <span class="badge">${names.length}</span></td></tr>
+        ${names.sort().map(n => `<tr><td></td><td>${n}</td></tr>`).join('')}
+      `).join('');
+    html = buildCatalogPage(
+      `RSA — Products (${apps.length})`,
+      `<table>
+        <thead><tr><th>Domain</th><th>Product</th></tr></thead>
+        <tbody>${domainSections}</tbody>
+      </table>`
+    );
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+function buildCatalogPage(title, tableHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a1a;color:#fff;padding:24px}
+  h1{font-size:20px;font-weight:700;margin-bottom:16px;color:#4fc3f7}
+  input{width:100%;max-width:400px;padding:8px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;margin-bottom:16px;outline:none}
+  input::placeholder{color:rgba(255,255,255,0.35)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead tr{background:rgba(79,195,247,0.1);border-bottom:2px solid rgba(79,195,247,0.3)}
+  th{text-align:left;padding:8px 12px;font-weight:600;color:#4fc3f7;white-space:nowrap}
+  td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.05);vertical-align:top}
+  tr:hover td{background:rgba(255,255,255,0.03)}
+  code{font-family:monospace;font-size:12px;color:#4fc3f7;background:rgba(79,195,247,0.1);padding:2px 5px;border-radius:3px}
+  .domain-row td{background:rgba(255,255,255,0.04);padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1)}
+  .badge{font-size:11px;background:rgba(79,195,247,0.2);color:#4fc3f7;border-radius:10px;padding:1px 7px;margin-left:6px}
+  .count{color:rgba(255,255,255,0.4);font-size:12px;margin-left:8px}
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<input type="text" placeholder="Filter…" oninput="filterTable(this.value)">
+<div id="table-wrap">${tableHtml}</div>
+<script>
+function filterTable(q) {
+  const s = q.toLowerCase();
+  document.querySelectorAll('tbody tr:not(.domain-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(s) ? '' : 'none';
+  });
+  // Hide domain-row if all its siblings are hidden
+  document.querySelectorAll('tbody tr.domain-row').forEach(dr => {
+    let sib = dr.nextElementSibling;
+    let anyVisible = false;
+    while (sib && !sib.classList.contains('domain-row')) {
+      if (sib.style.display !== 'none') anyVisible = true;
+      sib = sib.nextElementSibling;
+    }
+    dr.style.display = anyVisible || !q ? '' : 'none';
+  });
+}
+<\/script>
+</body>
+</html>`;
+}
+
+</script>
+</body>
+</html>

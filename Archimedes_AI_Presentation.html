@@ -1162,6 +1162,35 @@
     </div>
   </div>
 
+  <!-- SLIDE 12b — LeanIX API IMPROVEMENTS -->
+  <div class="slide" id="s12b">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">How it works</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">LeanIX API <span class="accent">Enhancements</span></div>
+      <div class="two-col" style="gap:32px;margin-top:28px">
+        <div class="info-box">
+          <div class="info-box-title">Reliability &amp; Performance</div>
+          <ul class="bullet-list">
+            <li><strong>Retry 429 with backoff</strong> — GraphQL calls auto-retry on rate-limit with exponential backoff (reads <code class="mono">Retry-After</code> header); also retries on network errors</li>
+            <li><strong>Batch GraphQL (×20)</strong> — Fact sheet lookups use aliased multi-query calls (up to 20 per round-trip), reducing API calls from N to ⌈N/20⌉</li>
+            <li><strong>ITComponent push</strong> — ITC sheet from Excel is now upserted into LeanIX before Applications (correct import order: BC → ITC → App → Initiative)</li>
+          </ul>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">Catalog Intelligence &amp; TO-BE Preview</div>
+          <ul class="bullet-list">
+            <li><strong>ITC Catalog linking</strong> — ITComponents auto-linked to official LeanIX catalog entries (<code class="mono">lx_ITC_XXXXXX</code>) via <code class="mono">/source/ltls/</code> API (mirrors existing App linking)</li>
+            <li><strong>Enrich from catalog</strong> — After VERYHIGH match, copies <code class="mono">hostingType</code> and <code class="mono">description</code> from catalog fact sheet to workspace Application</li>
+            <li><strong>Impacts API — Preview TO-BE</strong> — New wizard button calls <code class="mono">POST /impacts/v1/projections</code>: shows projected field changes for each Application given all active Transformations and a target date</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- SLIDE 12 — DIVIDER: Acciona -->
   <div class="slide slide-divider" id="s13">
     <div class="slide-header dark">
@@ -1396,7 +1425,7 @@
 <!-- Navigation -->
 <div id="nav">
   <button class="nav-btn" id="btn-prev" title="Previous (←)">&#8592;</button>
-  <div id="slide-counter">1 / 21</div>
+  <div id="slide-counter">1 / 22</div>
   <button class="nav-btn" id="btn-next" title="Next (→)">&#8594;</button>
 </div>
 

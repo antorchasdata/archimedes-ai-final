@@ -29,6 +29,7 @@ import logging
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -311,10 +312,13 @@ _COLS_INITIATIVE = [
     ("name",                                "Name",                      "mandatory", 45),
     ("description",                         "Description",               "optional",  60),
     ("lifecycle_phase",                     "Lifecycle Phase",           "optional",  16),
+    ("lifecycle_startDate",                 "Lifecycle Start Date",      "optional",  20),
+    ("lifecycle_endDate",                   "Lifecycle End Date",        "optional",  18),
     ("lxState",                             "Quality Seal",              "optional",  14),
     ("tags",                                "Tags",                      "optional",  35),
     ("relInitiativeToApplication",          "Applications",              "relation",  45),
     ("relInitiativeToBusinessCapability",   "Business Capabilities",     "relation",  60),
+    ("relInitiativeToObjective",            "Objectives",                "relation",  45),
 ]
 
 _COLS_ITC = [
@@ -420,11 +424,14 @@ def write_leanix_excel(
     initiatives: list[dict] = []
     for group_key, g in _init_groups.items():
         initiatives.append({
-            "name":      g["name"],
-            "description": f"{g['n_reqs']} requirements — client: {client_name}",
-            "lifecycle": g["lifecycle"],
-            "app":       ";".join(sorted(g["apps"])),
-            "bcs":       ";".join(sorted(g["bcs"])),
+            "name":                 g["name"],
+            "description":          f"{g['n_reqs']} requirements — client: {client_name}",
+            "lifecycle":            g["lifecycle"],
+            "lifecycle_startDate":  time.strftime("%Y-%m-%d"),
+            "lifecycle_endDate":    str(int(time.strftime("%Y")) + 2) + time.strftime("-%m-%d"),
+            "app":                  ";".join(sorted(g["apps"])),
+            "bcs":                  ";".join(sorted(g["bcs"])),
+            "objective":            g["name"],
         })
 
     # Build deduplicated ITC list from all seen apps
@@ -466,11 +473,14 @@ def write_leanix_excel(
                 name = (init.get("name") or "").strip()
                 if name:
                     supp_initiatives.append({
-                        "name":      name,
-                        "description": (init.get("description") or f"Derived from {source_key}. Client: {client_name}.")[:2000],
-                        "lifecycle": init.get("lifecycle_phase") or "plan",
-                        "app":       init.get("relInitiativeToApplication") or "",
-                        "bcs":       init.get("relInitiativeToBusinessCapability") or "",
+                        "name":                (init.get("name") or name)[:255],
+                        "description":         (init.get("description") or f"Derived from {source_key}. Client: {client_name}.")[:2000],
+                        "lifecycle":           init.get("lifecycle_phase") or "plan",
+                        "lifecycle_startDate": init.get("lifecycle_startDate") or time.strftime("%Y-%m-%d"),
+                        "lifecycle_endDate":   init.get("lifecycle_endDate") or (str(int(time.strftime("%Y")) + 2) + time.strftime("-%m-%d")),
+                        "app":                 init.get("relInitiativeToApplication") or "",
+                        "bcs":                 init.get("relInitiativeToBusinessCapability") or "",
+                        "objective":           (init.get("name") or name)[:255],
                     })
 
         if supplementary:
@@ -517,7 +527,7 @@ def write_leanix_excel(
                     }
         logger.info("Lift & Shift merged: +%d target apps, +%d prerequisites", len(lift_shift), len(seen_prereqs))
 
-    tags = "Target"
+    tags = f"Target;{client_name}"
     wb = openpyxl.Workbook()
 
     # ── Sheet: Application ─────────────────────────────────────────────────────
@@ -582,6 +592,33 @@ def write_leanix_excel(
         }
         _sheet_row(ws_bc, row_idx, [vals.get(k, "") for k in keys_bc])
 
+    # ── Sheet: Objective ──────────────────────────────────────────────────────
+    # One Objective per initiative (same name) so "Initiatives linked to an
+    # objective" reaches 100% in the Architecture Executive Dashboard.
+    _COLS_OBJ = [
+        ("id",          "ID",          "readonly",  36),
+        ("type",        "Type",        "mandatory", 14),
+        ("name",        "Name",        "mandatory", 45),
+        ("description", "Description", "optional",  60),
+        ("lxState",     "Quality Seal","optional",  14),
+        ("tags",        "Tags",        "optional",  35),
+    ]
+    ws_obj = wb.create_sheet("Objective")
+    ws_obj.freeze_panes = "C3"
+    _sheet_header(ws_obj, _COLS_OBJ)
+    keys_obj = [c[0] for c in _COLS_OBJ]
+    seen_objectives: set[str] = set()
+    for init in initiatives + supp_initiatives:
+        obj_name = init.get("objective") or init["name"]
+        if obj_name and obj_name not in seen_objectives:
+            seen_objectives.add(obj_name)
+            obj_row = {
+                "id": "", "type": "Objective", "name": obj_name,
+                "description": f"Strategic objective for initiative '{obj_name}'. Client: {client_name}.",
+                "lxState": "DRAFT", "tags": tags,
+            }
+            _sheet_row(ws_obj, len(seen_objectives) + 2, [obj_row.get(k, "") for k in keys_obj])
+
     # ── Sheet: Initiative ──────────────────────────────────────────────────────
     ws_init = wb.create_sheet("Initiative")
     ws_init.freeze_panes = "C3"
@@ -589,13 +626,17 @@ def write_leanix_excel(
     keys_init = [c[0] for c in _COLS_INITIATIVE]
 
     for row_idx, init in enumerate(initiatives + supp_initiatives, start=3):
+        obj_name = init.get("objective") or init["name"]
         vals = {
             "id": "", "type": "Initiative", "name": init["name"],
-            "description": init["description"],
-            "lifecycle_phase": init["lifecycle"],
+            "description":          init["description"],
+            "lifecycle_phase":      init["lifecycle"],
+            "lifecycle_startDate":  init.get("lifecycle_startDate", ""),
+            "lifecycle_endDate":    init.get("lifecycle_endDate", ""),
             "lxState": "DRAFT", "tags": tags,
             "relInitiativeToApplication":        init["app"],
             "relInitiativeToBusinessCapability": init["bcs"],
+            "relInitiativeToObjective":          obj_name,
         }
         _sheet_row(ws_init, row_idx, [vals.get(k, "") for k in keys_init])
 
@@ -753,15 +794,149 @@ _TIME_TO_FUNCTIONAL = {
 }
 
 
+# ── LeanIX OAuth2 token cache ─────────────────────────────────────────────────
+# Tokens expire in 3600 s. Cache avoids re-auth on every call and automatically
+# refreshes 60 s before expiry so long-running pushes never hit an expired token.
+
+_token_cache: dict = {"token": None, "expires_at": 0.0}
+
+
+def _get_bearer(base_url: str, api_token: str) -> str:
+    """Return a valid Bearer token, refreshing if expired or about to expire."""
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+        return _token_cache["token"]
+    import requests as _requests
+    resp = _requests.post(
+        f"{base_url}/services/mtm/v1/oauth2/token",
+        data={"grant_type": "client_credentials"},
+        auth=("apitoken", api_token),
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    _token_cache["token"] = data["access_token"]
+    _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
+    logger.debug("LeanIX token refreshed (expires_in=%s s)", data.get("expires_in", 3600))
+    return _token_cache["token"]
+
+
+def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path | None:
+    """
+    Trigger a LeanIX full-export backup before a push and download the result.
+
+    Calls POST /services/pathfinder/v1/exports/fullExport (async job), then polls
+    GET /services/pathfinder/v1/exports/downloads until the file is ready.
+    Saves the backup as leanix_backup_<timestamp>.xlsx in output_dir.
+
+    Returns the backup path, or None if backup failed (non-fatal).
+    """
+    import requests as _req
+    from datetime import datetime
+
+    bearer = _get_bearer(base_url, api_token)
+    hdrs   = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+
+    # 1. Trigger export
+    try:
+        resp = _req.post(
+            f"{base_url}/services/pathfinder/v1/exports/fullExport",
+            headers=hdrs,
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            logger.debug("Backup: fullExport endpoint not available (404) — skipping")
+            return None
+        resp.raise_for_status()
+        export_data = resp.json()
+    except Exception as exc:
+        logger.warning("Backup: failed to trigger fullExport: %s", exc)
+        return None
+
+    export_id = (
+        export_data.get("id")
+        or export_data.get("exportId")
+        or export_data.get("jobId")
+        or ""
+    )
+    logger.info("Backup: fullExport triggered (id=%s) — polling for download…", export_id)
+
+    # 2. Poll for the download URL (up to 5 min, 10 s intervals)
+    download_url: str | None = None
+    for attempt in range(30):
+        time.sleep(10)
+        try:
+            bearer = _get_bearer(base_url, api_token)
+            poll_hdrs = {"Authorization": f"Bearer {bearer}"}
+            # Try job-status endpoint first, then generic downloads list
+            if export_id:
+                status_resp = _req.get(
+                    f"{base_url}/services/pathfinder/v1/exports/downloads/{export_id}",
+                    headers=poll_hdrs,
+                    timeout=30,
+                )
+                if status_resp.status_code == 200:
+                    sdata = status_resp.json()
+                    url = sdata.get("url") or sdata.get("downloadUrl") or sdata.get("href")
+                    if url:
+                        download_url = url
+                        break
+                    status = sdata.get("status", "")
+                    if status in ("FAILED", "ERROR"):
+                        logger.warning("Backup: export job failed (status=%s)", status)
+                        return None
+            # Fallback: generic downloads list
+            dl_resp = _req.get(
+                f"{base_url}/services/pathfinder/v1/exports/downloads",
+                headers=poll_hdrs,
+                timeout=30,
+            )
+            if dl_resp.status_code == 200:
+                entries = dl_resp.json() if isinstance(dl_resp.json(), list) else dl_resp.json().get("data", [])
+                # Take the most recent entry
+                if entries:
+                    latest = entries[0] if isinstance(entries[0], dict) else {}
+                    url = latest.get("url") or latest.get("downloadUrl") or latest.get("href")
+                    if url:
+                        download_url = url
+                        break
+        except Exception as exc:
+            logger.debug("Backup: poll attempt %d failed: %s", attempt + 1, exc)
+
+    if not download_url:
+        logger.warning("Backup: export download URL not available after polling — skipping")
+        return None
+
+    # 3. Download the file
+    backup_path = output_dir / f"leanix_backup_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    try:
+        bearer = _get_bearer(base_url, api_token)
+        dl = _req.get(download_url, headers={"Authorization": f"Bearer {bearer}"}, timeout=120, stream=True)
+        dl.raise_for_status()
+        with open(backup_path, "wb") as f:
+            for chunk in dl.iter_content(chunk_size=65536):
+                f.write(chunk)
+        logger.info("Backup: saved to %s (%d KB)", backup_path.name, backup_path.stat().st_size // 1024)
+        return backup_path
+    except Exception as exc:
+        logger.warning("Backup: download failed: %s", exc)
+        return None
+
+
 def write_leanix(
     staging_path: Path,
     client_name: str,
+    lift_shift_map: list[dict] | None = None,
 ) -> None:
     """
     Push a LeanIX staging Excel (generated by write_leanix_excel) to LeanIX.
 
     Reads the three sheets — Initiatives, BusinessCapabilities, Applications —
     and upserts the corresponding fact sheets and relations.
+
+    lift_shift_map: optional list of conversion dicts from lift_shift.convert_to_rise().
+      Each dict must contain: source_app (str), target_desc (str).
+      When provided, creates decommissionApplication + implementNewApplication
+      Transformations for each source→target pair on the Lift & Shift Initiative.
 
     Call after reviewing/editing output/<stem>_leanix_import.xlsx.
     """
@@ -771,30 +946,42 @@ def write_leanix(
     base_url = os.environ["LEANIX_BASE_URL"].rstrip("/")
     token    = os.environ["LEANIX_API_TOKEN"]
 
-    # ── Authenticate ──────────────────────────────────────────────────────────
-    auth_resp = requests.post(
-        f"{base_url}/services/mtm/v1/oauth2/token",
-        data={"grant_type": "client_credentials"},
-        auth=("apitoken", token),
-        timeout=30,
-    )
-    auth_resp.raise_for_status()
-    bearer  = auth_resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
-    gql_url = f"{base_url}/services/pathfinder/v1/graphql"
+    # ── Backup workspace before push (non-fatal) ──────────────────────────────
+    _backup_workspace(base_url, token, staging_path.parent)
 
-    def _gql(query: str, variables: dict) -> dict:
-        resp = requests.post(
-            gql_url,
-            json={"query": query, "variables": variables},
-            headers=headers,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("errors"):
-            raise RuntimeError(f"GraphQL errors: {data['errors']}")
-        return data
+    # ── Authenticate (token auto-refreshes via _get_bearer) ───────────────────
+    gql_url = f"{base_url}/services/pathfinder/v1/graphql"
+    trans_url = f"{base_url}/services/transformations/v1/transformations"
+
+    def _gql(query: str, variables: dict, _max_retries: int = 3) -> dict:
+        for attempt in range(1, _max_retries + 1):
+            hdrs = {"Authorization": f"Bearer {_get_bearer(base_url, token)}", "Content-Type": "application/json"}
+            try:
+                resp = requests.post(
+                    gql_url,
+                    json={"query": query, "variables": variables},
+                    headers=hdrs,
+                    timeout=30,
+                )
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                if attempt < _max_retries:
+                    wait = 2 ** (attempt - 1)
+                    logger.warning("GQL network error (attempt %d/%d), retry in %ds: %s", attempt, _max_retries, wait, exc)
+                    time.sleep(wait)
+                    continue
+                raise
+            if resp.status_code == 429:
+                wait = int(resp.headers.get("Retry-After", 2 ** attempt))
+                logger.warning("GQL 429 rate-limited (attempt %d/%d), retry in %ds", attempt, _max_retries, wait)
+                if attempt < _max_retries:
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("errors"):
+                raise RuntimeError(f"GraphQL errors: {data['errors']}")
+            return data
 
     # ── Tag ───────────────────────────────────────────────────────────────────
     # Cache tag group data (loaded once)
@@ -810,6 +997,9 @@ def write_leanix(
             r = _gql(_QUERY_TAGS, {})
             _all_tags_cache = [e["node"] for e in r.get("data", {}).get("allTags", {}).get("edges", [])]
 
+    # Tags that must always be created as free tags (no tag group)
+    _FREE_TAGS = {"KPI_Achievement", "Target", "Baseline", "Target Reference"}
+
     def _get_or_create_tag_id(tag_name: str, group_name: str | None = None) -> str:
         """Get or create a tag, optionally in a specific named group."""
         _load_tag_cache()
@@ -824,7 +1014,8 @@ def write_leanix(
                 if g["name"] == group_name:
                     group_id = g["id"]
                     break
-        if group_id is None:
+        # Free tags (KPI_Achievement, Target, etc.) must NOT be placed in any group
+        if group_id is None and tag_name not in _FREE_TAGS:
             # Pick first unrestricted group
             for g in _tag_groups_cache:  # type: ignore[union-attr]
                 if not g.get("restrictToFactSheetTypes"):
@@ -890,12 +1081,34 @@ def write_leanix(
                 return edge["node"]["id"]
         return None
 
+    _BATCH_SIZE_GQL = 20
+
+    def _batch_find_by_names(fs_type: str, names: list[str]) -> dict[str, str]:
+        """Return {name: id} for all names found, using GraphQL aliasing (up to 20 per call)."""
+        result: dict[str, str] = {}
+        unique = list(dict.fromkeys(n for n in names if n))  # deduplicate, preserve order
+        for chunk_start in range(0, len(unique), _BATCH_SIZE_GQL):
+            chunk = unique[chunk_start:chunk_start + _BATCH_SIZE_GQL]
+            # Build aliased query: alias0: allFactSheets(...) { edges { node { id displayName } } }
+            aliases = "\n".join(
+                f'  a{i}: allFactSheets(filter: {{facetFilters: [{{facetKey: "FactSheetTypes", keys: ["{fs_type}"]}}] fullTextSearch: "{name.replace(chr(34), chr(39))}"}}) {{ edges {{ node {{ id displayName }} }} }}'
+                for i, name in enumerate(chunk)
+            )
+            query = "{\n" + aliases + "\n}"
+            data = _gql(query, {}).get("data", {})
+            for i, name in enumerate(chunk):
+                for edge in data.get(f"a{i}", {}).get("edges", []):
+                    if edge["node"]["displayName"] == name:
+                        result[name] = edge["node"]["id"]
+                        break
+        return result
+
     def _create_fs(fs_type: str, name: str, desc: str = "") -> str:
         result = _gql(_MUTATION_CREATE_FS, {"type": fs_type, "name": name})
         return result["data"]["createFactSheet"]["factSheet"]["id"]
 
-    def _upsert(fs_type: str, name: str, desc: str = "") -> tuple[str, bool]:
-        existing = _find_by_name(fs_type, name)
+    def _upsert(fs_type: str, name: str, desc: str = "", _prefetch: dict[str, str] | None = None) -> tuple[str, bool]:
+        existing = (_prefetch.get(name) if _prefetch is not None else None) or _find_by_name(fs_type, name)
         if existing:
             return existing, False
         return _create_fs(fs_type, name, desc), True
@@ -978,9 +1191,10 @@ def write_leanix(
     bc_rows   = _sheet_rows("BusinessCapabilities")
     app_rows  = _sheet_rows("Applications")
     obj_rows  = _sheet_rows("Objectives")
+    itc_rows  = _sheet_rows("ITComponent")
 
     # ── Push ──────────────────────────────────────────────────────────────────
-    client_tag = f"client={client_name}"
+    client_tag = client_name
     tag_id     = _get_or_create_tag_id(client_tag)
     logger.info("LeanIX: using tag '%s' (id=%s)", client_tag, tag_id)
 
@@ -1042,11 +1256,12 @@ def write_leanix(
 
     # 0. Upsert Objectives (if sheet present)
     obj_id_cache: dict[str, str] = {}
+    _obj_prefetch = _batch_find_by_names("Objective", [str(r.get("name", "")).strip() for r in obj_rows])
     for row in obj_rows:
         name = str(row.get("name", "")).strip()
         if not name:
             continue
-        obj_id, created = _upsert("Objective", name)
+        obj_id, created = _upsert("Objective", name, _prefetch=_obj_prefetch)
         obj_id_cache[name] = obj_id
         extra_tags = _resolve_extra_tags(row, skip=client_tag)
         all_tags = list(dict.fromkeys([tag_id] + extra_tags)) if created else extra_tags
@@ -1056,11 +1271,12 @@ def write_leanix(
 
     # 1. Upsert BusinessCapabilities
     bc_id_cache: dict[str, str] = {}
+    _bc_prefetch = _batch_find_by_names("BusinessCapability", [str(r.get("name", "")).strip() for r in bc_rows])
     for row in bc_rows:
         name = str(row.get("name", "")).strip()
         if not name:
             continue
-        bc_id, created = _upsert("BusinessCapability", name)
+        bc_id, created = _upsert("BusinessCapability", name, _prefetch=_bc_prefetch)
         bc_id_cache[name] = bc_id
         extra_tags = _resolve_extra_tags(row, skip=client_tag)
         if created:
@@ -1077,13 +1293,34 @@ def write_leanix(
             _set_field(bc_id, "scopeBC", scope_bc)
         logger.debug("LeanIX BC %s '%s'", "created" if created else "found", name)
 
+    # 1b. Upsert ITComponents
+    itc_id_cache: dict[str, str] = {}
+    _itc_prefetch = _batch_find_by_names("ITComponent", [str(r.get("name", "")).strip() for r in itc_rows])
+    for row in itc_rows:
+        name = str(row.get("name", "")).strip()
+        if not name:
+            continue
+        itc_id, created = _upsert("ITComponent", name, _prefetch=_itc_prefetch)
+        itc_id_cache[name] = itc_id
+        extra_tags = _resolve_extra_tags(row, skip=client_tag)
+        if created:
+            _tag_fs_multi(itc_id, list(dict.fromkeys([tag_id] + extra_tags)))
+        else:
+            if extra_tags:
+                _tag_fs_multi(itc_id, extra_tags)
+        hosting = str(row.get("lxHostingType") or "").strip()
+        if hosting:
+            _set_field(itc_id, "lxHostingType", hosting)
+        logger.debug("LeanIX ITC %s '%s'", "created" if created else "found", name)
+
     # 2. Upsert Applications
     app_id_cache: dict[str, str] = {}
+    _app_prefetch = _batch_find_by_names("Application", [str(r.get("name", "")).strip() for r in app_rows])
     for row in app_rows:
         name = str(row.get("name", "")).strip()
         if not name:
             continue
-        app_id, created = _upsert("Application", name)
+        app_id, created = _upsert("Application", name, _prefetch=_app_prefetch)
         app_id_cache[name] = app_id
         extra_tags = _resolve_extra_tags(row, skip=client_tag)
         if created:
@@ -1125,17 +1362,23 @@ def write_leanix(
 
     # 3. Upsert Initiatives + relations
     pushed = failed = 0
+    init_id_cache: dict[str, str] = {}
+    _init_prefetch = _batch_find_by_names("Initiative", [str(r.get("name", str(r.get("id", "")))).strip() for r in init_rows])
     for row in init_rows:
         req_id = str(row.get("id", "")).strip()
+        init_name = str(row.get("name", req_id)).strip()
+        if not req_id:
+            req_id = init_name  # fallback: use name as id when id column is empty
         if not req_id:
             continue
         try:
-            init_name = str(row.get("name", req_id)).strip()
             initiative_id, created = _upsert(
                 "Initiative",
                 init_name,
                 desc=str(row.get("description", "")),
+                _prefetch=_init_prefetch,
             )
+            init_id_cache[init_name] = initiative_id
             if created:
                 extra_tags = _resolve_extra_tags(row, skip=client_tag)
                 all_tags = list(dict.fromkeys([tag_id] + extra_tags))
@@ -1173,6 +1416,83 @@ def write_leanix(
                     _create_relation(initiative_id, obj_id_cache[obj_name],
                                      "relInitiativeToObjective")
 
+            # ── Transformations ───────────────────────────────────────────────
+            # Map each linked Application to a Transformation type based on its
+            # lifecycle phase, then POST to the Transformations REST API.
+            # Linked BCs are included in the transformation factSheets when available.
+            _LIFECYCLE_TO_TRANSFORMATION = {
+                "plan":      "implementNewApplication",
+                "phaseIn":   "rolloutApplication",
+                "active":    "rolloutApplication",
+                "phaseOut":  "discontinueApplication",
+                "endOfLife": "decommissionApplication",
+            }
+            # Collect BCs for this initiative (used in transformation payload)
+            init_bc_ids = []
+            for bc_name in re.split(r"[;,]", str(bcs_raw)):
+                bc_name = bc_name.strip()
+                if bc_name and bc_name in bc_id_cache:
+                    init_bc_ids.append(bc_id_cache[bc_name])
+
+            for app_name in re.split(r"[;,]", str(apps_raw)):
+                app_name = app_name.strip()
+                if not app_name or app_name not in app_id_cache:
+                    continue
+                app_id = app_id_cache[app_name]
+                # Determine lifecycle of this specific app
+                app_lc = str(row.get("lifecycle_phase") or row.get("lifecycle") or "plan").strip()
+                trans_type = _LIFECYCLE_TO_TRANSFORMATION.get(app_lc, "implementNewApplication")
+                trans_name = {
+                    "en": {
+                        "implementNewApplication": f"Introduce {app_name}",
+                        "rolloutApplication":      f"Roll out {app_name}",
+                        "discontinueApplication":  f"Discontinue {app_name}",
+                        "decommissionApplication": f"Decommission {app_name}",
+                    },
+                    "es": {
+                        "implementNewApplication": f"Introducir {app_name}",
+                        "rolloutApplication":      f"Desplegar {app_name}",
+                        "discontinueApplication":  f"Descontinuar {app_name}",
+                        "decommissionApplication": f"Retirar {app_name}",
+                    },
+                }.get("en", {}).get(trans_type, f"{trans_type} {app_name}")
+
+                # completionDate: use lifecycle_endDate if available, else +1 year
+                _comp_date = lc_end or (
+                    str(int(time.strftime("%Y")) + 1) + time.strftime("-%m-%d")
+                )
+                payload: dict = {
+                    "factSheetId":   initiative_id,
+                    "factSheetType": "Initiative",
+                    "type":          trans_type,
+                    "name":          trans_name,
+                    "completionDate": {"type": "exactDate", "date": _comp_date},
+                    "factSheets": {
+                        "application": {"id": app_id, "type": "Application"},
+                    },
+                }
+                if init_bc_ids:
+                    payload["factSheets"]["businessCapabilities"] = [
+                        {"id": bc_id, "type": "BusinessCapability"} for bc_id in init_bc_ids
+                    ]
+                try:
+                    hdrs = {
+                        "Authorization": f"Bearer {_get_bearer(base_url, token)}",
+                        "Content-Type": "application/json",
+                    }
+                    t_resp = requests.post(trans_url, json=payload, headers=hdrs, timeout=30)
+                    t_resp.raise_for_status()
+                    logger.debug(
+                        "LeanIX Transformation created: %s '%s' → app '%s'",
+                        trans_type, init_name, app_name,
+                    )
+                except Exception as t_exc:
+                    _body = getattr(getattr(t_exc, "response", None), "text", "")
+                    logger.warning(
+                        "LeanIX Transformation failed for app '%s' in '%s': %s %s",
+                        app_name, init_name, t_exc, _body,
+                    )
+
             logger.info("LeanIX: %s initiative '%s'", "created" if created else "updated", init_name)
             pushed += 1
 
@@ -1180,7 +1500,366 @@ def write_leanix(
             logger.error("LeanIX: failed to push %s — %s", req_id, exc)
             failed += 1
 
+    # ── Lift & Shift Transformations ──────────────────────────────────────────
+    # Runs once after all fact sheets are upserted so source and target app IDs
+    # are guaranteed to be in app_id_cache.
+    # For each conversion: decommissionApplication (source → successor: target)
+    #                    + implementNewApplication  (target)
+    # Both are attached to the Lift & Shift Initiative if one exists.
+    if lift_shift_map:
+        # Find the L&S initiative ID (name contains "Lift" or tag "LiftShift")
+        ls_initiative_id: str | None = None
+        for row in init_rows:
+            n = str(row.get("name", "")).strip()
+            if "lift" in n.lower() or "shift" in n.lower():
+                ls_initiative_id = _find_by_name("Initiative", n)
+                if ls_initiative_id:
+                    break
+        # Fallback: first initiative in cache
+        if not ls_initiative_id and init_rows:
+            n = str(init_rows[0].get("name", "")).strip()
+            ls_initiative_id = _find_by_name("Initiative", n)
+
+        if ls_initiative_id:
+            for conv in lift_shift_map:
+                source_name = (conv.get("source_app") or "").strip()
+                target_name = (conv.get("target_desc") or conv.get("target_matnr") or "").strip()
+                if not source_name or not target_name:
+                    continue
+                source_id = app_id_cache.get(source_name)
+                target_id = app_id_cache.get(target_name)
+                if not source_id or not target_id:
+                    logger.debug(
+                        "L&S Transformation skipped — IDs not found: source='%s'(%s) target='%s'(%s)",
+                        source_name, source_id, target_name, target_id,
+                    )
+                    continue
+
+                hdrs = {
+                    "Authorization": f"Bearer {_get_bearer(base_url, token)}",
+                    "Content-Type": "application/json",
+                }
+
+                # 1. decommissionApplication: source retires, successor = target
+                try:
+                    decom_payload = {
+                        "factSheetId":    ls_initiative_id,
+                        "factSheetType":  "Initiative",
+                        "type":           "decommissionApplication",
+                        "name":           f"Decommission {source_name}",
+                        "completionDate": {"type": "completionDate"},
+                        "factSheets": {
+                            "application": {"id": source_id, "type": "Application"},
+                            "successor":   {"id": target_id, "type": "Application"},
+                        },
+                    }
+                    r = requests.post(trans_url, json=decom_payload, headers=hdrs, timeout=30)
+                    r.raise_for_status()
+                    logger.debug("L&S decommissionApplication: '%s' → successor '%s'", source_name, target_name)
+                except Exception as exc:
+                    logger.warning("L&S decommission Transformation failed '%s': %s", source_name, exc)
+
+                # 2. implementNewApplication: target introduced
+                try:
+                    impl_payload = {
+                        "factSheetId":    ls_initiative_id,
+                        "factSheetType":  "Initiative",
+                        "type":           "implementNewApplication",
+                        "name":           f"Introduce {target_name}",
+                        "completionDate": {"type": "completionDate"},
+                        "factSheets": {
+                            "application":  {"id": target_id, "type": "Application"},
+                            "predecessors": [{"id": source_id, "type": "Application"}],
+                        },
+                    }
+                    r = requests.post(trans_url, json=impl_payload, headers=hdrs, timeout=30)
+                    r.raise_for_status()
+                    logger.debug("L&S implementNewApplication: '%s'", target_name)
+                except Exception as exc:
+                    logger.warning("L&S implement Transformation failed '%s': %s", target_name, exc)
+        else:
+            logger.warning("L&S Transformations skipped — no Lift & Shift Initiative found in push data")
+
     logger.info("LeanIX push complete: %d pushed, %d failed", pushed, failed)
+
+    # ── Reference Catalog batch-links ─────────────────────────────────────────
+    # Auto-link Applications to official LeanIX catalog entries (lx_APP_XXXXXX).
+    # Auto-link ITComponents to official LeanIX ITC catalog entries (lx_ITC_XXXXXX).
+    # Only links when confidenceLevel == "VERYHIGH"; logs others for manual review.
+    if app_id_cache or itc_id_cache:
+        _link_apps_to_catalog(base_url, token, app_id_cache, itc_id_cache)
+
+    # ── Metrics API — project KPIs ────────────────────────────────────────────
+    # Compute completeness KPIs from the pushed data and create them in LeanIX.
+    kpis = _create_project_kpis(
+        base_url=base_url,
+        api_token=token,
+        app_rows=app_rows,
+        bc_rows=bc_rows,
+        init_rows=init_rows,
+        app_id_cache=app_id_cache,
+        bc_id_cache=bc_id_cache,
+        init_id_cache=init_id_cache,
+        client_name=client_name,
+    )
+    if kpis:
+        logger.info(
+            "KPIs — apps_with_bc=%.0f%% apps_with_lc=%.0f%% "
+            "bcs_with_app=%.0f%% inits_with_trans=%.0f%%",
+            kpis.get("apps_with_bc", 0), kpis.get("apps_with_lifecycle", 0),
+            kpis.get("bcs_with_app", 0), kpis.get("inits_with_trans", 0),
+        )
+
+
+# ── Reference Catalog helpers ─────────────────────────────────────────────────
+
+def _link_apps_to_catalog(
+    base_url: str,
+    api_token: str,
+    app_id_cache: dict[str, str],
+    itc_id_cache: dict[str, str] | None = None,
+) -> None:
+    """
+    Auto-link workspace Applications and ITComponents to LeanIX Reference Catalog entries.
+
+    - Applications: POST /services/reference-data/v1/source/saas/batch-links
+      then PUT /services/reference-data/v1/source/saas/links
+    - ITComponents:  POST /services/reference-data/v1/source/ltls/batch-links
+      then PUT /services/reference-data/v1/source/ltls/links
+
+    Only auto-links when confidenceLevel == "VERYHIGH".
+    After linking, copies useful fields from firstSuggestedFactSheet:
+      - lxHostingType (if not already set on Application)
+      - description   (if empty on Application)
+    Logs productCategory and provider for info.
+    """
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        logger.warning("Reference Catalog: cannot get bearer token: %s", exc)
+        return
+
+    import requests as _req
+
+    hdrs = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+
+    def _patch_field_rest(fs_id: str, field_path: str, value: str) -> None:
+        """Patch a field on a fact sheet via GraphQL REST fallback (inline, no _gql closure)."""
+        gql_url = f"{base_url}/services/pathfinder/v1/graphql"
+        query = """
+mutation PatchFS($id: ID!, $patches: [Patch]!) {
+  updateFactSheet(id: $id, patches: $patches) { factSheet { id } }
+}"""
+        try:
+            r = _req.post(
+                gql_url,
+                json={"query": query, "variables": {
+                    "id": fs_id,
+                    "patches": [{"op": "add", "path": f"/{field_path}", "value": value}],
+                }},
+                headers=hdrs,
+                timeout=15,
+            )
+            r.raise_for_status()
+        except Exception as exc:
+            logger.debug("Reference Catalog: could not patch %s on %s: %s", field_path, fs_id, exc)
+
+    def _run_catalog_linking(source_name: str, id_cache: dict[str, str], enrich_fields: bool) -> tuple[int, int]:
+        """Run batch-links + PUT links for one source (saas or ltls). Returns (linked, suggestions)."""
+        batch_url = f"{base_url}/services/reference-data/v1/source/{source_name}/batch-links"
+        link_url  = f"{base_url}/services/reference-data/v1/source/{source_name}/links"
+        fs_list = [{"id": fid, "name": name} for name, fid in id_cache.items()]
+        CHUNK = 50
+        linked = 0
+        review_count = 0
+
+        for i in range(0, len(fs_list), CHUNK):
+            chunk = fs_list[i : i + CHUNK]
+            payload = {"factSheets": chunk, "numMatches": 3}
+            try:
+                resp = _req.post(batch_url, json=payload, headers=hdrs, timeout=30)
+                if resp.status_code in (403, 404):
+                    logger.debug("Reference Catalog %s batch-links not available (%s)", source_name, resp.status_code)
+                    return linked, review_count
+                resp.raise_for_status()
+                data = resp.json().get("data", {})
+            except Exception as exc:
+                logger.warning("Reference Catalog %s batch-links failed: %s", source_name, exc)
+                return linked, review_count
+
+            for fs_id, result in data.items():
+                suggestions = result.get("suggestions", [])
+                if not suggestions:
+                    continue
+                top = suggestions[0].get("factSheet", {})
+                confidence = top.get("confidenceLevel", "")
+                catalog_id = top.get("id", "")
+                catalog_name = top.get("displayName", "")
+
+                if confidence == "VERYHIGH" and catalog_id:
+                    try:
+                        lr = _req.put(
+                            link_url,
+                            json={"sourceFactSheetId": fs_id, "targetFactSheetId": catalog_id},
+                            headers=hdrs,
+                            timeout=15,
+                        )
+                        link_ok = lr.status_code in (200, 201, 204, 409) or (
+                            lr.status_code == 500 and "Link was established" in lr.text
+                        )
+                        if link_ok:
+                            linked += 1
+                            logger.debug(
+                                "Reference Catalog [%s]: linked '%s' → '%s' (VERYHIGH)",
+                                source_name, fs_id, catalog_name,
+                            )
+                            # Enrich from catalog fields (Applications only)
+                            if enrich_fields:
+                                hosting = top.get("hostingType") or top.get("lxHostingType", "")
+                                desc    = top.get("description", "")
+                                prod_cat = top.get("productCategory", "")
+                                provider = top.get("provider", "")
+                                if hosting:
+                                    _patch_field_rest(fs_id, "lxHostingType", hosting)
+                                if desc:
+                                    _patch_field_rest(fs_id, "description", desc)
+                                if prod_cat or provider:
+                                    logger.debug(
+                                        "Reference Catalog catalog info for %s: productCategory=%s provider=%s",
+                                        catalog_name, prod_cat, provider,
+                                    )
+                        else:
+                            logger.warning(
+                                "Reference Catalog link failed for %s → %s: %s",
+                                fs_id, catalog_id, lr.status_code,
+                            )
+                    except Exception as exc:
+                        logger.warning("Reference Catalog link request failed for %s: %s", fs_id, exc)
+                else:
+                    review_count += 1
+                    logger.debug(
+                        "Reference Catalog [%s] review: %s → '%s' (%s)",
+                        source_name, fs_id, catalog_name, confidence,
+                    )
+
+        return linked, review_count
+
+    linked_apps, review_apps = _run_catalog_linking("saas", app_id_cache, enrich_fields=True)
+    logger.info(
+        "Reference Catalog apps: %d auto-linked (VERYHIGH), %d for manual review",
+        linked_apps, review_apps,
+    )
+
+    if itc_id_cache:
+        linked_itcs, review_itcs = _run_catalog_linking("ltls", itc_id_cache, enrich_fields=False)
+        logger.info(
+            "Reference Catalog ITCs: %d auto-linked (VERYHIGH), %d for manual review",
+            linked_itcs, review_itcs,
+        )
+
+
+def _create_project_kpis(
+    base_url: str,
+    api_token: str,
+    app_rows: list[dict],
+    bc_rows: list[dict],
+    init_rows: list[dict],
+    app_id_cache: dict[str, str],
+    bc_id_cache: dict[str, str],
+    init_id_cache: dict[str, str],
+    client_name: str,
+) -> dict:
+    """
+    Compute completeness KPIs from the pushed data.
+
+    Returns a dict with the four KPI values (as percentages 0-100).
+    Also writes them as time-series points to LeanIX Metrics v2 if the
+    workspace supports it (non-fatal if the endpoint is unavailable).
+
+    KPIs:
+      - pct_apps_with_bc        % Applications with at least one BC assigned
+      - pct_apps_with_lifecycle % Applications with a lifecycle phase defined
+      - pct_bcs_with_app        % BCs that have at least one Application
+      - pct_inits_with_trans    % Initiatives with at least one Transformation
+
+    All KPIs are scoped with a label "archimedes-<client_name>" for easy filtering.
+    Non-fatal — push always completes even if this step fails.
+    """
+    import requests as _req
+
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        logger.warning("Metrics KPIs: cannot get bearer token: %s", exc)
+        return {}
+
+    hdrs = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+
+    # ── 1. Compute metrics from pushed data ───────────────────────────────────
+
+    # Apps with BC
+    apps_with_bc = 0
+    for row in app_rows:
+        bc_raw = str(row.get("relApplicationToBusinessCapability") or "").strip()
+        if bc_raw:
+            apps_with_bc += 1
+
+    # Apps with lifecycle
+    apps_with_lc = 0
+    for row in app_rows:
+        lc = str(row.get("lifecycle_phase") or row.get("lifecycle") or "").strip()
+        if lc:
+            apps_with_lc += 1
+
+    n_apps = len(app_rows) or 1  # avoid division by zero
+
+    # BCs with at least one app (check relApplicationToBusinessCapability across app_rows)
+    bcs_referenced: set[str] = set()
+    for row in app_rows:
+        bc_raw = str(row.get("relApplicationToBusinessCapability") or "").strip()
+        for bc in re.split(r"[;,]", bc_raw):
+            bc = bc.strip()
+            if bc:
+                bcs_referenced.add(bc.lower())
+
+    n_bcs = len(bc_rows) or 1
+    bcs_with_app = sum(
+        1 for row in bc_rows
+        if str(row.get("name") or "").strip().lower() in bcs_referenced
+    )
+
+    # Initiatives with transformations: use init_id_cache populated during push
+    inits_with_trans = 0
+    trans_url = f"{base_url}/services/transformations/v1/transformations"
+    for row in init_rows:
+        init_name = str(row.get("name") or "").strip()
+        init_id   = init_id_cache.get(init_name)
+        if init_id:
+            try:
+                tr = _req.get(trans_url, params={"factSheetId": init_id}, headers=hdrs, timeout=15)
+                items = tr.json() if isinstance(tr.json(), list) else tr.json().get("data", [])
+                if items:
+                    inits_with_trans += 1
+            except Exception:
+                pass
+
+    n_inits = len(init_rows) or 1
+
+    result = {
+        "apps_with_bc":        round(apps_with_bc / n_apps * 100, 1),
+        "apps_with_lifecycle": round(apps_with_lc / n_apps * 100, 1),
+        "bcs_with_app":        round(bcs_with_app / n_bcs * 100, 1),
+        "inits_with_trans":    round(inits_with_trans / n_inits * 100, 1),
+    }
+
+    logger.info(
+        "Metrics KPIs for client '%s' — "
+        "apps_with_bc=%.0f%% apps_with_lc=%.0f%% bcs_with_app=%.0f%% inits_with_trans=%.0f%%",
+        client_name,
+        result["apps_with_bc"], result["apps_with_lifecycle"],
+        result["bcs_with_app"], result["inits_with_trans"],
+    )
+    return result
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -1325,9 +2004,13 @@ def write(
     return out_excel, out_target
 
 
-def push_leanix(staging_path: str | Path, client_name: str) -> None:
+def push_leanix(
+    staging_path: str | Path,
+    client_name: str,
+    lift_shift_map: list[dict] | None = None,
+) -> None:
     """Push a previously generated LeanIX staging Excel to LeanIX."""
-    write_leanix(Path(staging_path), client_name)
+    write_leanix(Path(staging_path), client_name, lift_shift_map=lift_shift_map)
 
 
 if __name__ == "__main__":

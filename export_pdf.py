@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 
 HTML_PATH = Path(__file__).parent / "Archimedes_AI_Presentation.html"
 PDF_PATH  = Path(__file__).parent / "Archimedes_AI_Presentation.pdf"
-TOTAL_SLIDES = 21
+TOTAL_SLIDES = 22
 W, H = 1280, 720
 
 async def main():
