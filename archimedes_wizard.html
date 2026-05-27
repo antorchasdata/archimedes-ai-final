@@ -669,6 +669,8 @@ const LANGS = {
     s2_desc: 'Upload system inventory files to generate the Baseline (current architecture). Both files are optional — upload one or both, or skip this step.',
     s2_onprem_hint: 'On-premise systems',
     s2_cloud_hint: 'Cloud / SaaS systems',
+    s2_inbox_tip_title: 'SAP Discovery Inbox available?',
+    s2_inbox_tip_body: 'If your client has SAP Cloud ALM integrated with LeanIX, enable the SAP Discovery Inbox first to auto-discover the AS-IS landscape. Archimedes will complement it with the TO-BE target.',
     s2_busy: 'Generating baseline…',
     s2_ok: 'Baseline generated',
     s2_download: '⬇ Download baseline.xlsx',
@@ -822,6 +824,8 @@ const LANGS = {
     s2_desc: 'Sube los ficheros de inventario de sistemas para generar el Baseline (arquitectura actual). Ambos ficheros son opcionales — puedes subir uno o los dos, o saltar este paso.',
     s2_onprem_hint: 'Sistemas on-premise',
     s2_cloud_hint: 'Sistemas cloud / SaaS',
+    s2_inbox_tip_title: '¿Discovery Inbox de SAP disponible?',
+    s2_inbox_tip_body: 'Si tu cliente tiene SAP Cloud ALM integrado con LeanIX, activa primero el SAP Discovery Inbox para auto-descubrir el paisaje AS-IS. Archimedes lo complementará con el estado objetivo TO-BE.',
     s2_busy: 'Generando baseline…',
     s2_ok: 'Baseline generado',
     s2_download: '⬇ Descargar baseline.xlsx',
@@ -966,6 +970,8 @@ const LANGS = {
     s2_desc: 'Importez les fichiers d\'inventaire des systèmes pour générer le Baseline (architecture actuelle). Les deux fichiers sont optionnels.',
     s2_onprem_hint: 'Systèmes on-premise',
     s2_cloud_hint: 'Systèmes cloud / SaaS',
+    s2_inbox_tip_title: 'SAP Discovery Inbox disponible ?',
+    s2_inbox_tip_body: 'Si votre client a SAP Cloud ALM intégré à LeanIX, activez d\'abord le SAP Discovery Inbox pour auto-découvrir le paysage AS-IS. Archimedes le complétera avec l\'état cible TO-BE.',
     s2_busy: 'Génération du baseline…',
     s2_ok: 'Baseline généré',
     s2_download: '⬇ Télécharger baseline.xlsx',
@@ -1085,6 +1091,8 @@ const LANGS = {
     s2_desc: 'Carica i file di inventario dei sistemi per generare il Baseline (architettura attuale). Entrambi i file sono opzionali.',
     s2_onprem_hint: 'Sistemi on-premise',
     s2_cloud_hint: 'Sistemi cloud / SaaS',
+    s2_inbox_tip_title: 'SAP Discovery Inbox disponibile?',
+    s2_inbox_tip_body: 'Se il tuo cliente ha SAP Cloud ALM integrato con LeanIX, attiva prima il SAP Discovery Inbox per scoprire automaticamente il paesaggio AS-IS. Archimedes lo integrerà con lo stato target TO-BE.',
     s2_busy: 'Generazione baseline…',
     s2_ok: 'Baseline generato',
     s2_download: '⬇ Scarica baseline.xlsx',
@@ -1203,6 +1211,8 @@ const LANGS = {
     s2_desc: 'Lataa järjestelmäinventaaritiedostot baselinea varten (nykyinen arkkitehtuuri). Molemmat tiedostot ovat valinnaisia.',
     s2_onprem_hint: 'On-premise-järjestelmät',
     s2_cloud_hint: 'Pilvi- / SaaS-järjestelmät',
+    s2_inbox_tip_title: 'SAP Discovery Inbox käytettävissä?',
+    s2_inbox_tip_body: 'Jos asiakkaallasi on SAP Cloud ALM integroitu LeanIX:ään, ota ensin SAP Discovery Inbox käyttöön AS-IS-maiseman automaattiseen löytämiseen. Archimedes täydentää sen TO-BE-tavoitetilalla.',
     s2_busy: 'Luodaan baselinea…',
     s2_ok: 'Baseline luotu',
     s2_download: '⬇ Lataa baseline.xlsx',
@@ -1570,6 +1580,10 @@ function renderStep2() {
     <div class="step-eyebrow">${t('s2_eye', 3, STEPS.length)}</div>
     <h1 class="step-title">${t('s2_title')}</h1>
     <p class="step-desc">${t('s2_desc')}</p>
+    <div style="margin-bottom:16px;padding:12px 14px;border:1px solid var(--sap-blue);border-radius:8px;background:color-mix(in srgb,var(--sap-blue) 8%,transparent);font-size:13px;line-height:1.5">
+      💡 <strong>${t('s2_inbox_tip_title')}</strong><br>
+      <span style="color:var(--text-secondary)">${t('s2_inbox_tip_body')}</span>
+    </div>
     <div class="drop-grid">
       ${dropZone('onprem', '🖥️', 'OnPrem Systems.xlsx', t('s2_onprem_hint'), '.xlsx')}
       ${dropZone('cloud',  '☁️', 'Cloud Systems.xlsx',  t('s2_cloud_hint'), '.xlsx')}
