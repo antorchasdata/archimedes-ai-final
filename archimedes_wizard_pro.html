@@ -1228,7 +1228,7 @@ async function loadCatalogs() {
       const then = new Date(y, m - 1, 1);
       const now = new Date();
       const days = Math.floor((now - then) / 86400000);
-      ageEl.textContent = t('s1_updated_ago')(days < 0 ? 0 : days);
+      ageEl.textContent = t('s1_updated_ago', days < 0 ? 0 : days);
     } else {
       ageEl.textContent = '';
     }
