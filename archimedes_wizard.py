@@ -878,7 +878,7 @@ async def get_transformations(session_id: str):
     Queries all Initiatives via GraphQL, then fan-outs to the Transformations
     REST API for each one. EN/ES labels included for the frontend.
     """
-    sess = _session(session_id)
+    _ = session_id  # accepted for URL consistency, not required
     base_url  = os.environ.get("LEANIX_BASE_URL", "")
     api_token = os.environ.get("LEANIX_API_TOKEN", "")
     if not base_url or not api_token:
@@ -950,7 +950,7 @@ async def get_transformations(session_id: str):
 
 
 @app.get("/api/session/{session_id}/projections")
-async def get_projections(session_id: str, date: str | None = None):
+async def get_projections(session_id: str, date: Optional[str] = None):
     """
     Return a TO-BE scenario projection using the LeanIX Impacts API.
 
@@ -964,7 +964,8 @@ async def get_projections(session_id: str, date: str | None = None):
     Returns:
         { ok, date, impacts: [ { factSheetId, factSheetName, factSheetType, field, from, to } ] }
     """
-    sess = _session(session_id)
+    # session_id accepted for URL consistency but not required for this endpoint
+    _ = session_id
     base_url  = os.environ.get("LEANIX_BASE_URL", "")
     api_token = os.environ.get("LEANIX_API_TOKEN", "")
     if not base_url or not api_token:
@@ -1085,7 +1086,7 @@ async def get_synclog(session_id: str):
     Useful for debugging push failures — shows status, timestamps and warnings
     for the most recent integrations in this workspace.
     """
-    _session(session_id)  # validate session exists
+    _ = session_id  # accepted for URL consistency, no session needed
     base_url  = os.environ.get("LEANIX_BASE_URL", "")
     api_token = os.environ.get("LEANIX_API_TOKEN", "")
     if not base_url or not api_token:

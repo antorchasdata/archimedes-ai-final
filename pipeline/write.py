@@ -1329,7 +1329,11 @@ def write_leanix(
             all_extra = list(dict.fromkeys([arch_state_baseline_id] + extra_tags))
             _tag_fs_multi(app_id, all_extra)
         # Set lifecycle (with optional start/end dates)
+        # Target applications (not tagged Baseline) are always plan — they represent the TO-BE state
+        row_tags = str(row.get("tags") or "").lower()
         lc_phase = str(row.get("lifecycle_phase") or row.get("lifecycle") or "").strip()
+        if "baseline" not in row_tags and lc_phase in ("active", "phaseIn", ""):
+            lc_phase = "plan"
         if lc_phase:
             lc_start = str(row.get("lifecycle_startDate") or "").strip()
             lc_end   = str(row.get("lifecycle_endDate") or "").strip()
