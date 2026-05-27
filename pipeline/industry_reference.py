@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -376,17 +377,24 @@ def add_reference_to_target_excel(
     industry_label: str,
     client_name: str = "",
     relations: dict | None = None,
+    base_url: str | None = None,
+    api_token: str | None = None,
 ) -> Path:
     """
     Adds selected reference products to the Target LeanIX Excel.
     Appends rows to the Application sheet with the full LeanIX column format,
     tag "Target Reference", and derived BC/ITC relations.
+
+    If base_url and api_token are provided (or set via env vars LEANIX_BASE_URL /
+    LEANIX_API_TOKEN), also creates an ``implementNewApplication`` Transformation
+    in LeanIX for each selected product.
+
     Returns the modified path (same file, modified in-place).
     """
     import openpyxl as xl
     from pipeline.write import _COLS_APPLICATION, _COLS_BC, _sheet_header, _sheet_row
 
-    tag = "Target Reference"
+    tag = "Whitespace - IRA"
     description = f"SAP recommended product for {industry_label} — SAP Reference Architecture."
 
     wb = xl.load_workbook(str(target_path))
@@ -465,4 +473,234 @@ def add_reference_to_target_excel(
 
     wb.save(str(target_path))
     logger.info("Added %d reference products + %d BCs to %s", len(selected_products), len(new_bcs), target_path.name)
+
+    # ── LeanIX Transformations (optional) ────────────────────────────────────
+    _base_url  = base_url  or os.environ.get("LEANIX_BASE_URL", "")
+    _api_token = api_token or os.environ.get("LEANIX_API_TOKEN", "")
+    if _base_url and _api_token:
+        _create_industry_transformations(
+            selected_products=selected_products,
+            relations=relations or {},
+            industry_label=industry_label,
+            base_url=_base_url,
+            api_token=_api_token,
+        )
+
     return target_path
+
+
+def _create_industry_transformations(
+    selected_products: list[str],
+    relations: dict,
+    industry_label: str,
+    base_url: str,
+    api_token: str,
+) -> None:
+    """
+    Creates ``implementNewApplication`` Transformations in LeanIX for each
+    selected Industry Reference product.
+
+    Finds (or falls back to the first available) an Initiative whose name
+    contains "Industry Reference" or "Reference Architecture" in LeanIX.
+    For each product creates:
+      - Transformation type: implementNewApplication
+      - Custom impact: FACTSHEET_SET lxHostingType=saas
+    """
+    import requests
+    from pipeline.write import _get_bearer
+
+    try:
+        bearer = _get_bearer(base_url, api_token)
+    except Exception as exc:
+        logger.warning("Industry Reference Transformations: cannot get bearer token: %s", exc)
+        return
+
+    hdrs = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    trans_url = f"{base_url}/services/transformations/v1/transformations"
+    gql_url   = f"{base_url}/services/pathfinder/v1/graphql"
+
+    # ── 1. Find the Industry Reference Initiative ─────────────────────────────
+    initiative_id = _find_industry_initiative(gql_url, hdrs, industry_label)
+    if not initiative_id:
+        logger.warning(
+            "Industry Reference Transformations: no matching Initiative found in LeanIX. "
+            "Skipping Transformation creation."
+        )
+        return
+
+    # ── 2. Find App IDs for each selected product ─────────────────────────────
+    # Query all Applications whose name matches
+    app_ids = _find_app_ids(gql_url, hdrs, selected_products)
+
+    # ── 3. Create Transformations ─────────────────────────────────────────────
+    created = 0
+    for prod in selected_products:
+        app_id = app_ids.get(prod)
+        if not app_id:
+            logger.debug("Industry Reference Transformations: app '%s' not found in LeanIX — skipping", prod)
+            continue
+
+        rel = relations.get(prod, {})
+        bc_ids = _find_bc_ids(gql_url, hdrs, [fp.split("/")[-1].strip() for fp in rel.get("bcs", [])])
+
+        payload: dict = {
+            "factSheetId":   initiative_id,
+            "factSheetType": "Initiative",
+            "type":          "implementNewApplication",
+            "name":          f"Introduce {prod}",
+            "completionDate": {"type": "completionDate"},
+            "factSheets": {
+                "application": {"id": app_id, "type": "Application"},
+            },
+            "customImpacts": [
+                {
+                    "type":       "FACTSHEET_SET",
+                    "factSheetType": "Application",
+                    "factSheetIds": [app_id],
+                    "fieldName":  "lxHostingType",
+                    "fieldValue": "saas",
+                }
+            ],
+        }
+        if bc_ids:
+            payload["factSheets"]["businessCapabilities"] = [
+                {"id": bid, "type": "BusinessCapability"} for bid in bc_ids
+            ]
+
+        try:
+            resp = requests.post(trans_url, json=payload, headers=hdrs, timeout=30)
+            if resp.status_code in (200, 201):
+                created += 1
+                logger.debug("Created Transformation 'Introduce %s'", prod)
+            else:
+                logger.warning(
+                    "Transformation for '%s' failed: %s %s", prod, resp.status_code, resp.text[:200]
+                )
+        except Exception as exc:
+            logger.warning("Transformation request for '%s' raised: %s", prod, exc)
+
+    logger.info(
+        "Industry Reference Transformations: %d/%d created for initiative %s",
+        created, len(selected_products), initiative_id,
+    )
+
+
+def _find_industry_initiative(gql_url: str, hdrs: dict, industry_label: str) -> str | None:
+    """
+    Find an Initiative in LeanIX whose displayName contains 'Industry Reference',
+    'Reference Architecture', or the industry label (case-insensitive).
+    Falls back to the first Initiative found.
+    Returns the fact sheet ID or None.
+    """
+    import requests
+
+    query = """
+    query {
+      allFactSheets(filter: {facetFilters: [{facetKey: "FactSheetTypes", keys: ["Initiative"]}]}) {
+        edges {
+          node {
+            id
+            displayName
+          }
+        }
+      }
+    }
+    """
+    try:
+        resp = requests.post(gql_url, json={"query": query}, headers=hdrs, timeout=30)
+        resp.raise_for_status()
+        edges = resp.json().get("data", {}).get("allFactSheets", {}).get("edges", [])
+    except Exception as exc:
+        logger.warning("_find_industry_initiative GQL failed: %s", exc)
+        return None
+
+    search_terms = ["industry reference", "reference architecture", industry_label.lower()]
+    first_id = None
+    for edge in edges:
+        node = edge.get("node", {})
+        name_lower = (node.get("displayName") or "").lower()
+        if first_id is None:
+            first_id = node.get("id")
+        if any(t in name_lower for t in search_terms):
+            logger.debug("Found Industry Reference initiative: %s (%s)", node["displayName"], node["id"])
+            return node["id"]
+
+    if first_id:
+        logger.debug("No Industry Reference initiative found; using first initiative: %s", first_id)
+    return first_id
+
+
+def _find_app_ids(gql_url: str, hdrs: dict, app_names: list[str]) -> dict[str, str]:
+    """Return {app_name → id} for the given list of app names (exact match on displayName)."""
+    import requests
+
+    if not app_names:
+        return {}
+
+    query = """
+    query {
+      allFactSheets(filter: {facetFilters: [{facetKey: "FactSheetTypes", keys: ["Application"]}]}) {
+        edges {
+          node {
+            id
+            displayName
+          }
+        }
+      }
+    }
+    """
+    try:
+        resp = requests.post(gql_url, json={"query": query}, headers=hdrs, timeout=30)
+        resp.raise_for_status()
+        edges = resp.json().get("data", {}).get("allFactSheets", {}).get("edges", [])
+    except Exception as exc:
+        logger.warning("_find_app_ids GQL failed: %s", exc)
+        return {}
+
+    name_lower_to_id = {
+        (e["node"].get("displayName") or "").strip().lower(): e["node"]["id"]
+        for e in edges if e.get("node")
+    }
+    return {
+        name: name_lower_to_id[name.strip().lower()]
+        for name in app_names
+        if name.strip().lower() in name_lower_to_id
+    }
+
+
+def _find_bc_ids(gql_url: str, hdrs: dict, bc_names: list[str]) -> list[str]:
+    """Return list of BC IDs for the given leaf BC names."""
+    import requests
+
+    if not bc_names:
+        return []
+
+    query = """
+    query {
+      allFactSheets(filter: {facetFilters: [{facetKey: "FactSheetTypes", keys: ["BusinessCapability"]}]}) {
+        edges {
+          node {
+            id
+            displayName
+          }
+        }
+      }
+    }
+    """
+    try:
+        resp = requests.post(gql_url, json={"query": query}, headers=hdrs, timeout=30)
+        resp.raise_for_status()
+        edges = resp.json().get("data", {}).get("allFactSheets", {}).get("edges", [])
+    except Exception as exc:
+        logger.warning("_find_bc_ids GQL failed: %s", exc)
+        return []
+
+    name_lower_to_id = {
+        (e["node"].get("displayName") or "").strip().lower(): e["node"]["id"]
+        for e in edges if e.get("node")
+    }
+    return [
+        name_lower_to_id[n.strip().lower()]
+        for n in bc_names
+        if n.strip().lower() in name_lower_to_id
+    ]
