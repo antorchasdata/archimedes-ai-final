@@ -114,6 +114,7 @@ html, body { height: 100%; background: var(--grey-1); font-family: var(--font); 
 }
 .progress-step.done .step-label   { color: var(--blue-10); font-weight: 600; }
 .progress-step.active .step-label { color: var(--blue-7);  font-weight: 700; }
+.progress-step.done  { cursor: pointer; }
 
 /* ── Main layout ───────────────────────────────────────────── */
 .main {
@@ -1367,14 +1368,29 @@ async function apiFetch(url, opts = {}) {
 function renderProgress() {
   const labels = t('steps');
   const el = document.getElementById('progress-steps');
-  el.innerHTML = STEPS.map((s, i) => `
-    <div class="progress-step ${i < currentStep ? 'done' : i === currentStep ? 'active' : ''}">
-      <div class="step-circle">${i < currentStep ? '✓' : i + 1}</div>
+  el.innerHTML = STEPS.map((s, i) => {
+    const isDone   = i < currentStep;
+    const isActive = i === currentStep;
+    const cls      = isDone ? 'done' : isActive ? 'active' : '';
+    const click    = isDone ? `onclick="jumpToStep(${i})"` : '';
+    return `
+    <div class="progress-step ${cls}" ${click}>
+      <div class="step-circle">${isDone ? '✓' : i + 1}</div>
       <div class="step-label">${labels[i]}</div>
-    </div>
-  `).join('');
-  document.getElementById('header-step-label').textContent =
-    t('step_of', currentStep + 1, STEPS.length) + ' — ' + labels[currentStep];
+    </div>`;
+  }).join('');
+  if (currentStep < STEPS.length) {
+    document.getElementById('header-step-label').textContent =
+      t('step_of', currentStep + 1, STEPS.length) + ' — ' + labels[currentStep];
+  }
+}
+
+function jumpToStep(i) {
+  if (i >= currentStep && i !== currentStep) return;
+  currentStep = i;
+  renderProgress();
+  renderStep(currentStep);
+  showNav();
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
