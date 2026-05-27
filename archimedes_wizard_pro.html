@@ -1220,14 +1220,11 @@ async function loadCatalogs() {
         <div class="cc-stats"><span class="cc-stat clickable" onclick="openCatalog('rsa','products')">${d.rsa?.stats?.total_products || 0} productos</span></div>
       </div>
     `;
-    // Show age from version field (format YYYY-MM)
-    const version = d.rba?.version || d.rsa?.version || '';
+    // Age from file mtime (unix timestamp seconds)
+    const mtime = d.rba?.file_mtime || d.rsa?.file_mtime;
     const ageEl = document.getElementById('s1-age');
-    if (version && /^\d{4}-\d{2}$/.test(version)) {
-      const [y, m] = version.split('-').map(Number);
-      const then = new Date(y, m - 1, 1);
-      const now = new Date();
-      const days = Math.floor((now - then) / 86400000);
+    if (mtime) {
+      const days = Math.floor((Date.now() / 1000 - mtime) / 86400);
       ageEl.textContent = t('s1_updated_ago', days < 0 ? 0 : days);
     } else {
       ageEl.textContent = '';

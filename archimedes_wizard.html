@@ -1574,12 +1574,11 @@ async function loadCatalog() {
     grid.innerHTML = catalogCard('rba', 'RBA', t('cat_rba_title'), rba)
                    + catalogCard('rsa', 'RSA', t('cat_rsa_title'), rsa);
 
-    // Age from version field YYYY-MM
+    // Age from file mtime (unix timestamp seconds)
     let ageStr = '';
-    const version = rba.version || rsa.version || '';
-    if (version && /^\d{4}-\d{2}$/.test(version)) {
-      const [y, m] = version.split('-').map(Number);
-      const days = Math.floor((new Date() - new Date(y, m - 1, 1)) / 86400000);
+    const mtime = rba.file_mtime || rsa.file_mtime;
+    if (mtime) {
+      const days = Math.floor((Date.now() / 1000 - mtime) / 86400);
       ageStr = t('s1_updated_ago', days < 0 ? 0 : days);
     }
 

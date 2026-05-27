@@ -31,6 +31,7 @@ def _catalog_info(path: Path) -> dict:
         "version": data.get("version", "unknown"),
         "source":  data.get("source",  "unknown"),
         "stats":   data.get("stats",   {}),
+        "file_mtime": path.stat().st_mtime,
     }
 
 
