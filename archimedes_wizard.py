@@ -6,6 +6,7 @@ Endpoints:
   GET  /api/config                        → feature flags (leanix configured?)
   POST /api/session                       → create session (Step 0: client name)
   GET  /api/session/{id}/catalog          → catalog status (Step 1)
+  POST /api/catalogs/refresh              → refresh RBA/RSA catalogs from MXP
   POST /api/session/{id}/baseline         → baseline generation (Step 2)
   POST /api/session/{id}/lift-shift/resolve → Lift & Shift: resolve app names → Material Numbers (Step 2b)
   POST /api/session/{id}/lift-shift/convert → Lift & Shift: convert SKUs to RISE targets (Step 2b)
@@ -30,9 +31,11 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import uuid
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -187,6 +190,45 @@ async def catalog_rsa_full():
     if not RSA_PATH.exists():
         raise HTTPException(status_code=404, detail="RSA catalog not found")
     return json.loads(RSA_PATH.read_text(encoding="utf-8"))
+
+
+@app.post("/api/catalogs/refresh")
+async def catalogs_refresh():
+    """
+    Runs pipeline/catalog_mxp.py to refresh RBA/RSA catalogs from MXP REST API.
+    Returns updated stats on success, or a helpful error message on failure (e.g. 401).
+    """
+    script = BASE_DIR / "pipeline" / "catalog_mxp.py"
+    if not script.exists():
+        return JSONResponse({"ok": False, "message": "catalog_mxp.py not found"}, status_code=500)
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True, text=True, timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"ok": False, "message": "Timeout: catalog update took >120s"}, status_code=504)
+
+    if result.returncode != 0:
+        output = (result.stdout + result.stderr).strip()
+        if "401" in output or "Token" in output or "token" in output:
+            msg = ("Token MXP inválido o no configurado. "
+                   "Ejecuta /update-catalogs en Claude Code para actualizar via MCP session.")
+        else:
+            msg = f"Error actualizando catálogos: {output[:400]}"
+        return JSONResponse({"ok": False, "message": msg})
+
+    # Success — read updated stats
+    updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rba_info = _catalog_info(RBA_PATH) if RBA_PATH.exists() else {}
+    rsa_info = _catalog_info(RSA_PATH) if RSA_PATH.exists() else {}
+    return {
+        "ok": True,
+        "updated_at": updated_at,
+        "rba": rba_info,
+        "rsa": rsa_info,
+    }
 
 
 # ── Step 2 — Baseline / Footprint ─────────────────────────────────────────────

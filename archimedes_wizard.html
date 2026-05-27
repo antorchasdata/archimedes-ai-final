@@ -664,6 +664,11 @@ const LANGS = {
     s1_version: 'Version',
     s1_source: 'Source',
     s1_err: 'Error loading catalogs',
+    s1_refresh_btn: 'Refresh from MXP',
+    s1_refreshing: 'Updating…',
+    s1_refresh_ok: 'Catalogs updated',
+    s1_refresh_err: 'Update failed',
+    s1_updated_ago: (d) => d === 0 ? 'Updated today' : `Updated ${d} day${d===1?'':'s'} ago`,
     // step 2
     s2_eye: (n, total) => `Step ${n} of ${total}`,
     s2_title: 'Footprint / AS-IS Baseline',
@@ -820,6 +825,11 @@ const LANGS = {
     s1_version: 'Versión',
     s1_source: 'Fuente',
     s1_err: 'Error cargando catálogos',
+    s1_refresh_btn: 'Actualizar desde MXP',
+    s1_refreshing: 'Actualizando…',
+    s1_refresh_ok: 'Catálogos actualizados',
+    s1_refresh_err: 'Error en la actualización',
+    s1_updated_ago: (d) => d === 0 ? 'Actualizado hoy' : `Actualizado hace ${d} día${d===1?'':'s'}`,
     s2_eye: (n, total) => `Paso ${n} de ${total}`,
     s2_title: 'Footprint / Baseline AS-IS',
     s2_desc: 'Sube los ficheros de inventario de sistemas para generar el Baseline (arquitectura actual). Ambos ficheros son opcionales — puedes subir uno o los dos, o saltar este paso.',
@@ -966,6 +976,11 @@ const LANGS = {
     s1_version: 'Version',
     s1_source: 'Source',
     s1_err: 'Erreur lors du chargement des catalogues',
+    s1_refresh_btn: 'Actualiser depuis MXP',
+    s1_refreshing: 'Mise à jour…',
+    s1_refresh_ok: 'Catalogues mis à jour',
+    s1_refresh_err: 'Échec de la mise à jour',
+    s1_updated_ago: (d) => d === 0 ? 'Mis à jour aujourd\'hui' : `Mis à jour il y a ${d} jour${d===1?'':'s'}`,
     s2_eye: (n, total) => `Étape ${n} sur ${total}`,
     s2_title: 'Empreinte / Baseline AS-IS',
     s2_desc: 'Importez les fichiers d\'inventaire des systèmes pour générer le Baseline (architecture actuelle). Les deux fichiers sont optionnels.',
@@ -1087,6 +1102,11 @@ const LANGS = {
     s1_version: 'Versione',
     s1_source: 'Fonte',
     s1_err: 'Errore nel caricamento dei cataloghi',
+    s1_refresh_btn: 'Aggiorna da MXP',
+    s1_refreshing: 'Aggiornamento…',
+    s1_refresh_ok: 'Cataloghi aggiornati',
+    s1_refresh_err: 'Aggiornamento fallito',
+    s1_updated_ago: (d) => d === 0 ? 'Aggiornato oggi' : `Aggiornato ${d} giorn${d===1?'o':'i'} fa`,
     s2_eye: (n, total) => `Passo ${n} di ${total}`,
     s2_title: 'Footprint / Baseline AS-IS',
     s2_desc: 'Carica i file di inventario dei sistemi per generare il Baseline (architettura attuale). Entrambi i file sono opzionali.',
@@ -1207,6 +1227,11 @@ const LANGS = {
     s1_version: 'Versio',
     s1_source: 'Lähde',
     s1_err: 'Virhe katalogien latauksessa',
+    s1_refresh_btn: 'Päivitä MXP:stä',
+    s1_refreshing: 'Päivitetään…',
+    s1_refresh_ok: 'Katalogit päivitetty',
+    s1_refresh_err: 'Päivitys epäonnistui',
+    s1_updated_ago: (d) => d === 0 ? 'Päivitetty tänään' : `Päivitetty ${d} päivä${d===1?'':'ä'} sitten`,
     s2_eye: (n, total) => `Vaihe ${n} / ${total}`,
     s2_title: 'Jalanjälki / AS-IS-baseline',
     s2_desc: 'Lataa järjestelmäinventaaritiedostot baselinea varten (nykyinen arkkitehtuuri). Molemmat tiedostot ovat valinnaisia.',
@@ -1549,12 +1574,21 @@ async function loadCatalog() {
     grid.innerHTML = catalogCard('rba', 'RBA', t('cat_rba_title'), rba)
                    + catalogCard('rsa', 'RSA', t('cat_rsa_title'), rsa);
 
+    // Age from version field YYYY-MM
+    let ageStr = '';
+    const version = rba.version || rsa.version || '';
+    if (version && /^\d{4}-\d{2}$/.test(version)) {
+      const [y, m] = version.split('-').map(Number);
+      const days = Math.floor((new Date() - new Date(y, m - 1, 1)) / 86400000);
+      ageStr = t('s1_updated_ago')(days < 0 ? 0 : days);
+    }
+
     const statusEl = document.getElementById('catalog-status');
     statusEl.innerHTML = `<div class="result-card info show">
       <div class="result-header">ℹ️ ${t('s1_loaded')}</div>
-      <div class="result-summary">
-        RBA v${rba.version || '?'} · RSA v${rsa.version || '?'}<br>
-        ${t('s1_update_hint')}
+      <div class="result-summary" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <span>RBA v${rba.version || '?'} · RSA v${rsa.version || '?'}${ageStr ? ' — ' + ageStr : ''}</span>
+        <button id="catalog-refresh-btn" onclick="refreshCatalog()" style="padding:4px 12px;font-size:11px;cursor:pointer;">${t('s1_refresh_btn')}</button>
       </div>
     </div>`;
   } catch(e) {
@@ -1562,6 +1596,23 @@ async function loadCatalog() {
     document.getElementById('catalog-content').style.display = '';
     document.getElementById('catalog-grid').innerHTML =
       `<div class="result-card error show"><div class="result-header">⚠ ${t('s1_err')}: ${esc(e.message)}</div></div>`;
+  }
+}
+
+async function refreshCatalog() {
+  const btn = document.getElementById('catalog-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = t('s1_refreshing'); }
+  try {
+    const d = await apiFetch('/api/catalogs/refresh', { method: 'POST' });
+    if (d.ok) {
+      await loadCatalog();
+    } else {
+      const statusEl = document.getElementById('catalog-status');
+      if (statusEl) statusEl.innerHTML = `<div class="result-card error show"><div class="result-header">⚠ ${t('s1_refresh_err')}</div><div class="result-summary">${esc(d.message||'')}</div></div>`;
+    }
+  } catch(e) {
+    const statusEl = document.getElementById('catalog-status');
+    if (statusEl) statusEl.innerHTML = `<div class="result-card error show"><div class="result-header">⚠ ${t('s1_refresh_err')}: ${esc(e.message)}</div></div>`;
   }
 }
 

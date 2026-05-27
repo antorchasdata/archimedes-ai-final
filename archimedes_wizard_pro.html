@@ -671,6 +671,11 @@ const LANGS = {
     s1_version: 'Version',
     s1_source: 'Source',
     s1_err: 'Error loading catalogs',
+    s1_refresh_btn: 'Refresh from MXP',
+    s1_refreshing: 'Updating catalogs…',
+    s1_refresh_ok: 'Catalogs updated',
+    s1_refresh_err: 'Update failed',
+    s1_updated_ago: (d) => d === 0 ? 'Updated today' : `Updated ${d} day${d===1?'':'s'} ago`,
     s2_eye: (n, total) => `Step ${n} of ${total}`,
     s2_title: 'Footprint / AS-IS Baseline',
     s2_desc: 'Upload system inventory files to generate the Baseline (current architecture). Both files are optional — upload one or both, or skip this step.',
@@ -831,6 +836,11 @@ const LANGS = {
     s1_version: 'Versión',
     s1_source: 'Fuente',
     s1_err: 'Error cargando catálogos',
+    s1_refresh_btn: 'Actualizar desde MXP',
+    s1_refreshing: 'Actualizando catálogos…',
+    s1_refresh_ok: 'Catálogos actualizados',
+    s1_refresh_err: 'Error en la actualización',
+    s1_updated_ago: (d) => d === 0 ? 'Actualizado hoy' : `Actualizado hace ${d} día${d===1?'':'s'}`,
     s2_eye: (n, total) => `Paso ${n} de ${total}`,
     s2_title: 'Footprint / Baseline AS-IS',
     s2_desc: 'Sube los ficheros de inventario de sistemas para generar el Baseline (arquitectura actual). Ambos ficheros son opcionales — puedes subir uno o los dos, o saltar este paso.',
@@ -1180,7 +1190,11 @@ function renderS1(el) {
     <div id="s1-spinner" class="spinner-wrap"><div class="spinner"></div><span class="spin-msg">${t('s1_loading')}</span></div>
     <div id="s1-result" class="result-card"></div>
     <div id="s1-catalogs" class="catalog-grid" style="margin-top:16px;"></div>
-    <div id="s1-hint" style="margin-top:14px;font-size:12px;color:var(--text-muted);display:none;">${t('s1_update_hint')}</div>
+    <div id="s1-refresh-row" style="margin-top:14px;display:none;align-items:center;gap:12px;">
+      <button id="s1-refresh-btn" class="btn-secondary" onclick="refreshCatalogs()" style="font-size:12px;padding:6px 14px;">${t('s1_refresh_btn')}</button>
+      <span id="s1-age" style="font-size:12px;color:var(--text-muted);"></span>
+    </div>
+    <div id="s1-hint" style="margin-top:8px;font-size:11px;color:var(--text-muted);display:none;">${t('s1_update_hint')}</div>
   `;
   loadCatalogs();
 }
@@ -1206,10 +1220,45 @@ async function loadCatalogs() {
         <div class="cc-stats"><span class="cc-stat clickable" onclick="openCatalog('rsa','products')">${d.rsa?.stats?.total_products || 0} productos</span></div>
       </div>
     `;
+    // Show age from version field (format YYYY-MM)
+    const version = d.rba?.version || d.rsa?.version || '';
+    const ageEl = document.getElementById('s1-age');
+    if (version && /^\d{4}-\d{2}$/.test(version)) {
+      const [y, m] = version.split('-').map(Number);
+      const then = new Date(y, m - 1, 1);
+      const now = new Date();
+      const days = Math.floor((now - then) / 86400000);
+      ageEl.textContent = t('s1_updated_ago')(days < 0 ? 0 : days);
+    } else {
+      ageEl.textContent = '';
+    }
+    document.getElementById('s1-refresh-row').style.display = 'flex';
     document.getElementById('s1-hint').style.display = '';
   } catch(e) {
     document.getElementById('s1-spinner').classList.remove('show');
     showResult('s1-result', 'error', `✗ ${t('s1_err')}`, e.message);
+  }
+}
+
+async function refreshCatalogs() {
+  const btn = document.getElementById('s1-refresh-btn');
+  const ageEl = document.getElementById('s1-age');
+  btn.disabled = true;
+  btn.textContent = t('s1_refreshing');
+  ageEl.textContent = '';
+  try {
+    const d = await apiFetch('/api/catalogs/refresh', { method: 'POST' });
+    if (d.ok) {
+      showResult('s1-result', 'success', `✓ ${t('s1_refresh_ok')}`);
+      await loadCatalogs();
+    } else {
+      showResult('s1-result', 'error', `✗ ${t('s1_refresh_err')}`, d.message || '');
+    }
+  } catch(e) {
+    showResult('s1-result', 'error', `✗ ${t('s1_refresh_err')}`, e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('s1_refresh_btn');
   }
 }
 
