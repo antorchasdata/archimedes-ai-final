@@ -1712,15 +1712,6 @@ async function saveAndValidateWorkspace() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name, base_url: url, api_token: token}),
     });
-    if (!vdata.ok) {
-      const badge = document.getElementById('ws-badge');
-      if (badge) {
-        badge.className = 'ws-badge ws-badge-err';
-        badge.style.display = '';
-        badge.textContent = t('s0_ws_err') + ': ' + (vdata.detail || '');
-      }
-      return;
-    }
     await loadWorkspaces();
     document.getElementById('ws-select').value = name;
     workspaceName = name; workspaceUrl = url; workspaceValidated = true;
@@ -1733,7 +1724,12 @@ async function saveAndValidateWorkspace() {
     }
     updateHeaderBadge();
   } catch(e) {
-    alert(t('s0_ws_err'));
+    const badge = document.getElementById('ws-badge');
+    if (badge) {
+      badge.className   = 'ws-badge ws-badge-err';
+      badge.style.display = '';
+      badge.textContent = t('s0_ws_err') + (e.message ? ': ' + e.message : '');
+    }
   } finally {
     saveBtn.disabled = false;
   }
@@ -1743,6 +1739,8 @@ function cancelNewWorkspace() {
   document.getElementById('ws-new-form').style.display = 'none';
   document.getElementById('ws-select').value = '';
   workspaceValidated = false;
+  workspaceName = ''; workspaceUrl = '';
+  updateHeaderBadge();
 }
 
 function updateHeaderBadge() {
