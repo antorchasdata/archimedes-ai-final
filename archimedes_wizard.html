@@ -1702,17 +1702,25 @@ async function saveAndValidateWorkspace() {
   const saveBtn = document.getElementById('ws-save-btn');
   saveBtn.disabled = true;
   try {
-    const vdata = await apiFetch('/api/workspaces/validate', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name, base_url: url, api_token: token}),
-    });
-    if (!vdata.ok) { alert(t('s0_ws_err') + ': ' + (vdata.detail || '')); return; }
     await apiFetch('/api/workspaces', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name, base_url: url, api_token: token}),
     });
+    const vdata = await apiFetch('/api/workspaces/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, base_url: url, api_token: token}),
+    });
+    if (!vdata.ok) {
+      const badge = document.getElementById('ws-badge');
+      if (badge) {
+        badge.className = 'ws-badge ws-badge-err';
+        badge.style.display = '';
+        badge.textContent = t('s0_ws_err') + ': ' + (vdata.detail || '');
+      }
+      return;
+    }
     await loadWorkspaces();
     document.getElementById('ws-select').value = name;
     workspaceName = name; workspaceUrl = url; workspaceValidated = true;
@@ -2920,7 +2928,7 @@ function renderStep(n) {
   document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
   showNav();
 
-  if (step === 0) setTimeout(loadWorkspaces, 0);
+  if (n === 0) setTimeout(loadWorkspaces, 0);
   if (id === 'catalog' && sessionId) loadCatalog();
   if (id === 'generate' && sessionId) {
     setBusy(true, t('generating'));
