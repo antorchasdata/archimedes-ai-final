@@ -99,6 +99,13 @@ def _session(session_id: str) -> dict:
     return _sessions[session_id]
 
 
+def _leanix_creds(sess: dict) -> tuple[str, str]:
+    """Return (base_url, api_token) from session, falling back to env vars."""
+    base_url  = sess.get("leanix_base_url")  or os.environ.get("LEANIX_BASE_URL", "")
+    api_token = sess.get("leanix_api_token") or os.environ.get("LEANIX_API_TOKEN", "")
+    return base_url, api_token
+
+
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 app = FastAPI(title="Archimedes Wizard", docs_url=None, redoc_url=None)
 
@@ -146,6 +153,8 @@ async def create_session(body: dict):
     _sessions[session_id] = {
         "client_name":       client_name,
         "output_dir":        output_dir,
+        "leanix_base_url":   body.get("leanix_base_url") or None,
+        "leanix_api_token":  body.get("leanix_api_token") or None,
         "baseline_result":   None,
         "req_excel_path":    None,
         "req_enriched_xlsx": None,
