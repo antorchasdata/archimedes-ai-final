@@ -87,3 +87,24 @@ def test_post_workspaces_upserts_by_name(tmp_path, monkeypatch):
     data = json.loads((tmp_path / "workspaces.json").read_text())
     assert len(data["workspaces"]) == 1
     assert data["workspaces"][0]["base_url"] == "https://b.net"
+
+
+def test_create_session_resolves_workspace_by_name(tmp_path, monkeypatch):
+    monkeypatch.setattr("archimedes_wizard.WORKSPACES_PATH", tmp_path / "workspaces.json")
+    # First save a workspace
+    client.post("/api/workspaces", json={
+        "name": "Prod WS",
+        "base_url": "https://prod.leanix.net",
+        "api_token": "prodtok",
+    })
+    # Now create a session using just the workspace name
+    resp = client.post("/api/session", json={
+        "client_name": "Acme",
+        "leanix_workspace": "Prod WS",
+    })
+    assert resp.status_code == 200
+    sid = resp.json()["session_id"]
+    from archimedes_wizard import _sessions
+    sess = _sessions[sid]
+    assert sess["leanix_base_url"] == "https://prod.leanix.net"
+    assert sess["leanix_api_token"] == "prodtok"
