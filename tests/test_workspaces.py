@@ -29,3 +29,23 @@ def test_create_session_without_creds_leaves_none():
     sess = _sessions[sid]
     assert sess.get("leanix_base_url") is None
     assert sess.get("leanix_api_token") is None
+
+
+def test_leanix_creds_prefers_session_over_env(monkeypatch):
+    monkeypatch.setenv("LEANIX_BASE_URL", "https://env.leanix.net")
+    monkeypatch.setenv("LEANIX_API_TOKEN", "env_token")
+    from archimedes_wizard import _leanix_creds
+    sess = {"leanix_base_url": "https://sess.leanix.net", "leanix_api_token": "sess_token"}
+    base_url, api_token = _leanix_creds(sess)
+    assert base_url == "https://sess.leanix.net"
+    assert api_token == "sess_token"
+
+
+def test_leanix_creds_falls_back_to_env(monkeypatch):
+    monkeypatch.setenv("LEANIX_BASE_URL", "https://env.leanix.net")
+    monkeypatch.setenv("LEANIX_API_TOKEN", "env_token")
+    from archimedes_wizard import _leanix_creds
+    sess = {"leanix_base_url": None, "leanix_api_token": None}
+    base_url, api_token = _leanix_creds(sess)
+    assert base_url == "https://env.leanix.net"
+    assert api_token == "env_token"

@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -104,6 +105,21 @@ def _leanix_creds(sess: dict) -> tuple[str, str]:
     base_url  = sess.get("leanix_base_url")  or os.environ.get("LEANIX_BASE_URL", "")
     api_token = sess.get("leanix_api_token") or os.environ.get("LEANIX_API_TOKEN", "")
     return base_url, api_token
+
+
+@contextlib.contextmanager
+def _env_override(env: dict):
+    """Temporarily set env vars, restoring originals on exit."""
+    old = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+    try:
+        yield
+    finally:
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
@@ -629,7 +645,7 @@ async def apply_industry_reference(session_id: str, body: dict):
         await asyncio.to_thread(
             add_reference_to_target_excel,
             out_target, selected, industry_label, client_name, relations,
-            os.environ.get("LEANIX_BASE_URL"), os.environ.get("LEANIX_API_TOKEN"),
+            *_leanix_creds(sess),
         )
     except Exception as exc:
         logger.exception("Apply industry reference error")
@@ -851,8 +867,9 @@ async def run_generate(session_id: str):
 async def run_push(session_id: str, body: dict):
     sess = _session(session_id)
 
-    if not os.environ.get("LEANIX_API_TOKEN") or not os.environ.get("LEANIX_BASE_URL"):
-        raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
+    base_url, api_token = _leanix_creds(sess)
+    if not api_token or not base_url:
+        raise HTTPException(status_code=400, detail="No hay workspace LeanIX configurado. Selecciona uno en el Step 0.")
 
     client_name    = sess["client_name"]
     # Accept both naming conventions (wizard.html uses push_*, wizard_pro uses import_*)
@@ -863,7 +880,8 @@ async def run_push(session_id: str, body: dict):
 
     if push_baseline and sess.get("out_baseline"):
         try:
-            await asyncio.to_thread(push_leanix, sess["out_baseline"], client_name)
+            with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
+                await asyncio.to_thread(push_leanix, sess["out_baseline"], client_name)
             pushed.append("baseline")
         except Exception as exc:
             errors.append(f"Baseline: {exc}")
@@ -871,7 +889,8 @@ async def run_push(session_id: str, body: dict):
     if push_target and sess.get("out_target"):
         try:
             ls_map = (sess.get("lift_shift_result") or {}).get("conversions") or None
-            await asyncio.to_thread(push_leanix, sess["out_target"], client_name, ls_map)
+            with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
+                await asyncio.to_thread(push_leanix, sess["out_target"], client_name, ls_map)
             pushed.append("target")
         except Exception as exc:
             errors.append(f"Target: {exc}")
@@ -893,8 +912,9 @@ async def run_push_ldif(session_id: str, body: dict):
     """
     sess = _session(session_id)
 
-    if not os.environ.get("LEANIX_API_TOKEN") or not os.environ.get("LEANIX_BASE_URL"):
-        raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
+    base_url, api_token = _leanix_creds(sess)
+    if not api_token or not base_url:
+        raise HTTPException(status_code=400, detail="No hay workspace LeanIX configurado. Selecciona uno en el Step 0.")
 
     client_name  = sess["client_name"]
     push_target  = body.get("push_target", True)
@@ -904,10 +924,10 @@ async def run_push_ldif(session_id: str, body: dict):
 
     if push_target and sess.get("out_target"):
         try:
-            result = await asyncio.to_thread(
-                push_leanix_ldif,
-                sess["out_target"], client_name, mode,
-            )
+            with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
+                result = await asyncio.to_thread(
+                    push_leanix_ldif, sess["out_target"], client_name, mode,
+                )
             results.append({"sheet": "target", **result})
             if not result.get("ok"):
                 errors.append(f"Target LDIF: {result.get('detail', 'unknown error')}")
@@ -930,8 +950,8 @@ async def get_transformations(session_id: str):
     REST API for each one. EN/ES labels included for the frontend.
     """
     _ = session_id  # accepted for URL consistency, not required
-    base_url  = os.environ.get("LEANIX_BASE_URL", "")
-    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    sess_obj  = _sessions.get(session_id, {})
+    base_url, api_token = _leanix_creds(sess_obj)
     if not base_url or not api_token:
         return {"ok": True, "transformations": [], "warning": "LeanIX not configured"}
 
@@ -1017,8 +1037,8 @@ async def get_projections(session_id: str, date: Optional[str] = None):
     """
     # session_id accepted for URL consistency but not required for this endpoint
     _ = session_id
-    base_url  = os.environ.get("LEANIX_BASE_URL", "")
-    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    sess_obj  = _sessions.get(session_id, {})
+    base_url, api_token = _leanix_creds(sess_obj)
     if not base_url or not api_token:
         return {"ok": True, "impacts": [], "warning": "LeanIX not configured"}
 
@@ -1138,8 +1158,8 @@ async def get_synclog(session_id: str):
     for the most recent integrations in this workspace.
     """
     _ = session_id  # accepted for URL consistency, no session needed
-    base_url  = os.environ.get("LEANIX_BASE_URL", "")
-    api_token = os.environ.get("LEANIX_API_TOKEN", "")
+    sess_obj  = _sessions.get(session_id, {})
+    base_url, api_token = _leanix_creds(sess_obj)
     if not base_url or not api_token:
         return {"ok": True, "synchronizations": [], "warning": "LeanIX not configured"}
 
@@ -1192,8 +1212,9 @@ async def run_push_kpi(session_id: str):
     """🍪 Easter egg: generate KPI Achievement Excel and import it into LeanIX."""
     sess = _session(session_id)
 
-    if not os.environ.get("LEANIX_API_TOKEN") or not os.environ.get("LEANIX_BASE_URL"):
-        raise HTTPException(status_code=400, detail="LEANIX_API_TOKEN y/o LEANIX_BASE_URL no configurados en .env")
+    base_url, api_token = _leanix_creds(sess)
+    if not api_token or not base_url:
+        raise HTTPException(status_code=400, detail="No hay workspace LeanIX configurado. Selecciona uno en el Step 0.")
 
     client_name = sess["client_name"]
     out_dir     = sess["output_dir"]
@@ -1221,7 +1242,8 @@ async def run_push_kpi(session_id: str):
 
     # ── Push to LeanIX in order: Objective → BusinessCapability → Application → Initiative ──
     try:
-        await asyncio.to_thread(push_leanix, kpi_path, client_name)
+        with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
+            await asyncio.to_thread(push_leanix, kpi_path, client_name)
     except Exception as exc:
         return {"ok": False, "errors": [str(exc)], "path": str(kpi_path)}
 
