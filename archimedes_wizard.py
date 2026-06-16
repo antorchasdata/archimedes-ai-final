@@ -202,12 +202,12 @@ async def validate_workspace(body: dict):
         ws = _load_workspaces()
         match = next((w for w in ws if w["name"] == name), None)
         if not match:
-            raise HTTPException(status_code=404, detail=f"Workspace '{name}' not found")
+            return {"ok": False, "detail": f"Workspace '{name}' not found"}
         base_url  = match["base_url"]
         api_token = match["api_token"]
 
     if not base_url or not api_token:
-        raise HTTPException(status_code=400, detail="base_url and api_token are required")
+        return {"ok": False, "detail": "base_url and api_token are required"}
 
     import requests as _req
     try:
