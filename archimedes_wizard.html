@@ -1647,6 +1647,7 @@ async function onWsChange(sel) {
   const badge   = document.getElementById('ws-badge');
   const newForm = document.getElementById('ws-new-form');
   workspaceValidated = false;
+  leanixOk = false;
   workspaceName = ''; workspaceUrl = '';
   if (badge) badge.style.display = 'none';
   if (newForm) newForm.style.display = sel.value === '__new__' ? 'block' : 'none';
@@ -1669,6 +1670,7 @@ async function validateWorkspace() {
       workspaceName      = sel.value;
       workspaceUrl       = _wsData[sel.value] || '';
       workspaceValidated = true;
+      leanixOk = true;
       if (badge) {
         badge.className   = 'ws-badge ws-badge-ok';
         badge.style.display = '';
@@ -1715,6 +1717,7 @@ async function saveAndValidateWorkspace() {
     await loadWorkspaces();
     document.getElementById('ws-select').value = name;
     workspaceName = name; workspaceUrl = url; workspaceValidated = true;
+    leanixOk = true;
     document.getElementById('ws-new-form').style.display = 'none';
     const badge = document.getElementById('ws-badge');
     if (badge) {
@@ -1739,6 +1742,7 @@ function cancelNewWorkspace() {
   document.getElementById('ws-new-form').style.display = 'none';
   document.getElementById('ws-select').value = '';
   workspaceValidated = false;
+  leanixOk = false;
   workspaceName = ''; workspaceUrl = '';
   updateHeaderBadge();
 }
