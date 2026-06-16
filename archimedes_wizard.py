@@ -50,6 +50,7 @@ load_dotenv()
 BASE_DIR    = Path(__file__).parent
 WIZARD_HTML = BASE_DIR / "archimedes_wizard.html"
 OUTPUT_DIR  = BASE_DIR / "output" / "sessions"
+WORKSPACES_PATH = BASE_DIR / "workspaces.json"
 
 sys.path.insert(0, str(BASE_DIR))
 
@@ -154,7 +155,78 @@ async def get_config():
     return {"ok": True, "leanix_configured": leanix_ok, "anthropic_configured": anthropic_ok, "model": MODEL}
 
 
-# ── Step 0 — Create session ───────────────────────────────────────────────────
+# ── Workspaces ────────────────────────────────────────────────────────────────
+
+def _load_workspaces() -> list[dict]:
+    if not WORKSPACES_PATH.exists():
+        return []
+    return json.loads(WORKSPACES_PATH.read_text(encoding="utf-8")).get("workspaces", [])
+
+
+def _save_workspaces(workspaces: list[dict]) -> None:
+    WORKSPACES_PATH.write_text(
+        json.dumps({"workspaces": workspaces}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+@app.get("/api/workspaces")
+async def list_workspaces():
+    ws = _load_workspaces()
+    return {"ok": True, "workspaces": [{"name": w["name"], "base_url": w["base_url"]} for w in ws]}
+
+
+@app.post("/api/workspaces")
+async def save_workspace(body: dict):
+    name      = (body.get("name") or "").strip()
+    base_url  = (body.get("base_url") or "").strip()
+    api_token = (body.get("api_token") or "").strip()
+    if not name or not base_url or not api_token:
+        raise HTTPException(status_code=400, detail="name, base_url and api_token are required")
+    ws = _load_workspaces()
+    # Upsert by name
+    ws = [w for w in ws if w["name"] != name]
+    ws.append({"name": name, "base_url": base_url, "api_token": api_token})
+    _save_workspaces(ws)
+    return {"ok": True, "name": name}
+
+
+@app.post("/api/workspaces/validate")
+async def validate_workspace(body: dict):
+    name      = (body.get("name") or "").strip()
+    base_url  = (body.get("base_url") or "").strip()
+    api_token = (body.get("api_token") or "").strip()
+
+    # If only name provided, look up token from workspaces.json
+    if name and not api_token:
+        ws = _load_workspaces()
+        match = next((w for w in ws if w["name"] == name), None)
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Workspace '{name}' not found")
+        base_url  = match["base_url"]
+        api_token = match["api_token"]
+
+    if not base_url or not api_token:
+        raise HTTPException(status_code=400, detail="base_url and api_token are required")
+
+    import requests as _req
+    try:
+        from pipeline.write import _get_bearer
+        bearer = await asyncio.to_thread(_get_bearer, base_url, api_token)
+        hdrs = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+        gql_url = f"{base_url}/services/pathfinder/v1/graphql"
+        payload = {"query": '{ allFactSheets(filter:{facetFilters:[{facetKey:"FactSheetTypes",keys:["Application"]}]}) { totalCount } }'}
+        r = await asyncio.to_thread(
+            lambda: _req.post(gql_url, json=payload, headers=hdrs, timeout=15)
+        )
+        r.raise_for_status()
+        n_apps = r.json().get("data", {}).get("allFactSheets", {}).get("totalCount", 0)
+    except Exception as exc:
+        return {"ok": False, "detail": str(exc)}
+
+    return {"ok": True, "workspace_name": name or base_url, "n_applications": n_apps}
+
+
 
 @app.post("/api/session")
 async def create_session(body: dict):

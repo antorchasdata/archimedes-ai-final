@@ -49,3 +49,41 @@ def test_leanix_creds_falls_back_to_env(monkeypatch):
     base_url, api_token = _leanix_creds(sess)
     assert base_url == "https://env.leanix.net"
     assert api_token == "env_token"
+
+
+import json
+
+def test_get_workspaces_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr("archimedes_wizard.WORKSPACES_PATH", tmp_path / "workspaces.json")
+    resp = client.get("/api/workspaces")
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "workspaces": []}
+
+
+def test_post_workspaces_saves_and_returns_no_token(tmp_path, monkeypatch):
+    monkeypatch.setattr("archimedes_wizard.WORKSPACES_PATH", tmp_path / "workspaces.json")
+    resp = client.post("/api/workspaces", json={
+        "name": "Test WS", "base_url": "https://test.leanix.net", "api_token": "secret123"
+    })
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+
+    # Verify file written with token
+    data = json.loads((tmp_path / "workspaces.json").read_text())
+    assert data["workspaces"][0]["api_token"] == "secret123"
+
+    # Verify GET response excludes token
+    resp2 = client.get("/api/workspaces")
+    ws_list = resp2.json()["workspaces"]
+    assert len(ws_list) == 1
+    assert "api_token" not in ws_list[0]
+    assert ws_list[0]["name"] == "Test WS"
+
+
+def test_post_workspaces_upserts_by_name(tmp_path, monkeypatch):
+    monkeypatch.setattr("archimedes_wizard.WORKSPACES_PATH", tmp_path / "workspaces.json")
+    client.post("/api/workspaces", json={"name": "WS1", "base_url": "https://a.net", "api_token": "tok1"})
+    client.post("/api/workspaces", json={"name": "WS1", "base_url": "https://b.net", "api_token": "tok2"})
+    data = json.loads((tmp_path / "workspaces.json").read_text())
+    assert len(data["workspaces"]) == 1
+    assert data["workspaces"][0]["base_url"] == "https://b.net"
