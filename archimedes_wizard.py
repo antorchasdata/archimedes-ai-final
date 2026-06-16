@@ -234,6 +234,17 @@ async def create_session(body: dict):
     if not client_name:
         raise HTTPException(status_code=400, detail="client_name is required")
 
+    # Resolve workspace credentials — by name (preferred) or direct values
+    leanix_base_url  = body.get("leanix_base_url") or None
+    leanix_api_token = body.get("leanix_api_token") or None
+    ws_name = (body.get("leanix_workspace") or "").strip()
+    if ws_name and not leanix_api_token:
+        ws_list = _load_workspaces()
+        match = next((w for w in ws_list if w["name"] == ws_name), None)
+        if match:
+            leanix_base_url  = match["base_url"]
+            leanix_api_token = match["api_token"]
+
     session_id = str(uuid.uuid4())
     output_dir = OUTPUT_DIR / session_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -241,8 +252,8 @@ async def create_session(body: dict):
     _sessions[session_id] = {
         "client_name":       client_name,
         "output_dir":        output_dir,
-        "leanix_base_url":   body.get("leanix_base_url") or None,
-        "leanix_api_token":  body.get("leanix_api_token") or None,
+        "leanix_base_url":   leanix_base_url,
+        "leanix_api_token":  leanix_api_token,
         "baseline_result":   None,
         "req_excel_path":    None,
         "req_enriched_xlsx": None,
@@ -255,7 +266,7 @@ async def create_session(body: dict):
         "lift_shift_result": None,
     }
 
-    logger.info("Session created: %s  client=%s", session_id, client_name)
+    logger.info("Session created: %s  client=%s  workspace=%s", session_id, client_name, ws_name or "env")
     return {"ok": True, "session_id": session_id, "client_name": client_name}
 
 

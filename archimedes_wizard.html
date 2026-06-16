@@ -596,6 +596,18 @@ input[type="file"] { display: none; }
 }
 .lang-select:hover { background-color: rgba(255,255,255,0.2); }
 .lang-select option { background: var(--blue-10); color: #fff; }
+.ws-badge { margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.ws-badge-ok  { background: #e8f5e9; color: #2e7d32; }
+.ws-badge-err { background: #fdecea; color: #c62828; }
+.header-ws-badge {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  font-weight: 500;
+  background: rgba(255,255,255,0.12);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-left: 8px;
+}
 </style>
 </head>
 <body>
@@ -606,6 +618,7 @@ input[type="file"] { display: none; }
   <div class="header-sub">LeanIX Population Pipeline</div>
   <div class="header-sep"></div>
   <div class="header-step-label" id="header-step-label"></div>
+  <div class="header-ws-badge" id="header-ws-badge" style="display:none"></div>
   <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
     <option value="en">🇬🇧 English</option>
     <option value="es">🇪🇸 Español</option>
@@ -654,6 +667,23 @@ const LANGS = {
     s0_placeholder: 'E.g. Acme Corp, Contoso…',
     s0_err: 'Enter the client name',
     s0_busy: 'Creating session…',
+    s0_ws_label:       'LeanIX Workspace',
+    s0_ws_placeholder: '— Select workspace —',
+    s0_ws_new:         '+ Create new workspace…',
+    s0_ws_validate:    'Validate',
+    s0_ws_validating:  'Validating…',
+    s0_ws_ok:          (name, n) => `✓ Connected · ${name} · ${n} applications`,
+    s0_ws_err:         'Connection failed',
+    s0_ws_new_title:   'New workspace',
+    s0_ws_name_lbl:    'Name',
+    s0_ws_url_lbl:     'Base URL',
+    s0_ws_token_lbl:   'Technical User API Token',
+    s0_ws_save:        'Save & Validate',
+    s0_ws_cancel:      'Cancel',
+    s0_ws_required:    'Select and validate a LeanIX workspace to continue',
+    s0_ws_name_ph:     'E.g. BBVA Production',
+    s0_ws_url_ph:      'https://yourcompany.leanix.net',
+    s0_ws_token_ph:    'Paste API token here…',
     // step 1
     s1_eye: (n, total) => `Step ${n} of ${total}`,
     s1_title: 'SAP RBA / RSA Catalogs',
@@ -816,6 +846,23 @@ const LANGS = {
     s0_placeholder: 'Ej: Acme Corp, Acciona, N3C…',
     s0_err: 'Introduce el nombre del cliente',
     s0_busy: 'Creando sesión…',
+    s0_ws_label:       'Workspace LeanIX',
+    s0_ws_placeholder: '— Selecciona workspace —',
+    s0_ws_new:         '+ Crear nuevo workspace…',
+    s0_ws_validate:    'Validar',
+    s0_ws_validating:  'Validando…',
+    s0_ws_ok:          (name, n) => `✓ Conectado · ${name} · ${n} aplicaciones`,
+    s0_ws_err:         'Error de conexión',
+    s0_ws_new_title:   'Nuevo workspace',
+    s0_ws_name_lbl:    'Nombre',
+    s0_ws_url_lbl:     'URL base',
+    s0_ws_token_lbl:   'Token de usuario técnico',
+    s0_ws_save:        'Guardar y validar',
+    s0_ws_cancel:      'Cancelar',
+    s0_ws_required:    'Selecciona y valida un workspace LeanIX para continuar',
+    s0_ws_name_ph:     'Ej. BBVA Producción',
+    s0_ws_url_ph:      'https://tuempresa.leanix.net',
+    s0_ws_token_ph:    'Pega el token aquí…',
     s1_eye: (n, total) => `Paso ${n} de ${total}`,
     s1_title: 'Catálogos SAP RBA / RSA',
     s1_desc: 'Estado de los catálogos de referencia. El pipeline los usa para mapear Business Capabilities y Applications a nomenclatura SAP canónica.',
@@ -967,6 +1014,23 @@ const LANGS = {
     s0_placeholder: 'Ex : Acme Corp, Renault…',
     s0_err: 'Saisissez le nom du client',
     s0_busy: 'Création de la session…',
+    s0_ws_label:       'Workspace LeanIX',
+    s0_ws_placeholder: '— Sélectionner workspace —',
+    s0_ws_new:         '+ Créer nouveau workspace…',
+    s0_ws_validate:    'Valider',
+    s0_ws_validating:  'Validation…',
+    s0_ws_ok:          (name, n) => `✓ Connecté · ${name} · ${n} applications`,
+    s0_ws_err:         'Échec de connexion',
+    s0_ws_new_title:   'Nouveau workspace',
+    s0_ws_name_lbl:    'Nom',
+    s0_ws_url_lbl:     'URL de base',
+    s0_ws_token_lbl:   'Jeton utilisateur technique',
+    s0_ws_save:        'Enregistrer et valider',
+    s0_ws_cancel:      'Annuler',
+    s0_ws_required:    'Sélectionnez et validez un workspace LeanIX pour continuer',
+    s0_ws_name_ph:     'Ex. BBVA Production',
+    s0_ws_url_ph:      'https://votreentreprise.leanix.net',
+    s0_ws_token_ph:    'Coller le jeton ici…',
     s1_eye: (n, total) => `Étape ${n} sur ${total}`,
     s1_title: 'Catalogues SAP RBA / RSA',
     s1_desc: 'État des catalogues de référence. Le pipeline les utilise pour mapper les Business Capabilities et Applications à la nomenclature canonique SAP.',
@@ -1093,6 +1157,23 @@ const LANGS = {
     s0_placeholder: 'Es: Acme Corp, Fiat…',
     s0_err: 'Inserisci il nome del cliente',
     s0_busy: 'Creazione sessione…',
+    s0_ws_label:       'Workspace LeanIX',
+    s0_ws_placeholder: '— Seleziona workspace —',
+    s0_ws_new:         '+ Crea nuovo workspace…',
+    s0_ws_validate:    'Valida',
+    s0_ws_validating:  'Validazione…',
+    s0_ws_ok:          (name, n) => `✓ Connesso · ${name} · ${n} applicazioni`,
+    s0_ws_err:         'Connessione fallita',
+    s0_ws_new_title:   'Nuovo workspace',
+    s0_ws_name_lbl:    'Nome',
+    s0_ws_url_lbl:     'URL base',
+    s0_ws_token_lbl:   'Token utente tecnico',
+    s0_ws_save:        'Salva e valida',
+    s0_ws_cancel:      'Annulla',
+    s0_ws_required:    'Seleziona e valida un workspace LeanIX per continuare',
+    s0_ws_name_ph:     'Es. BBVA Produzione',
+    s0_ws_url_ph:      'https://tuaazienda.leanix.net',
+    s0_ws_token_ph:    'Incolla token qui…',
     s1_eye: (n, total) => `Passo ${n} di ${total}`,
     s1_title: 'Cataloghi SAP RBA / RSA',
     s1_desc: 'Stato dei cataloghi di riferimento. La pipeline li usa per mappare le Business Capability e le Application alla nomenclatura SAP canonica.',
@@ -1218,6 +1299,23 @@ const LANGS = {
     s0_placeholder: 'Esim: Acme Corp, Nokia…',
     s0_err: 'Syötä asiakkaan nimi',
     s0_busy: 'Luodaan istuntoa…',
+    s0_ws_label:       'LeanIX-työtila',
+    s0_ws_placeholder: '— Valitse työtila —',
+    s0_ws_new:         '+ Luo uusi työtila…',
+    s0_ws_validate:    'Vahvista',
+    s0_ws_validating:  'Vahvistetaan…',
+    s0_ws_ok:          (name, n) => `✓ Yhdistetty · ${name} · ${n} sovellusta`,
+    s0_ws_err:         'Yhteys epäonnistui',
+    s0_ws_new_title:   'Uusi työtila',
+    s0_ws_name_lbl:    'Nimi',
+    s0_ws_url_lbl:     'Perus-URL',
+    s0_ws_token_lbl:   'Teknisen käyttäjän API-avain',
+    s0_ws_save:        'Tallenna ja vahvista',
+    s0_ws_cancel:      'Peruuta',
+    s0_ws_required:    'Valitse ja vahvista LeanIX-työtila jatkaaksesi',
+    s0_ws_name_ph:     'Esim. BBVA Tuotanto',
+    s0_ws_url_ph:      'https://yrityksesi.leanix.net',
+    s0_ws_token_ph:    'Liitä API-avain tähän…',
     s1_eye: (n, total) => `Vaihe ${n} / ${total}`,
     s1_title: 'SAP RBA / RSA -katalogit',
     s1_desc: 'Viitekatalogien tila. Pipeline käyttää niitä Business Capabilitien ja sovellusten kartoittamiseen SAP-nimikkeistöön.',
@@ -1356,6 +1454,9 @@ let generateOutputs = [];
 let currentLang    = 'en';
 let liftShiftEnabled = false;
 let liftShiftData    = { resolved: [], modes: [], conversions: [], selectedConversions: [] };
+let workspaceName      = '';   // display name of validated workspace
+let workspaceUrl       = '';   // base_url
+let workspaceValidated = false;
 
 // ── i18n ─────────────────────────────────────────────────────────────────────
 function t(key, ...args) {
@@ -1516,6 +1617,133 @@ async function runStep(step) {
   if (id === 'import')    return runStepPush();
 }
 
+// ── Workspace helpers ─────────────────────────────────────────────────────────
+let _wsData = {};  // name -> base_url map (no tokens in frontend state)
+
+async function loadWorkspaces() {
+  try {
+    const data = await apiFetch('/api/workspaces');
+    _wsData = {};
+    const sel = document.getElementById('ws-select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${t('s0_ws_placeholder')}</option>`;
+    (data.workspaces || []).forEach(w => {
+      _wsData[w.name] = w.base_url;
+      const opt = document.createElement('option');
+      opt.value = w.name;
+      opt.textContent = `${w.name} (${w.base_url})`;
+      sel.appendChild(opt);
+    });
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__';
+    newOpt.textContent = t('s0_ws_new');
+    sel.appendChild(newOpt);
+    if (cur) sel.value = cur;
+  } catch(e) { /* silent */ }
+}
+
+async function onWsChange(sel) {
+  const badge   = document.getElementById('ws-badge');
+  const newForm = document.getElementById('ws-new-form');
+  workspaceValidated = false;
+  workspaceName = ''; workspaceUrl = '';
+  if (badge) badge.style.display = 'none';
+  if (newForm) newForm.style.display = sel.value === '__new__' ? 'block' : 'none';
+}
+
+async function validateWorkspace() {
+  const sel   = document.getElementById('ws-select');
+  const badge = document.getElementById('ws-badge');
+  const btn   = document.getElementById('ws-validate-btn');
+  if (!sel || sel.value === '' || sel.value === '__new__') return;
+  btn.disabled = true;
+  btn.textContent = t('s0_ws_validating');
+  try {
+    const data = await apiFetch('/api/workspaces/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: sel.value}),
+    });
+    if (data.ok) {
+      workspaceName      = sel.value;
+      workspaceUrl       = _wsData[sel.value] || '';
+      workspaceValidated = true;
+      if (badge) {
+        badge.className   = 'ws-badge ws-badge-ok';
+        badge.style.display = '';
+        badge.textContent = t('s0_ws_ok', data.workspace_name, data.n_applications);
+      }
+      updateHeaderBadge();
+    } else {
+      if (badge) {
+        badge.className   = 'ws-badge ws-badge-err';
+        badge.style.display = '';
+        badge.textContent = t('s0_ws_err') + (data.detail ? ': ' + data.detail : '');
+      }
+    }
+  } catch(e) {
+    if (badge) {
+      badge.className   = 'ws-badge ws-badge-err';
+      badge.style.display = '';
+      badge.textContent = t('s0_ws_err');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('s0_ws_validate');
+  }
+}
+
+async function saveAndValidateWorkspace() {
+  const name  = (document.getElementById('ws-new-name')?.value  || '').trim();
+  const url   = (document.getElementById('ws-new-url')?.value   || '').trim();
+  const token = (document.getElementById('ws-new-token')?.value || '').trim();
+  if (!name || !url || !token) { alert('Complete all fields'); return; }
+  const saveBtn = document.getElementById('ws-save-btn');
+  saveBtn.disabled = true;
+  try {
+    const vdata = await apiFetch('/api/workspaces/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, base_url: url, api_token: token}),
+    });
+    if (!vdata.ok) { alert(t('s0_ws_err') + ': ' + (vdata.detail || '')); return; }
+    await apiFetch('/api/workspaces', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, base_url: url, api_token: token}),
+    });
+    await loadWorkspaces();
+    document.getElementById('ws-select').value = name;
+    workspaceName = name; workspaceUrl = url; workspaceValidated = true;
+    document.getElementById('ws-new-form').style.display = 'none';
+    const badge = document.getElementById('ws-badge');
+    if (badge) {
+      badge.className   = 'ws-badge ws-badge-ok';
+      badge.style.display = '';
+      badge.textContent = t('s0_ws_ok', vdata.workspace_name, vdata.n_applications);
+    }
+    updateHeaderBadge();
+  } catch(e) {
+    alert(t('s0_ws_err'));
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function cancelNewWorkspace() {
+  document.getElementById('ws-new-form').style.display = 'none';
+  document.getElementById('ws-select').value = '';
+  workspaceValidated = false;
+}
+
+function updateHeaderBadge() {
+  const el = document.getElementById('header-ws-badge');
+  if (!el) return;
+  el.textContent  = workspaceName ? `🏢 ${workspaceName}` : '';
+  el.style.display = workspaceName ? '' : 'none';
+}
+
 // ── Step 0 — Client name ──────────────────────────────────────────────────────
 function renderStep0() {
   return `
@@ -1525,20 +1753,51 @@ function renderStep0() {
     <label class="field-label" for="client-input">${t('s0_label')}</label>
     <input type="text" id="client-input" placeholder="${t('s0_placeholder')}"
       value="${esc(clientName)}"
-      onkeydown="if(event.key==='Enter') nextStep()"
+      onkeydown="if(event.key==='Enter') document.getElementById('ws-select')?.focus()"
       oninput="clientName=this.value.trim()">
+
+    <hr style="border:none;border-top:1px solid var(--border,#e5e7eb);margin:20px 0">
+
+    <label class="field-label">${t('s0_ws_label')}</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="ws-select" class="field-input" style="flex:1" onchange="onWsChange(this)">
+        <option value="">${t('s0_ws_placeholder')}</option>
+        <option value="__new__">${t('s0_ws_new')}</option>
+      </select>
+      <button id="ws-validate-btn" class="btn-secondary" style="white-space:nowrap"
+        onclick="validateWorkspace()">${t('s0_ws_validate')}</button>
+    </div>
+    <div id="ws-badge" class="ws-badge ws-badge-ok" style="display:none"></div>
+
+    <div id="ws-new-form" style="display:none;margin-top:12px;padding:16px;background:var(--surface2,#f8f9fa);border-radius:8px;border:1px solid var(--border,#e0e0e0)">
+      <div style="font-weight:600;font-size:13px;margin-bottom:12px">${t('s0_ws_new_title')}</div>
+      <label class="field-label">${t('s0_ws_name_lbl')}</label>
+      <input id="ws-new-name" class="field-input" placeholder="${t('s0_ws_name_ph')}" style="margin-bottom:10px;display:block;width:100%;box-sizing:border-box">
+      <label class="field-label">${t('s0_ws_url_lbl')}</label>
+      <input id="ws-new-url" class="field-input" placeholder="${t('s0_ws_url_ph')}" style="margin-bottom:10px;display:block;width:100%;box-sizing:border-box">
+      <label class="field-label">${t('s0_ws_token_lbl')}</label>
+      <input id="ws-new-token" class="field-input" type="password" placeholder="${t('s0_ws_token_ph')}" style="margin-bottom:14px;display:block;width:100%;box-sizing:border-box">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-secondary" onclick="cancelNewWorkspace()">${t('s0_ws_cancel')}</button>
+        <button id="ws-save-btn" class="btn-primary" onclick="saveAndValidateWorkspace()">${t('s0_ws_save')}</button>
+      </div>
+    </div>
   `;
 }
 
 async function runStepClient() {
   const val = (document.getElementById('client-input')?.value || '').trim();
   if (!val) throw new Error(t('s0_err'));
+  if (!workspaceValidated) throw new Error(t('s0_ws_required'));
   clientName = val;
   setBusy(true, t('s0_busy'));
   const data = await apiFetch('/api/session', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({client_name: clientName})
+    body: JSON.stringify({
+      client_name:      clientName,
+      leanix_workspace: workspaceName,
+    })
   });
   sessionId = data.session_id;
   setBusy(false);
@@ -2661,6 +2920,7 @@ function renderStep(n) {
   document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
   showNav();
 
+  if (step === 0) setTimeout(loadWorkspaces, 0);
   if (id === 'catalog' && sessionId) loadCatalog();
   if (id === 'generate' && sessionId) {
     setBusy(true, t('generating'));
