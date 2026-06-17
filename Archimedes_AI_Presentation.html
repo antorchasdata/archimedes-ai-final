@@ -1434,7 +1434,42 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SLIDE 19 — Q&A
+       SLIDE 20 — Workspace Selector
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s20ws">
+    <div class="slide-header">
+      <div class="logo-mark"><span class="sap-box">SAP</span> LeanIX</div>
+      <div class="slide-section-label">New in June 2026</div>
+    </div>
+    <div class="slide-body">
+      <div class="slide-title">Multi-Workspace Support — <span class="accent">Step 0</span></div>
+      <div class="two-col" style="gap:32px;margin-top:28px">
+        <div class="info-box">
+          <div class="info-box-title">What Changed</div>
+          <ul class="bullet-list">
+            <li><strong>Before:</strong> credentials fixed in <code class="mono">.env</code> — one workspace per deployment</li>
+            <li><strong>Now:</strong> Step 0 (Client &amp; Workspace) shows a <strong>workspace dropdown</strong> populated from <code class="mono">workspaces.json</code></li>
+            <li>User selects a saved workspace → <em>Validate</em> → green badge confirms connection + app count</li>
+            <li>Or clicks <em>"+ Create new workspace…"</em> → inline form (Name, Base URL, API Token) → <em>Save &amp; Validate</em></li>
+            <li>All subsequent pipeline steps use that workspace's credentials — not <code class="mono">.env</code></li>
+          </ul>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">Technical Design</div>
+          <ul class="bullet-list">
+            <li><strong><code class="mono">workspaces.json</code></strong> — project-root file; tokens in plaintext (same model as <code class="mono">.env</code>); git-ignored</li>
+            <li><strong><code class="mono">GET /api/workspaces</code></strong> — returns name + URL only (no tokens)</li>
+            <li><strong><code class="mono">POST /api/workspaces/validate</code></strong> — validates via LeanIX GraphQL, returns app count</li>
+            <li><strong><code class="mono">_leanix_creds(sess)</code></strong> — session-first credential lookup; falls back to <code class="mono">.env</code> (backwards-compatible)</li>
+            <li>Header badge <strong>🏢 &lt;workspace&gt;</strong> always visible after validation — no ambiguity</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 21 — Q&A
   ══════════════════════════════════════════════════════════════ -->
   <div class="slide" id="s20">
     <div class="slide-header dark">
@@ -1444,7 +1479,7 @@
     <div class="qa-body">
       <div class="qa-title">Questions?</div>
       <div class="qa-sub">Let's talk about your next engagement</div>
-      <div class="qa-tag">Archimedes AI — SAP EA Internal Tool · v2026.05</div>
+      <div class="qa-tag">Archimedes AI — SAP EA Internal Tool · v2026.06</div>
     </div>
   </div>
 
@@ -1456,7 +1491,7 @@
 <!-- Navigation -->
 <div id="nav">
   <button class="nav-btn" id="btn-prev" title="Previous (←)">&#8592;</button>
-  <div id="slide-counter">1 / 22</div>
+  <div id="slide-counter">1 / 23</div>
   <button class="nav-btn" id="btn-next" title="Next (→)">&#8594;</button>
 </div>
 
