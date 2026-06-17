@@ -1182,6 +1182,7 @@
         <div class="info-box">
           <div class="info-box-title">Catalog Intelligence &amp; TO-BE Preview</div>
           <ul class="bullet-list">
+            <li><strong>App &amp; ITC Catalog linking (fix 2026-06-17)</strong> — Payload correcto via <code class="mono">GET /reference-data/v1/openapi.json</code>: campo <code class="mono">sourceFactSheetIdentifier: {id, externalId}</code> (objeto anidado). Payload plano anterior (<code class="mono">sourceFactSheetId</code>) retornaba <code class="mono">null</code> y status <code class="mono">ignored</code>. Flujo: <code class="mono">POST batch-links</code> → resolver UUID + externalId → <code class="mono">PUT /links</code>.</li>
             <li><strong>ITC Catalog linking</strong> — ITComponents auto-linked to official LeanIX catalog entries (<code class="mono">lx_ITC_XXXXXX</code>) via <code class="mono">/source/ltls/</code> API (mirrors existing App linking)</li>
             <li><strong>Enrich from catalog</strong> — After VERYHIGH match, copies <code class="mono">hostingType</code> and <code class="mono">description</code> from catalog fact sheet to workspace Application</li>
             <li><strong>Impacts API — Preview TO-BE</strong> — New wizard button calls <code class="mono">POST /impacts/v1/projections</code>: shows projected field changes for each Application given all active Transformations and a target date</li>

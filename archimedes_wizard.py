@@ -996,8 +996,9 @@ async def run_push(session_id: str, body: dict):
     if push_baseline and sess.get("out_baseline"):
         try:
             with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
-                await asyncio.to_thread(push_leanix, sess["out_baseline"], client_name)
+                result = await asyncio.to_thread(push_leanix, sess["out_baseline"], client_name)
             pushed.append("baseline")
+            sess["push_baseline_stats"] = result or {}
         except Exception as exc:
             errors.append(f"Baseline: {exc}")
 
@@ -1005,15 +1006,23 @@ async def run_push(session_id: str, body: dict):
         try:
             ls_map = (sess.get("lift_shift_result") or {}).get("conversions") or None
             with _env_override({"LEANIX_BASE_URL": base_url, "LEANIX_API_TOKEN": api_token}):
-                await asyncio.to_thread(push_leanix, sess["out_target"], client_name, ls_map)
+                result = await asyncio.to_thread(push_leanix, sess["out_target"], client_name, ls_map)
             pushed.append("target")
+            sess["push_target_stats"] = result or {}
         except Exception as exc:
             errors.append(f"Target: {exc}")
+
+    catalog = {}
+    for key in ("push_baseline_stats", "push_target_stats"):
+        c = (sess.get(key) or {}).get("catalog", {})
+        for k, v in c.items():
+            catalog[k] = catalog.get(k, 0) + v
 
     return {
         "ok":     not errors,
         "pushed": pushed,
         "errors": errors,
+        "catalog": catalog,
     }
 
 

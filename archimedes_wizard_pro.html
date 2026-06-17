@@ -1854,6 +1854,11 @@ async function runImport() {
     document.getElementById('s7-spinner').classList.remove('show');
     const imported = [baseline && 'baseline', target && 'target'].filter(Boolean).join(', ');
     showResult('s7-result', 'success', `✓ ${t('s7_ok')}`, t('s7_imported', imported));
+    // Catalog linking stats
+    if (r.catalog && (r.catalog.apps_linked || r.catalog.itcs_linked)) {
+      const rc = document.getElementById('s7-result');
+      if (rc) rc.innerHTML += _renderCatalogStats(r.catalog);
+    }
     // Fetch and render transformations
     try {
       const tr = await apiFetch(`/api/session/${_sessionId}/transformations`);
@@ -1867,6 +1872,22 @@ async function runImport() {
     showResult('s7-result', 'error', `✗ ${t('s7_err')}`, e.message);
     btn.disabled = false;
   }
+}
+
+function _renderCatalogStats(c) {
+  const appsLinked = c.apps_linked || 0;
+  const appsReview = c.apps_review || 0;
+  const itcsLinked = c.itcs_linked || 0;
+  const itcsReview = c.itcs_review || 0;
+  const rows = [];
+  if (appsLinked || appsReview) rows.push(`<tr><td>Applications</td><td style="color:var(--success)">✓ ${appsLinked} linked</td><td style="color:var(--text-muted)">${appsReview} for review</td></tr>`);
+  if (itcsLinked || itcsReview) rows.push(`<tr><td>IT Components</td><td style="color:var(--success)">✓ ${itcsLinked} linked</td><td style="color:var(--text-muted)">${itcsReview} for review</td></tr>`);
+  if (!rows.length) return '';
+  return `<div style="font-weight:600;margin-top:14px;margin-bottom:6px;color:var(--text-primary)">🔗 Reference Catalog Linking</div>
+<table style="width:100%;font-size:13px;border-collapse:collapse">
+<thead><tr style="color:var(--text-muted)"><th style="text-align:left;padding:4px 8px">Type</th><th style="text-align:left;padding:4px 8px">Auto-linked (VERYHIGH)</th><th style="text-align:left;padding:4px 8px">Manual review needed</th></tr></thead>
+<tbody>${rows.join('')}</tbody>
+</table>`;
 }
 
 function _renderTransformationsTable(rows) {

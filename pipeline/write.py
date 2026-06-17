@@ -1731,8 +1731,9 @@ def write_leanix(
     # Auto-link Applications to official LeanIX catalog entries (lx_APP_XXXXXX).
     # Auto-link ITComponents to official LeanIX ITC catalog entries (lx_ITC_XXXXXX).
     # Only links when confidenceLevel == "VERYHIGH"; logs others for manual review.
+    catalog_stats: dict = {}
     if app_id_cache or itc_id_cache:
-        _link_apps_to_catalog(base_url, token, app_id_cache, itc_id_cache)
+        catalog_stats = _link_apps_to_catalog(base_url, token, app_id_cache, itc_id_cache)
 
     # ── Metrics API — project KPIs ────────────────────────────────────────────
     # Compute completeness KPIs from the pushed data and create them in LeanIX.
@@ -1755,6 +1756,13 @@ def write_leanix(
             kpis.get("bcs_with_app", 0), kpis.get("inits_with_trans", 0),
         )
 
+    return {
+        "pushed": pushed,
+        "failed": failed,
+        "catalog": catalog_stats,
+        "kpis": kpis or {},
+    }
+
 
 # ── Reference Catalog helpers ─────────────────────────────────────────────────
 
@@ -1763,7 +1771,7 @@ def _link_apps_to_catalog(
     api_token: str,
     app_id_cache: dict[str, str],
     itc_id_cache: dict[str, str] | None = None,
-) -> None:
+) -> dict:
     """
     Auto-link workspace Applications and ITComponents to LeanIX Reference Catalog entries.
 
@@ -1773,6 +1781,7 @@ def _link_apps_to_catalog(
       then PUT /services/reference-data/v1/source/ltls/links
 
     Only auto-links when confidenceLevel == "VERYHIGH".
+    Returns a dict with stats: {apps_linked, apps_review, itcs_linked, itcs_review}.
     After linking, copies useful fields from firstSuggestedFactSheet:
       - lxHostingType (if not already set on Application)
       - description   (if empty on Application)
@@ -1839,13 +1848,17 @@ mutation PatchFS($id: ID!, $patches: [Patch]!) {
                 top = suggestions[0].get("factSheet", {})
                 confidence = top.get("confidenceLevel", "")
                 catalog_id = top.get("id", "")
+                catalog_ext_id = top.get("externalId", "")
                 catalog_name = top.get("displayName", "")
 
                 if confidence == "VERYHIGH" and catalog_id:
                     try:
                         lr = _req.put(
                             link_url,
-                            json={"sourceFactSheetId": fs_id, "targetFactSheetId": catalog_id},
+                            json={
+                                "sourceFactSheetIdentifier": {"id": catalog_id, "externalId": catalog_ext_id},
+                                "targetFactSheetId": fs_id,
+                            },
                             headers=hdrs,
                             timeout=15,
                         )
@@ -1895,12 +1908,20 @@ mutation PatchFS($id: ID!, $patches: [Patch]!) {
         linked_apps, review_apps,
     )
 
+    linked_itcs, review_itcs = 0, 0
     if itc_id_cache:
         linked_itcs, review_itcs = _run_catalog_linking("ltls", itc_id_cache, enrich_fields=False)
         logger.info(
             "Reference Catalog ITCs: %d auto-linked (VERYHIGH), %d for manual review",
             linked_itcs, review_itcs,
         )
+
+    return {
+        "apps_linked": linked_apps,
+        "apps_review": review_apps,
+        "itcs_linked": linked_itcs,
+        "itcs_review": review_itcs,
+    }
 
 
 def _create_project_kpis(
