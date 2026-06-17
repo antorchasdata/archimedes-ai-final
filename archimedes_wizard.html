@@ -1478,8 +1478,21 @@ function setLang(lang) {
     const cfg = await apiFetch('/api/config');
     leanixOk = cfg.leanix_configured;
   } catch(e) {}
+
+  // Resume from URL: ?sid=<session_id>&step=<stepIndex>
+  const params = new URLSearchParams(location.search);
+  const resumeSid  = params.get('sid');
+  const resumeStep = parseInt(params.get('step') || '1', 10);
+  if (resumeSid) {
+    sessionId = resumeSid;
+    stepDone[0] = true;   // Step 0 (session) already done
+    leanixOk = true;
+    currentStep = Math.max(1, resumeStep);
+    for (let i = 0; i < currentStep; i++) stepDone[i] = true;
+  }
+
   renderProgress();
-  renderStep(0);
+  renderStep(currentStep);
 })();
 
 // ── API helper ────────────────────────────────────────────────────────────────

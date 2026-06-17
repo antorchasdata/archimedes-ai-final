@@ -12,6 +12,7 @@ import json
 import os
 import urllib.parse
 import logging
+from pathlib import Path
 from typing import Optional
 
 import requests
@@ -24,6 +25,22 @@ except ImportError:
     _BROWSER_COOKIE3_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+_LPR_CATALOG_PATH = Path(__file__).parent.parent / "knowledge" / "sap_lpr_catalog.json"
+_lpr_catalog_cache: Optional[dict] = None
+
+
+def _load_lpr_catalog() -> dict:
+    """Load sap_lpr_catalog.json once and cache in module variable."""
+    global _lpr_catalog_cache
+    if _lpr_catalog_cache is None:
+        if not _LPR_CATALOG_PATH.exists():
+            logger.warning("sap_lpr_catalog.json not found at %s", _LPR_CATALOG_PATH)
+            _lpr_catalog_cache = {"lpr_index": {}, "rsa_name_index": {}}
+        else:
+            _lpr_catalog_cache = json.loads(_LPR_CATALOG_PATH.read_text())
+    return _lpr_catalog_cache
+
 
 MODEL   = os.getenv("ENRICH_MODEL", "claude-sonnet-4-6")
 _BASE_URL = (
@@ -121,9 +138,11 @@ def _claude_pick_best(app_name: str, candidates: list[dict]) -> Optional[str]:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def resolve_app_to_skus(app_names: list[str], session: requests.Session) -> list[dict]:
+def resolve_app_to_skus(app_names: list[str], session: Optional[requests.Session] = None) -> list[dict]:
     """
     Resolve a list of application names to Material Numbers.
+
+    If session is None or check_session() fails, falls back to resolve_app_to_skus_offline().
 
     Returns list of:
       {
@@ -132,9 +151,12 @@ def resolve_app_to_skus(app_names: list[str], session: requests.Session) -> list
         "candidates":  [{matnr, maktx}, ...],
         "selected":    str,   # best candidate chosen by Claude (or first if only one)
         "selected_maktx": str,
-        "resolved_by": "exact" | "claude" | "manual" | "not_found"
+        "resolved_by": "exact" | "claude" | "manual" | "lpr_catalog" | "not_found"
       }
     """
+    if session is None or not check_session(session):
+        logger.info("OData session unavailable — using LPR catalog offline fallback")
+        return resolve_app_to_skus_offline(app_names)
     results = []
     for app_name in app_names:
         clean = _strip_sid(app_name)
@@ -166,6 +188,56 @@ def resolve_app_to_skus(app_names: list[str], session: requests.Session) -> list
             "selected":       selected,
             "selected_maktx": selected_maktx,
             "resolved_by":    resolved_by,
+        })
+
+    return results
+
+
+def resolve_app_to_skus_offline(app_names: list[str]) -> list[dict]:
+    """
+    Resolve app names to Material Numbers using local sap_lpr_catalog.json.
+    Fallback when OData RISE session is unavailable.
+
+    Returns same structure as resolve_app_to_skus() with resolved_by="lpr_catalog".
+    """
+    catalog = _load_lpr_catalog()
+    rsa_index: dict[str, str] = catalog.get("rsa_name_index", {})      # RSA name → LPR ID
+    lpr_index: dict[str, dict] = catalog.get("lpr_index", {})           # LPR ID → entry
+
+    # Build case-insensitive lookup
+    rsa_lower: dict[str, str] = {k.lower(): v for k, v in rsa_index.items()}
+
+    results = []
+    for app_name in app_names:
+        clean = _strip_sid(app_name)
+
+        # Exact match first, then case-insensitive
+        lpr_id = rsa_index.get(clean) or rsa_lower.get(clean.lower())
+
+        if not lpr_id:
+            results.append({
+                "app_name":        app_name,
+                "clean_name":      clean,
+                "candidates":      [],
+                "selected":        "",
+                "selected_maktx":  "",
+                "resolved_by":     "not_found",
+            })
+            logger.debug("LPR catalog: no match for '%s'", clean)
+            continue
+
+        lpr_entry = lpr_index.get(lpr_id, {})
+        material_ids = lpr_entry.get("material_ids", [])
+        selected = material_ids[0] if material_ids else ""
+        lpr_name = lpr_entry.get("lpr_name", clean)
+
+        results.append({
+            "app_name":        app_name,
+            "clean_name":      clean,
+            "candidates":      [{"matnr": m, "maktx": lpr_name} for m in material_ids],
+            "selected":        selected,
+            "selected_maktx":  lpr_name,
+            "resolved_by":     "lpr_catalog",
         })
 
     return results

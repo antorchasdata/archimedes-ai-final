@@ -125,7 +125,7 @@ def _load_catalogs() -> tuple[str, str]:
 
     rsa = json.loads((KNOWLEDGE_DIR / "sap_rsa_catalog.json").read_text())
     rsa_str = "\n".join(
-        f'- "{a["name"]}": {a.get("use_when", "")}'
+        f'- "{a["name"]}": {a.get("use_when", a.get("domain", ""))}'
         for a in rsa["applications"]
     )
     return rba_str, rsa_str

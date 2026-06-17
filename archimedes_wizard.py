@@ -179,8 +179,12 @@ async def list_workspaces():
 @app.post("/api/workspaces")
 async def save_workspace(body: dict):
     name      = (body.get("name") or "").strip()
-    base_url  = (body.get("base_url") or "").strip()
     api_token = (body.get("api_token") or "").strip()
+    # Strip any path/query — only scheme+host is valid for the API
+    from urllib.parse import urlparse as _urlparse
+    _raw     = (body.get("base_url") or "").strip()
+    _p       = _urlparse(_raw)
+    base_url = f"{_p.scheme}://{_p.netloc}" if _p.netloc else _raw
     if not name or not base_url or not api_token:
         raise HTTPException(status_code=400, detail="name, base_url and api_token are required")
     ws = _load_workspaces()
@@ -390,6 +394,34 @@ async def run_baseline(
         "n_onprem":     result["n_onprem"],
         "n_cloud":      result["n_cloud"],
         "n_total":      result["n_total"],
+        "download_url": f"/api/session/{session_id}/download/baseline",
+    }
+
+
+# ── Step 2 — Register pre-built baseline (admin/debug) ────────────────────────
+
+@app.post("/api/session/{session_id}/baseline/register")
+async def register_baseline(session_id: str, body: dict):
+    """Register an existing baseline Excel file into the session (bypasses generation)."""
+    sess = _session(session_id)
+    file_path = Path(body.get("file_path", ""))
+    if not file_path.exists():
+        raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
+
+    import openpyxl
+    try:
+        wb = openpyxl.load_workbook(file_path)
+        ws = wb.active
+        n_total = ws.max_row - 2  # header rows
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not open Excel: {exc}")
+
+    sess["out_baseline"]    = file_path
+    sess["baseline_result"] = {"n_onprem": 0, "n_cloud": n_total, "n_total": n_total}
+    return {
+        "ok":           True,
+        "registered":   str(file_path),
+        "n_total":      n_total,
         "download_url": f"/api/session/{session_id}/download/baseline",
     }
 

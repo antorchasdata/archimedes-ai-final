@@ -14,7 +14,9 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import anthropic
@@ -28,6 +30,7 @@ MODEL         = os.getenv("ENRICH_MODEL", "claude-sonnet-4-6")
 BATCH_SIZE    = int(os.getenv("ENRICH_BATCH_SIZE", "10"))
 MAX_RETRIES   = int(os.getenv("ENRICH_MAX_RETRIES", "3"))
 RETRY_DELAY   = 5  # seconds between retries
+ENRICH_WORKERS = int(os.getenv("ENRICH_WORKERS", "10"))
 
 
 # ── Load knowledge base ───────────────────────────────────────────────────────
@@ -46,7 +49,7 @@ def _load_knowledge() -> tuple[str, dict, str, str]:
 
     rsa = json.loads((KNOWLEDGE_DIR / "sap_rsa_catalog.json").read_text())
     rsa_str = "\n".join(
-        f"- \"{a['name']}\": {a['use_when']}"
+        f"- \"{a['name']}\": {a.get('use_when', a.get('domain', ''))}"
         for a in rsa["applications"]
     )
 
@@ -233,24 +236,38 @@ def enrich(
     enriched: list[dict] = []
     errors: list[str] = []
 
-    for i, req in enumerate(reqs, start=1):
-        # Skip requirements already in checkpoint
-        if req["id"] in already_done:
-            enriched.append(already_done[req["id"]])
-            logger.debug("[%d/%d] %s — from checkpoint", i, len(reqs), req["id"])
-            continue
+    # Reqs pendientes (no en checkpoint)
+    pending = [r for r in reqs if r["id"] not in already_done]
+    logger.info("Pending: %d reqs — workers: %d", len(pending), ENRICH_WORKERS)
 
-        logger.info("[%d/%d] %s", i, len(reqs), req["id"])
+    checkpoint_lock = Lock()
+    enriched_map: dict[str, dict] = dict(already_done)
+
+    def _process(req: dict) -> dict:
         result = _enrich_one(client, req, template, rba_str, rsa_str)
-        enriched.append(result)
-        if "_error" in result:
-            errors.append(req["id"])
+        with checkpoint_lock:
+            enriched_map[req["id"]] = result
+            if len(enriched_map) % BATCH_SIZE == 0:
+                snapshot = [enriched_map[r["id"]] for r in reqs if r["id"] in enriched_map]
+                checkpoint_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
+                logger.debug("Checkpoint saved (%d/%d)", len(enriched_map), len(reqs))
+        return result
 
-        # Write checkpoint after every batch
-        if i % BATCH_SIZE == 0:
-            checkpoint_path.write_text(json.dumps(enriched, ensure_ascii=False, indent=2))
-            logger.debug("Checkpoint saved (%d/%d)", i, len(reqs))
-            time.sleep(1)
+    with ThreadPoolExecutor(max_workers=ENRICH_WORKERS) as pool:
+        futures = {pool.submit(_process, req): req for req in pending}
+        for i, future in enumerate(as_completed(futures), start=1):
+            req = futures[future]
+            try:
+                result = future.result()
+                if "_error" in result:
+                    errors.append(req["id"])
+                logger.info("[%d/%d] %s", len(enriched_map), len(reqs), req["id"])
+            except Exception as exc:
+                logger.error("Unexpected error for %s: %s", req["id"], exc)
+                errors.append(req["id"])
+
+    # Reconstruct enriched list in original order
+    enriched = [enriched_map[r["id"]] for r in reqs if r["id"] in enriched_map]
 
     out_path = output_dir / "reqs_enriched.json"
     out_path.write_text(json.dumps(enriched, ensure_ascii=False, indent=2))
