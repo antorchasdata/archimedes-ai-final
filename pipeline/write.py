@@ -40,6 +40,38 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
+LPR_CATALOG_PATH = KNOWLEDGE_DIR / "sap_lpr_catalog.json"
+
+
+def _load_lpr_catalog() -> dict:
+    """Load sap_lpr_catalog.json. Returns empty structure if not found."""
+    if not LPR_CATALOG_PATH.exists():
+        logger.debug("sap_lpr_catalog.json not found — LPR enrichment disabled")
+        return {"lpr_index": {}, "rsa_name_index": {}}
+    return json.loads(LPR_CATALOG_PATH.read_text())
+
+
+def _enrich_with_lpr(row: dict, lpr_catalog: dict) -> None:
+    """
+    In-place: set externalId and lprId on an Application fact sheet row
+    if the displayName matches an RSA name in rsa_name_index.
+    """
+    rsa_index: dict = lpr_catalog.get("rsa_name_index", {})
+    lpr_index: dict = lpr_catalog.get("lpr_index", {})
+
+    name = row.get("name", "")
+    lpr_id = rsa_index.get(name)
+    if not lpr_id:
+        return
+
+    entry = lpr_index.get(lpr_id, {})
+    material_ids = entry.get("material_ids", [])
+
+    if material_ids:
+        row["externalId"] = material_ids[0]
+    row["lprId"] = lpr_id
+    logger.debug("LPR enriched '%s' → %s (externalId=%s)",
+                 name, lpr_id, material_ids[0] if material_ids else "")
 
 # Column indices in the output Excel (0-based), matching the project standard
 COL_H = 7   # coverage
@@ -537,6 +569,7 @@ def write_leanix_excel(
     _sheet_header(ws_app, _COLS_APPLICATION)
     keys_app = [c[0] for c in _COLS_APPLICATION]
 
+    lpr_catalog = _load_lpr_catalog()
     for row_idx, (app_name, app) in enumerate(sorted(seen_apps.items()), start=3):
         bcs_str  = ";".join(sorted(app["bcs"]))
         itcs_str = ";".join(sorted(app.get("itcs", set())))
@@ -554,6 +587,7 @@ def write_leanix_excel(
             "relApplicationToBusinessCapability": bcs_str,
             "relApplicationToITComponent": itcs_str, "relToParent": "",
         }
+        _enrich_with_lpr(vals, lpr_catalog)
         _sheet_row(ws_app, row_idx, [vals.get(k, "") for k in keys_app])
 
     # ── Sheet: Prerequisites (Lift & Shift only — reference, not for import) ───
@@ -733,14 +767,14 @@ mutation AddTag($id: ID!, $patches: [Patch]!) {
 
 _QUERY_TAGS = """
 query GetTags {
-  allTags { edges { node { id name } } }
+  allTags { edges { node { id name tagGroup { id name } } } }
 }
 """
 
 _QUERY_TAG_GROUPS = """
 query GetTagGroups {
   allTagGroups { edges { node {
-    id name restrictToFactSheetTypes
+    id name mode restrictToFactSheetTypes
     tags { edges { node { id name } } }
   } } }
 }
@@ -1001,32 +1035,46 @@ def write_leanix(
     _FREE_TAGS = {"KPI_Achievement", "Target", "Baseline", "Target Reference"}
 
     def _get_or_create_tag_id(tag_name: str, group_name: str | None = None) -> str:
-        """Get or create a tag, optionally in a specific named group."""
+        """Get or create a tag, optionally in a specific named group.
+
+        Lookup rules:
+        - If group_name given: find tag with that name IN that group. If not found, create it there.
+        - If no group_name: find tag with that name that has NO group (free tag). If not found, create it free.
+        This prevents accidentally returning a grouped tag when a free one is needed (or vice versa).
+        """
         _load_tag_cache()
-        # Find existing tag
-        for t in _all_tags_cache:  # type: ignore[union-attr]
-            if t["name"] == tag_name:
-                return t["id"]
-        # Find target group
         group_id = None
         if group_name:
             for g in _tag_groups_cache:  # type: ignore[union-attr]
                 if g["name"] == group_name:
                     group_id = g["id"]
                     break
-        # Free tags (KPI_Achievement, Target, etc.) must NOT be placed in any group
-        if group_id is None and tag_name not in _FREE_TAGS:
-            # Pick first unrestricted group
-            for g in _tag_groups_cache:  # type: ignore[union-attr]
-                if not g.get("restrictToFactSheetTypes"):
-                    group_id = g["id"]
-                    break
-            if group_id is None and _tag_groups_cache:
-                group_id = _tag_groups_cache[0]["id"]
+        # Find existing tag matching name AND group context
+        for t in _all_tags_cache:  # type: ignore[union-attr]
+            if t["name"] != tag_name:
+                continue
+            t_group = t.get("tagGroup")
+            t_group_id = t_group["id"] if t_group else None
+            if group_id is not None:
+                if t_group_id == group_id:
+                    return t["id"]  # exact group match
+            else:
+                if t_group_id is None:
+                    return t["id"]  # free tag match
+        # Not found — create it
         result = _gql(_MUTATION_CREATE_TAG, {"name": tag_name, "groupId": group_id})
         new_tag = result["data"]["createTag"]
-        _all_tags_cache.append({"id": new_tag["id"], "name": new_tag["name"]})  # type: ignore[union-attr]
+        _all_tags_cache.append({"id": new_tag["id"], "name": new_tag["name"], "tagGroup": {"id": group_id} if group_id else None})  # type: ignore[union-attr]
         return new_tag["id"]
+
+    def _get_tag_group_id(tag_id: str) -> str | None:
+        """Return the group ID for a given tag ID, or None if free tag."""
+        _load_tag_cache()
+        for t in _all_tags_cache:  # type: ignore[union-attr]
+            if t["id"] == tag_id:
+                tg = t.get("tagGroup")
+                return tg["id"] if tg else None
+        return None
 
     def _find_tag_in_group(tag_name: str, group_name: str) -> str | None:
         """Find an existing tag by name within a specific tag group (no create)."""
@@ -1038,18 +1086,45 @@ def write_leanix(
                         return t["node"]["id"]
         return None
 
+    def _single_group_ids() -> set[str]:
+        """Return IDs of tag groups whose mode is SINGLE (only one tag allowed per fact sheet)."""
+        _load_tag_cache()
+        return {g["id"] for g in _tag_groups_cache if g.get("mode") == "SINGLE"}  # type: ignore[union-attr]
+
+    def _tag_name_to_group(tag_name: str) -> str | None:
+        """Return the group_name for a tag that exists in a group, or None if it's a free tag.
+
+        Looks up the tag in _all_tags_cache (which includes tagGroup info).
+        If a tag with that name exists in a group, return the group name so the caller
+        can pass it to _get_or_create_tag_id — ensuring the right tag variant is used.
+        If the tag name is in _FREE_TAGS or has no group entry, return None.
+        """
+        if tag_name in _FREE_TAGS:
+            return None
+        _load_tag_cache()
+        for t in _all_tags_cache:  # type: ignore[union-attr]
+            if t["name"] == tag_name:
+                tg = t.get("tagGroup")
+                if tg:
+                    # Find the group name from _tag_groups_cache
+                    gid = tg["id"]
+                    for g in _tag_groups_cache:  # type: ignore[union-attr]
+                        if g["id"] == gid:
+                            return g["name"]
+        return None
+
     def _tag_fs(fs_id: str, tag_id: str) -> None:
-        try:
-            _gql(_MUTATION_ADD_TAG, {
-                "id": fs_id,
-                "patches": [{"op": "add", "path": "/tags",
-                             "value": json.dumps([{"tagId": tag_id}])}],
-            })
-        except Exception as exc:
-            logger.warning("LeanIX: skipping tag for %s — %s", fs_id, exc)
+        """Apply a single tag to a fact sheet (delegates to _tag_fs_multi for SINGLE-group safety)."""
+        _tag_fs_multi(fs_id, [tag_id])
 
     def _resolve_extra_tags(row: dict, skip: str = "") -> list[str]:
-        """Parse semicolon-separated tags field and return resolved tag IDs, skipping client tag."""
+        """Parse semicolon-separated tags field and return resolved tag IDs, skipping client tag.
+
+        Each tag name is resolved group-aware:
+        - If the tag name already exists in a tag group in LeanIX, it is resolved within that group.
+        - If the tag name is in _FREE_TAGS or has no group match, it is resolved as a free tag.
+        This prevents accidentally creating duplicate tags in the wrong group.
+        """
         raw = str(row.get("tags") or "").strip()
         ids: list[str] = []
         for t in raw.split(";"):
@@ -1057,19 +1132,59 @@ def write_leanix(
             if not t or t == skip:
                 continue
             try:
-                ids.append(_get_or_create_tag_id(t))
+                group_name = _tag_name_to_group(t)
+                ids.append(_get_or_create_tag_id(t, group_name))
             except Exception as exc:
                 logger.warning("LeanIX: cannot resolve tag '%s' — %s", t, exc)
         return ids
 
     def _tag_fs_multi(fs_id: str, tag_ids: list[str]) -> None:
-        """Apply multiple tags at once."""
+        """Apply multiple tags to a fact sheet, handling SINGLE-group conflicts.
+
+        For tags that belong to a SINGLE-mode tag group, LeanIX only allows one tag per
+        group per fact sheet. Before adding, we fetch the fact sheet's current tags and
+        remove any existing tag that conflicts (same SINGLE group). Tags are then added
+        in a single batch call.
+        """
+        if not tag_ids:
+            return
+
+        _load_tag_cache()
+        single_gids = _single_group_ids()
+
+        # Build a map: group_id → tag_id for the tags we want to apply
+        new_tag_group: dict[str, str] = {}  # group_id → new_tag_id (only SINGLE groups)
+        for tid in tag_ids:
+            gid = _get_tag_group_id(tid)
+            if gid and gid in single_gids:
+                new_tag_group[gid] = tid
+
+        patches: list[dict] = []
+
+        # If we have SINGLE-group tags to apply, fetch current FS tags and remove conflicts
+        if new_tag_group:
+            try:
+                _QUERY_FS_TAGS = """
+                query FsTags($id: ID!) {
+                  factSheet(id: $id) { tags { id tagGroup { id } } }
+                }
+                """
+                r = _gql(_QUERY_FS_TAGS, {"id": fs_id})
+                current_tags = r.get("data", {}).get("factSheet", {}).get("tags", [])
+                for ct in current_tags:
+                    ct_gid = (ct.get("tagGroup") or {}).get("id")
+                    if ct_gid and ct_gid in new_tag_group:
+                        # Conflict: same SINGLE group — remove the old tag first
+                        patches.append({"op": "remove", "path": f"/tags/{ct['id']}"})
+                        logger.debug("LeanIX: removing conflicting SINGLE-group tag %s from %s", ct["id"], fs_id)
+            except Exception as exc:
+                logger.warning("LeanIX: could not fetch current tags for %s, proceeding without conflict check — %s", fs_id, exc)
+
+        # Add all new tags
+        patches.append({"op": "add", "path": "/tags",
+                        "value": json.dumps([{"tagId": tid} for tid in tag_ids])})
         try:
-            _gql(_MUTATION_ADD_TAG, {
-                "id": fs_id,
-                "patches": [{"op": "add", "path": "/tags",
-                             "value": json.dumps([{"tagId": tid} for tid in tag_ids])}],
-            })
+            _gql(_MUTATION_ADD_TAG, {"id": fs_id, "patches": patches})
         except Exception as exc:
             logger.warning("LeanIX: skipping tags for %s — %s", fs_id, exc)
 
@@ -1163,7 +1278,31 @@ def write_leanix(
         if name not in wb.sheetnames:
             return []
         ws     = wb[name]
-        header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        raw_header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        # Normalise header: map Title-Case / human labels → camelCase API keys
+        _col_alias = {
+            "id": "id", "type": "type", "name": "name", "description": "description",
+            "alias": "alias", "external id": "externalId",
+            "lifecycle phase": "lifecycle_phase", "lifecycle": "lifecycle_phase",
+            "lifecycle start date": "lifecycle_startDate",
+            "lifecycle end date": "lifecycle_endDate",
+            "business criticality": "businessCriticality",
+            "functional fit": "functionalSuitability",
+            "technical fit": "technicalSuitability",
+            "hosting type": "lxHostingType",
+            "quality seal": "lxState",
+            "tags": "tags",
+            "it component": "relApplicationToITComponent",
+            "business capability": "relApplicationToBusinessCapability",
+            "parent": "relToParent",
+            "lpr id": "lprId",
+            "material id": "materialId",
+            "material description": "materialDescription",
+            "solution area": "solutionArea",
+            "sub-solution area": "subSolutionArea",
+            "contract end": "contractEnd",
+        }
+        header = [_col_alias.get(str(h or "").strip().lower(), str(h or "").strip()) for h in raw_header]
         # Detect 2-row header (row 2 = translations): skip row 2 if all non-empty
         # cells look like human labels (no slash, no camelCase pattern of keys)
         rows_iter = ws.iter_rows(min_row=2)
@@ -1195,6 +1334,8 @@ def write_leanix(
 
     # ── Push ──────────────────────────────────────────────────────────────────
     client_tag = client_name
+    # Ensure client name is always resolved as a free tag (never grouped)
+    _FREE_TAGS.add(client_tag)
     tag_id     = _get_or_create_tag_id(client_tag)
     logger.info("LeanIX: using tag '%s' (id=%s)", client_tag, tag_id)
 
