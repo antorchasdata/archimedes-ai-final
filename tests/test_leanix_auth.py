@@ -77,3 +77,16 @@ def test_get_bearer_refreshes_when_near_expiry():
     assert first == "JWT_OLD"
     assert second == "JWT_NEW"
     assert post.call_count == 2
+
+
+def test_get_bearer_raises_on_http_error():
+    """raise_for_status() failures propagate; callers wrap in try/except."""
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = requests.HTTPError("401")
+
+    with patch("pipeline.leanix_auth.requests.post", return_value=mock_resp):
+        with pytest.raises(requests.HTTPError):
+            leanix_auth.get_bearer("https://x", "bad")
+
+    # Cache must remain empty after a failed handshake
+    assert leanix_auth._token_cache["token"] is None
