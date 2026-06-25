@@ -74,3 +74,18 @@ def _classify(entry: dict) -> Status:
     if confidence in ("HIGH", "MEDIUM"):
         return "REVIEW"
     return "CUSTOM"
+
+
+_STATUS_ORDER = {"LINKED": 0, "REVIEW": 1, "CUSTOM": 2}
+
+
+def sort_rows(rows: list[ReportRow]) -> list[ReportRow]:
+    return sorted(rows, key=lambda r: (_STATUS_ORDER.get(r.status, 99), r.type, r.name))
+
+
+def count_rows(rows: list[ReportRow]) -> dict[str, int]:
+    out = {"LINKED": 0, "REVIEW": 0, "CUSTOM": 0}
+    for r in rows:
+        out[r.status] = out.get(r.status, 0) + 1
+    return out
+

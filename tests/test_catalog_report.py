@@ -1,5 +1,5 @@
 # tests/test_catalog_report.py
-from pipeline.catalog_report import build_rows
+from pipeline.catalog_report import build_rows, sort_rows, count_rows
 
 def test_build_rows_empty_inputs():
     rows = build_rows(
@@ -58,3 +58,22 @@ def test_push_failed_marked():
     rows = build_rows(res, umap)
     assert rows[0].fs_uuid is None
     assert rows[0].push_failed is True
+
+def test_rows_sorted_linked_review_custom():
+    res = {"entries": [
+        {"name": "C", "type": "Application", "status": "CUSTOM",  "confidence": "NONE"},
+        {"name": "L", "type": "Application", "status": "LINKED",  "confidence": "VERYHIGH"},
+        {"name": "R", "type": "Application", "status": "CUSTOM",  "confidence": "HIGH"},
+    ]}
+    rows = sort_rows(build_rows(res, _UUID_MAP_EMPTY))
+    assert [r.name for r in rows] == ["L", "R", "C"]
+
+def test_counters():
+    res = {"entries": [
+        {"name": "L1", "type": "Application", "status": "LINKED",  "confidence": "VERYHIGH"},
+        {"name": "L2", "type": "Application", "status": "LINKED",  "confidence": "VERYHIGH"},
+        {"name": "R1", "type": "Application", "status": "CUSTOM",  "confidence": "HIGH"},
+        {"name": "C1", "type": "Application", "status": "CUSTOM",  "confidence": "NONE"},
+    ]}
+    counts = count_rows(build_rows(res, _UUID_MAP_EMPTY))
+    assert counts == {"LINKED": 2, "REVIEW": 1, "CUSTOM": 1}
