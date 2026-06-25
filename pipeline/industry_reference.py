@@ -507,10 +507,10 @@ def _create_industry_transformations(
       - Custom impact: FACTSHEET_SET lxHostingType=saas
     """
     import requests
-    from pipeline.write import _get_bearer
+    from pipeline.leanix_auth import get_bearer
 
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         logger.warning("Industry Reference Transformations: cannot get bearer token: %s", exc)
         return
