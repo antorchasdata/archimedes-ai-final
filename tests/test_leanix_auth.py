@@ -90,3 +90,17 @@ def test_get_bearer_raises_on_http_error():
 
     # Cache must remain empty after a failed handshake
     assert leanix_auth._token_cache["token"] is None
+
+
+def test_get_bearer_handles_missing_expires_in():
+    """When the response omits expires_in, the cache uses the 3600s fallback."""
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"access_token": "JWT"}  # no expires_in
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.leanix_auth.requests.post", return_value=mock_resp), \
+         patch("pipeline.leanix_auth.time.time", return_value=1000.0):
+        token = leanix_auth.get_bearer("https://x", "tok")
+
+    assert token == "JWT"
+    assert leanix_auth._token_cache["expires_at"] == 1000.0 + 3600
