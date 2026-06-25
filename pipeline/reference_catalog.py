@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -221,6 +222,28 @@ class ReferenceCatalogResolver:
         if not suggestions:
             return None
         return suggestions[0].get("factSheet")
+
+    def _prompt_link(self, name: str, catalog_display: str, confidence: str) -> bool:
+        """Interactive Y/n/s prompt for HIGH/MEDIUM matches.
+        Returns True to link, False to skip. Sets _skip_all_prompts on 's'."""
+        if not self.interactive or self._skip_all_prompts:
+            return False
+        if not getattr(sys.stdin, "isatty", lambda: False)():
+            return False
+        prompt = (
+            f"  Link '{name}' to catalog entry '{catalog_display}' "
+            f"(confidence={confidence})? [Y/n/s(kip all)]: "
+        )
+        try:
+            answer = input(prompt).strip().lower()
+        except EOFError:
+            return False
+        if answer in ("", "y", "yes", "s\u00ed", "si"):
+            return True
+        if answer in ("s", "skip"):
+            self._skip_all_prompts = True
+            return False
+        return False
 
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""

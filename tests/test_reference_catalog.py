@@ -217,3 +217,35 @@ def test_batch_links_error_returns_none():
     with patch("pipeline.reference_catalog.requests.post",
                return_value=_mk_response({}, status=500)):
         assert r._batch_links("Application", "probe-uuid-1", "X") is None
+
+
+import io
+
+
+def test_prompt_yes_returns_true(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("y\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("SAP S4", "SAP S/4HANA Cloud", "HIGH") is True
+
+
+def test_prompt_no_returns_false(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("n\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
+
+
+def test_prompt_skip_all_sets_flag_and_returns_false(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("s\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
+    assert r._skip_all_prompts is True
+    # subsequent call should not prompt at all
+    assert r._prompt_link("A", "B", "MEDIUM") is False
+
+
+def test_prompt_non_interactive_returns_false():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
