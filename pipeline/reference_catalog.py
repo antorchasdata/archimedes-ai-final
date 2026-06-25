@@ -285,9 +285,67 @@ class ReferenceCatalogResolver:
                 out[k] = v
         return out
 
+    _PROBE_BASE = {
+        "Application": "_archimedes_probe_application",
+        "ITComponent": "_archimedes_probe_itcomponent",
+    }
+
+    def _ensure_probe(self, fs_type: str) -> str | None:
+        """Lazy-create the per-type reusable probe FS. Returns its UUID or None."""
+        if self._no_probe_mode:
+            return None
+        if fs_type in self._probe_ids:
+            return self._probe_ids[fs_type]
+        probe_id = self._probe_create(fs_type, self._PROBE_BASE[fs_type])
+        if probe_id is None:
+            self._no_probe_mode = True
+            logger.warning("Probe creation failed for %s — entering no-probe mode", fs_type)
+            return None
+        self._probe_ids[fs_type] = probe_id
+        return probe_id
+
     def _resolve_via_probe(self, fs_type: str, name: str) -> ResolvedMatch:
-        """Placeholder — filled in by Task 10."""
-        return ResolvedMatch(name=name)
+        probe_id = self._ensure_probe(fs_type)
+        if probe_id is None:
+            return ResolvedMatch(name=name)
+
+        # Rename probe so the catalog matcher sees the actual search term.
+        if not self._probe_rename(probe_id, name):
+            return ResolvedMatch(name=name)
+
+        top = self._batch_links(fs_type, probe_id, name)
+        if not top:
+            return ResolvedMatch(name=name)
+
+        confidence = (top.get("confidenceLevel") or "NONE").upper()
+        ext_id = top.get("externalId")
+        display = top.get("displayName")
+        catalog_uuid = top.get("id")
+
+        # Decision
+        link = False
+        if confidence == "VERYHIGH":
+            link = True
+        elif confidence in ("HIGH", "MEDIUM"):
+            link = self._prompt_link(name, display or "?", confidence)
+        # LOW / anything else → CUSTOM
+
+        if link and ext_id:
+            detail = self._fetch_detail(fs_type, ext_id)
+            return ResolvedMatch(
+                name=name,
+                external_id=ext_id,
+                catalog_uuid=catalog_uuid,
+                display_name=display,
+                confidence=confidence,
+                status="LINKED",
+                fields=self._build_fields(detail),
+            )
+        # Informational match — kept for the audit report, but not linked.
+        return ResolvedMatch(
+            name=name, confidence=confidence, status="CUSTOM",
+            display_name=display, catalog_uuid=catalog_uuid,
+        )
 
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
