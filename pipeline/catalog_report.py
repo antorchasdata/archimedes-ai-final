@@ -145,10 +145,11 @@ _HTML_TEMPLATE = """<!doctype html>
 
 
 def _row_html(r: ReportRow, base_url: str, workspace: str) -> str:
+    confidence_label = _html_escape(r.confidence or ("NONE" if r.status == "CUSTOM" else "-"))
     status_label = {
-        "LINKED": f"🟢 LINKED ({r.confidence or '-'})",
-        "REVIEW": f"🟡 REVIEW ({r.confidence or '-'})",
-        "CUSTOM": f"🔴 CUSTOM ({r.confidence or 'NONE'})",
+        "LINKED": f"🟢 LINKED ({confidence_label})",
+        "REVIEW": f"🟡 REVIEW ({confidence_label})",
+        "CUSTOM": f"🔴 CUSTOM ({confidence_label})",
     }[r.status]
     if r.push_failed:
         status_label = f'<span class="failed-tag">⚠️ PUSH FAILED</span> · {status_label}'
@@ -163,10 +164,10 @@ def _row_html(r: ReportRow, base_url: str, workspace: str) -> str:
     fs_url = build_fs_url(base_url, workspace, r.type, r.fs_uuid)
     actions: list[str] = []
     if fs_url:
-        actions.append(f'<a href="{fs_url}" target="_blank">Open FS</a>')
+        actions.append(f'<a href="{_html_escape(fs_url, quote=True)}" target="_blank">Open FS</a>')
     if r.status == "REVIEW":
         search_url = build_catalog_search_url(base_url, workspace, r.name)
-        actions.append(f'<a href="{search_url}" target="_blank">Search catalog</a>')
+        actions.append(f'<a href="{_html_escape(search_url, quote=True)}" target="_blank">Search catalog</a>')
     actions_html = " ".join(actions) if actions else "—"
 
     cls = {"LINKED": "row-linked", "REVIEW": "row-review", "CUSTOM": "row-custom"}[r.status]

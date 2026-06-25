@@ -159,3 +159,35 @@ def test_render_html_push_failed_row_marked():
             "entries": {}, "failed": [{"name": "Broken", "type": "Application", "error": "boom"}]}
     html = render_html(res, umap, client_name="Acme")
     assert "PUSH FAILED" in html
+
+
+def test_render_html_escapes_dangerous_chars_in_name():
+    res = {"entries": [{"name": "<script>alert(1)</script>", "type": "Application",
+                        "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_render_html_escapes_quotes_in_workspace_for_href():
+    res = {"entries": [{"name": "L", "type": "Application", "status": "LINKED",
+                        "confidence": "VERYHIGH", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": 'ws"oops', "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True}}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    # Raw `ws"oops` inside an href attribute would close the attribute.
+    assert 'href="https://demo-eu-3.leanix.net/ws"oops/' not in html
+    # The double quote must be escaped to &quot;
+    assert "ws&quot;oops" in html
+
+
+def test_render_html_escapes_confidence_html():
+    res = {"entries": [{"name": "L", "type": "Application", "status": "LINKED",
+                        "confidence": "<b>X</b>", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    assert "<b>X</b>" not in html
+    assert "&lt;b&gt;X&lt;/b&gt;" in html
