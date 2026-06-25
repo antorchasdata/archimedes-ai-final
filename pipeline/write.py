@@ -1805,7 +1805,16 @@ def write_leanix(
     # Only links when confidenceLevel == "VERYHIGH"; logs others for manual review.
     catalog_stats: dict = {}
     if app_id_cache or itc_id_cache:
-        catalog_stats = _link_apps_to_catalog(base_url, token, app_id_cache, itc_id_cache)
+        # Rows that already carry externalId were linked at create time via the
+        # pre-creation Reference Catalog resolver — skip them in the post-push linker.
+        rows_by_name = {
+            str(r.get("name") or "").strip(): r
+            for r in app_rows if r.get("name")
+        }
+        catalog_stats = _link_apps_to_catalog(
+            base_url, token, app_id_cache, itc_id_cache,
+            rows_by_name=rows_by_name,
+        )
 
     # ── Metrics API — project KPIs ────────────────────────────────────────────
     # Compute completeness KPIs from the pushed data and create them in LeanIX.
@@ -1843,6 +1852,7 @@ def _link_apps_to_catalog(
     api_token: str,
     app_id_cache: dict[str, str],
     itc_id_cache: dict[str, str] | None = None,
+    rows_by_name: dict[str, dict] | None = None,
 ) -> dict:
     """
     Auto-link workspace Applications and ITComponents to LeanIX Reference Catalog entries.
@@ -1858,7 +1868,24 @@ def _link_apps_to_catalog(
       - lxHostingType (if not already set on Application)
       - description   (if empty on Application)
     Logs productCategory and provider for info.
+
+    ``rows_by_name`` (optional): name → row dict. Any row with a truthy
+    ``externalId`` is skipped here because it was already linked at create
+    time via the pre-creation Reference Catalog resolver.
     """
+    rows_by_name = rows_by_name or {}
+    skipped = {
+        name for name, row in rows_by_name.items()
+        if row and row.get("externalId")
+    }
+    if skipped:
+        logger.debug(
+            "Reference Catalog post-push: skipping %d rows already linked at create",
+            len(skipped),
+        )
+    app_id_cache = {n: i for n, i in app_id_cache.items() if n not in skipped}
+    if itc_id_cache:
+        itc_id_cache = {n: i for n, i in itc_id_cache.items() if n not in skipped}
     try:
         bearer = _get_bearer(base_url, api_token)
     except Exception as exc:

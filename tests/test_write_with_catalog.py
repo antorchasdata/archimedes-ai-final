@@ -142,3 +142,49 @@ def test_push_payload_omits_external_id_when_absent():
     row = {"name": "Custom App", "type": "Application", "description": ""}
     payload = build_create_factsheet_payload(row)
     assert "externalId" not in payload or payload["externalId"] in (None, "")
+
+
+def test_link_apps_skips_rows_with_external_id():
+    """Post-push linker must not try to link rows that already carried externalId.
+
+    The pre-creation Reference Catalog resolver populates externalId in the
+    staging Excel. Once a row is created in LeanIX with that externalId, the
+    fact sheet is already linked to the catalog — the post-push linker must
+    skip it to avoid spurious work and conflicting links.
+    """
+    from pipeline.write import _link_apps_to_catalog
+
+    app_id_cache = {"SAP S/4HANA": "ws-uuid-1", "Custom App": "ws-uuid-2"}
+    rows_by_name = {
+        "SAP S/4HANA": {"externalId": "lx_APP_000123"},
+        "Custom App": {},  # no externalId — eligible for post-push linking
+    }
+
+    # Mock the bearer so the function proceeds past auth.
+    # `requests` is imported locally inside the function (`import requests as _req`);
+    # patch the module-level `requests` so the local import resolves to our mock.
+    fake_requests = MagicMock()
+    fake_requests.post.return_value = MagicMock(
+        status_code=200,
+        json=lambda: {"data": {}},
+        raise_for_status=MagicMock(),
+    )
+    fake_requests.put.return_value = MagicMock(
+        status_code=200,
+        json=lambda: {},
+        raise_for_status=MagicMock(),
+    )
+    with patch.object(write_mod, "_get_bearer", return_value="fake-token"), \
+         patch.dict("sys.modules", {"requests": fake_requests}):
+        _link_apps_to_catalog(
+            "https://x", "tok", app_id_cache, {},
+            rows_by_name=rows_by_name,
+        )
+
+    # The skipped app's workspace UUID must never appear in any POST body.
+    called_bodies = [
+        str(c.kwargs.get("json", "")) + str(c.args)
+        for c in fake_requests.post.call_args_list
+    ]
+    assert all("ws-uuid-1" not in body for body in called_bodies), \
+        "Pre-linked app SAP S/4HANA must not be sent to batch-links"
