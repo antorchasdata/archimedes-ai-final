@@ -46,6 +46,46 @@ KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
 LPR_CATALOG_PATH = KNOWLEDGE_DIR / "sap_lpr_catalog.json"
 
 
+def _workspace_from_base_url(base_url: str) -> str:
+    """Extract workspace slug from a LeanIX base URL.
+
+    https://demo-eu-3.leanix.net  → demo-eu-3
+    https://app.leanix.net        → app
+    """
+    from urllib.parse import urlparse
+    host = urlparse(base_url).hostname or ""
+    return host.split(".")[0] if host else ""
+
+
+def _write_push_uuid_map(
+    out_dir: Path,
+    base_url: str,
+    workspace: str,
+    app_id_cache: dict[str, str],
+    itc_id_cache: dict[str, str],
+    failed: list[dict] | None = None,
+) -> Path:
+    """Persist UUID map → push_uuid_map.json in out_dir.
+
+    Schema:
+        {workspace, base_url, entries: {"<Type>::<Name>": {uuid, created}}, failed: [...]}
+    """
+    entries: dict[str, dict] = {}
+    for name, uid in (app_id_cache or {}).items():
+        entries[f"Application::{name}"] = {"uuid": uid, "created": True}
+    for name, uid in (itc_id_cache or {}).items():
+        entries[f"ITComponent::{name}"] = {"uuid": uid, "created": True}
+    payload = {
+        "workspace": workspace,
+        "base_url": base_url,
+        "entries": entries,
+        "failed": failed or [],
+    }
+    out_path = Path(out_dir) / "push_uuid_map.json"
+    out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    return out_path
+
+
 def _load_lpr_catalog() -> dict:
     """Load sap_lpr_catalog.json. Returns empty structure if not found."""
     if not LPR_CATALOG_PATH.exists():
@@ -1856,6 +1896,19 @@ def write_leanix(
             kpis.get("apps_with_bc", 0), kpis.get("apps_with_lifecycle", 0),
             kpis.get("bcs_with_app", 0), kpis.get("inits_with_trans", 0),
         )
+
+    # Persist UUID map for Step 8 Catalog Linking Review (alongside staging Excel).
+    try:
+        _write_push_uuid_map(
+            out_dir=Path(staging_path).parent,
+            base_url=base_url,
+            workspace=_workspace_from_base_url(base_url),
+            app_id_cache=app_id_cache,
+            itc_id_cache=itc_id_cache,
+            failed=[],   # GraphQL path raises on failure — no per-row failure list collected here today
+        )
+    except Exception as exc:
+        logger.warning("Could not write push_uuid_map.json: %s", exc)
 
     return {
         "pushed": pushed,
