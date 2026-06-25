@@ -274,6 +274,24 @@ async def create_session(body: dict):
     return {"ok": True, "session_id": session_id, "client_name": client_name}
 
 
+@app.get("/api/session/{session_id}")
+async def session_state(session_id: str):
+    """Return session state, including the step8_available flag for the frontend sidebar."""
+    sess = _session(session_id)
+
+    resolver_enabled = (os.environ.get("ARCHIMEDES_USE_CATALOG_RESOLVER", "").lower() == "true")
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_present = (session_dir / "push_uuid_map.json").exists()
+    step8_available = resolver_enabled and uuid_map_present
+
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "client_name": sess.get("client_name"),
+        "step8_available": step8_available,
+    }
+
+
 # ── Step 1 — Catalog status ───────────────────────────────────────────────────
 
 @app.get("/api/session/{session_id}/catalog")

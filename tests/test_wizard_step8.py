@@ -81,3 +81,38 @@ def test_catalog_report_404_when_no_push():
     resp = client.get(f"/api/session/{session_id}/catalog-report")
     assert resp.status_code == 404
     assert "push_uuid_map.json not found" in resp.text
+
+
+def test_session_state_includes_step8_available_true_when_uuid_map_present(monkeypatch):
+    monkeypatch.setenv("ARCHIMEDES_USE_CATALOG_RESOLVER", "true")
+    session_id, _ = _make_session()
+    client = TestClient(app)
+    resp = client.get(f"/api/session/{session_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body.get("step8_available") is True
+
+
+def test_session_state_step8_unavailable_when_resolver_disabled(monkeypatch):
+    monkeypatch.setenv("ARCHIMEDES_USE_CATALOG_RESOLVER", "false")
+    session_id, _ = _make_session()
+    client = TestClient(app)
+    resp = client.get(f"/api/session/{session_id}")
+    body = resp.json()
+    assert body.get("step8_available") is False
+
+
+def test_session_state_step8_unavailable_when_no_uuid_map(monkeypatch):
+    monkeypatch.setenv("ARCHIMEDES_USE_CATALOG_RESOLVER", "true")
+    session_id = str(_uuid.uuid4())
+    session_dir = OUTPUT_DIR / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    _sessions[session_id] = {
+        "client_name": "Acme",
+        "output_dir":  session_dir,
+        "out_baseline": None, "out_target": None,
+    }
+    client = TestClient(app)
+    resp = client.get(f"/api/session/{session_id}")
+    body = resp.json()
+    assert body.get("step8_available") is False
