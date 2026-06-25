@@ -249,3 +249,48 @@ def test_prompt_skip_all_sets_flag_and_returns_false(monkeypatch):
 def test_prompt_non_interactive_returns_false():
     r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
     assert r._prompt_link("X", "Y", "HIGH") is False
+
+
+def test_exact_match_skips_probe():
+    """Single candidate with displayName matching name → VERYHIGH, no batch-links."""
+    r = ReferenceCatalogResolver("https://x", "tok")
+    search_payload = [
+        {
+            "alreadyLinked": False,
+            "factSheet": {
+                "id": "uuid-1",
+                "externalId": "lx_APP_000123",
+                "displayName": "SAP S/4HANA",
+                "type": "Application",
+            },
+        }
+    ]
+    detail_payload = {
+        "id": "uuid-1",
+        "externalId": "lx_APP_000123",
+        "displayName": "SAP S/4HANA",
+        "description": "ERP suite",
+        "fields": [{"name": "lxHostingType", "value": "saas"}],
+        "relations": [],
+    }
+    with patch("pipeline.reference_catalog.requests.get",
+               side_effect=[_mk_response(search_payload),
+                            _mk_response(detail_payload)]), \
+         patch("pipeline.reference_catalog.requests.post") as post:
+        m = r._resolve_one("Application", "SAP S/4HANA")
+    assert m.status == "LINKED"
+    assert m.confidence == "VERYHIGH"
+    assert m.external_id == "lx_APP_000123"
+    assert m.display_name == "SAP S/4HANA"
+    assert m.fields["lxHostingType"] == "saas"
+    post.assert_not_called()  # no probe
+
+
+def test_zero_candidates_custom():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response([])):
+        m = r._resolve_one("Application", "Unknown App")
+    assert m.status == "CUSTOM"
+    assert m.confidence == "NONE"
+    assert m.external_id is None

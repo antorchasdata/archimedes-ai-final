@@ -245,6 +245,50 @@ class ReferenceCatalogResolver:
             return False
         return False
 
+    # ── Resolution algorithm ───────────────────────────────────────────────
+
+    def _resolve_one(self, fs_type: str, name: str) -> ResolvedMatch:
+        """Resolve a single name. Pure (no caching) — caller manages cache."""
+        candidates = self._search_by_name(fs_type, name)
+
+        # Step 2a: zero candidates
+        if not candidates:
+            return ResolvedMatch(name=name)
+
+        # Step 2b: exact-match shortcut
+        norm = _normalize_name(name)
+        for cand in candidates:
+            fs = cand.get("factSheet") or {}
+            if _normalize_name(fs.get("displayName") or "") == norm:
+                ext_id = fs.get("externalId")
+                detail = self._fetch_detail(fs_type, ext_id) if ext_id else {}
+                return ResolvedMatch(
+                    name=name,
+                    external_id=ext_id,
+                    catalog_uuid=fs.get("id"),
+                    display_name=fs.get("displayName"),
+                    confidence="VERYHIGH",
+                    status="LINKED",
+                    fields=self._build_fields(detail),
+                )
+
+        # Step 3+: ambiguous — probe path (added in Task 10)
+        return self._resolve_via_probe(fs_type, name)
+
+    def _build_fields(self, detail: dict) -> dict:
+        """Flatten detail into the fields dict stored on ResolvedMatch."""
+        out: dict[str, Any] = {}
+        if detail.get("description"):
+            out["description"] = detail["description"]
+        for k, v in (detail.get("fields") or {}).items():
+            if v is not None:
+                out[k] = v
+        return out
+
+    def _resolve_via_probe(self, fs_type: str, name: str) -> ResolvedMatch:
+        """Placeholder — filled in by Task 10."""
+        return ResolvedMatch(name=name)
+
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
         return
