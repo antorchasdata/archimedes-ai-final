@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pipeline.reference_catalog import ResolvedMatch, ReferenceCatalogResolver, _normalize_name
+from pipeline.reference_catalog import ResolvedMatch, ReferenceCatalogResolver, _normalize_name, _source_for_type, _external_id_prefix
+import pytest
 
 
 def test_resolved_match_defaults():
@@ -37,3 +38,21 @@ def test_normalize_idempotent():
     once = _normalize_name("SAP S/4HANA")
     twice = _normalize_name(once)
     assert once == twice
+
+
+def test_source_for_type_application():
+    assert _source_for_type("Application") == "saas"
+
+
+def test_source_for_type_itcomponent():
+    assert _source_for_type("ITComponent") == "ltls"
+
+
+def test_source_for_type_invalid():
+    with pytest.raises(ValueError):
+        _source_for_type("BusinessCapability")
+
+
+def test_external_id_prefix():
+    assert _external_id_prefix("Application") == "lx_APP_"
+    assert _external_id_prefix("ITComponent") == "lx_ITC_"

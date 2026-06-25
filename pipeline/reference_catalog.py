@@ -23,6 +23,23 @@ def _normalize_name(name: str) -> str:
     return _WHITESPACE_RE.sub(" ", name.strip().lower())
 
 
+_SOURCE_BY_TYPE = {"Application": "saas", "ITComponent": "ltls"}
+_PREFIX_BY_TYPE = {"Application": "lx_APP_", "ITComponent": "lx_ITC_"}
+
+
+def _source_for_type(fs_type: str) -> str:
+    try:
+        return _SOURCE_BY_TYPE[fs_type]
+    except KeyError as exc:
+        raise ValueError(
+            f"Reference Catalog only supports Application and ITComponent, got {fs_type!r}"
+        ) from exc
+
+
+def _external_id_prefix(fs_type: str) -> str:
+    return _PREFIX_BY_TYPE[fs_type]
+
+
 @dataclass
 class ResolvedMatch:
     """Result of resolving a single name against the catalog."""
