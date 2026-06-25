@@ -188,3 +188,36 @@ def test_link_apps_skips_rows_with_external_id():
     ]
     assert all("ws-uuid-1" not in body for body in called_bodies), \
         "Pre-linked app SAP S/4HANA must not be sent to batch-links"
+
+
+def test_catalog_resolution_report_written(tmp_path, monkeypatch):
+    """When the resolver runs, a catalog_resolution_report.json is written
+    next to the Excel with one entry per resolved name per type."""
+    monkeypatch.setenv("ARCHIMEDES_USE_CATALOG_RESOLVER", "true")
+
+    fake_resolver = MagicMock()
+    fake_resolver.resolve.side_effect = lambda fs_type, names: {
+        n: ResolvedMatch(
+            name=n,
+            external_id=f"lx_APP_{i:03d}" if fs_type == "Application" else f"lx_ITC_{i:03d}",
+            display_name=n, confidence="VERYHIGH", status="LINKED", fields={},
+        )
+        for i, n in enumerate(names, start=1)
+    }
+    out = tmp_path / "x.xlsx"
+    with patch.object(write_mod, "ReferenceCatalogResolver", return_value=fake_resolver), \
+         patch.object(write_mod, "_resolver_credentials", return_value=("https://x", "tok")):
+        write_mod.write_leanix_excel(
+            enriched=_minimal_enriched(),
+            bcs_index={},
+            output_path=out,
+            client_name="ACME",
+        )
+
+    import json as _json
+    report_path = tmp_path / "catalog_resolution_report.json"
+    assert report_path.exists(), "catalog_resolution_report.json must be written next to the Excel"
+    body = _json.loads(report_path.read_text())
+    assert "Application" in body and "ITComponent" in body
+    assert any(e.get("status") == "LINKED" for e in body["Application"])
+    assert all(e.get("external_id", "").startswith("lx_APP_") for e in body["Application"])

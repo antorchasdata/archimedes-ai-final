@@ -782,6 +782,46 @@ def write_leanix_excel(
         len(seen_apps), len(seen_bcs), len(initiatives), output_path,
     )
 
+    # ── Reference Catalog audit report ────────────────────────────────────────
+    # Writes catalog_resolution_report.json next to the Excel with per-type
+    # entries {name, external_id, confidence, status}. Always safe to call
+    # (empty dicts when the resolver flag is off → empty arrays in the JSON).
+    if app_matches or itc_matches:
+        report = {
+            "Application": [
+                {"name": m.name, "external_id": m.external_id,
+                 "confidence": m.confidence, "status": m.status}
+                for m in app_matches.values()
+            ],
+            "ITComponent": [
+                {"name": m.name, "external_id": m.external_id,
+                 "confidence": m.confidence, "status": m.status}
+                for m in itc_matches.values()
+            ],
+        }
+        try:
+            (Path(output_path).parent / "catalog_resolution_report.json").write_text(
+                json.dumps(report, ensure_ascii=False, indent=2)
+            )
+        except Exception as exc:
+            logger.warning("Could not write catalog_resolution_report.json: %s", exc)
+
+        def _count(matches: dict, key: str, value: str) -> int:
+            return sum(1 for m in matches.values() if getattr(m, key) == value)
+
+        logger.info(
+            "Reference Catalog Application: %d names — %d LINKED, %d CUSTOM",
+            len(app_matches),
+            _count(app_matches, "status", "LINKED"),
+            _count(app_matches, "status", "CUSTOM"),
+        )
+        logger.info(
+            "Reference Catalog ITComponent: %d names — %d LINKED, %d CUSTOM",
+            len(itc_matches),
+            _count(itc_matches, "status", "LINKED"),
+            _count(itc_matches, "status", "CUSTOM"),
+        )
+
     if resolver is not None:
         try:
             resolver.cleanup()
