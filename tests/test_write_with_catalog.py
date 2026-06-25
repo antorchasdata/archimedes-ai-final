@@ -174,7 +174,7 @@ def test_link_apps_skips_rows_with_external_id():
         json=lambda: {},
         raise_for_status=MagicMock(),
     )
-    with patch.object(write_mod, "_get_bearer", return_value="fake-token"), \
+    with patch.object(write_mod, "get_bearer", return_value="fake-token"), \
          patch.dict("sys.modules", {"requests": fake_requests}):
         _link_apps_to_catalog(
             "https://x", "tok", app_id_cache, {},

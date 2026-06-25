@@ -37,6 +37,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from pipeline.reference_catalog import ReferenceCatalogResolver, ResolvedMatch
+from pipeline.leanix_auth import get_bearer
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -929,11 +930,9 @@ _TIME_TO_FUNCTIONAL = {
 }
 
 
-# ── LeanIX OAuth2 token cache ─────────────────────────────────────────────────
-# Tokens expire in 3600 s. Cache avoids re-auth on every call and automatically
-# refreshes 60 s before expiry so long-running pushes never hit an expired token.
-
-_token_cache: dict = {"token": None, "expires_at": 0.0}
+# ── LeanIX OAuth2 helpers ─────────────────────────────────────────────────────
+# Auth handshake lives in pipeline.leanix_auth (shared with push_ldif and
+# the Reference Catalog resolver).
 
 
 def _resolver_credentials() -> tuple[str, str]:
@@ -945,25 +944,6 @@ def _resolver_credentials() -> tuple[str, str]:
         os.environ["LEANIX_BASE_URL"].rstrip("/"),
         os.environ["LEANIX_API_TOKEN"],
     )
-
-
-def _get_bearer(base_url: str, api_token: str) -> str:
-    """Return a valid Bearer token, refreshing if expired or about to expire."""
-    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
-        return _token_cache["token"]
-    import requests as _requests
-    resp = _requests.post(
-        f"{base_url}/services/mtm/v1/oauth2/token",
-        data={"grant_type": "client_credentials"},
-        auth=("apitoken", api_token),
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    _token_cache["token"] = data["access_token"]
-    _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
-    logger.debug("LeanIX token refreshed (expires_in=%s s)", data.get("expires_in", 3600))
-    return _token_cache["token"]
 
 
 def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path | None:
@@ -979,7 +959,7 @@ def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path |
     import requests as _req
     from datetime import datetime
 
-    bearer = _get_bearer(base_url, api_token)
+    bearer = get_bearer(base_url, api_token)
     hdrs   = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
 
     # 1. Trigger export
@@ -1011,7 +991,7 @@ def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path |
     for attempt in range(30):
         time.sleep(10)
         try:
-            bearer = _get_bearer(base_url, api_token)
+            bearer = get_bearer(base_url, api_token)
             poll_hdrs = {"Authorization": f"Bearer {bearer}"}
             # Try job-status endpoint first, then generic downloads list
             if export_id:
@@ -1055,7 +1035,7 @@ def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path |
     # 3. Download the file
     backup_path = output_dir / f"leanix_backup_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
         dl = _req.get(download_url, headers={"Authorization": f"Bearer {bearer}"}, timeout=120, stream=True)
         dl.raise_for_status()
         with open(backup_path, "wb") as f:
@@ -1095,13 +1075,13 @@ def write_leanix(
     # ── Backup workspace before push (non-fatal) ──────────────────────────────
     _backup_workspace(base_url, token, staging_path.parent)
 
-    # ── Authenticate (token auto-refreshes via _get_bearer) ───────────────────
+    # ── Authenticate (token auto-refreshes via get_bearer) ───────────────────
     gql_url = f"{base_url}/services/pathfinder/v1/graphql"
     trans_url = f"{base_url}/services/transformations/v1/transformations"
 
     def _gql(query: str, variables: dict, _max_retries: int = 3) -> dict:
         for attempt in range(1, _max_retries + 1):
-            hdrs = {"Authorization": f"Bearer {_get_bearer(base_url, token)}", "Content-Type": "application/json"}
+            hdrs = {"Authorization": f"Bearer {get_bearer(base_url, token)}", "Content-Type": "application/json"}
             try:
                 resp = requests.post(
                     gql_url,
@@ -1734,7 +1714,7 @@ def write_leanix(
                     ]
                 try:
                     hdrs = {
-                        "Authorization": f"Bearer {_get_bearer(base_url, token)}",
+                        "Authorization": f"Bearer {get_bearer(base_url, token)}",
                         "Content-Type": "application/json",
                     }
                     t_resp = requests.post(trans_url, json=payload, headers=hdrs, timeout=30)
@@ -1793,7 +1773,7 @@ def write_leanix(
                     continue
 
                 hdrs = {
-                    "Authorization": f"Bearer {_get_bearer(base_url, token)}",
+                    "Authorization": f"Bearer {get_bearer(base_url, token)}",
                     "Content-Type": "application/json",
                 }
 
@@ -1927,7 +1907,7 @@ def _link_apps_to_catalog(
     if itc_id_cache:
         itc_id_cache = {n: i for n, i in itc_id_cache.items() if n not in skipped}
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         logger.warning("Reference Catalog: cannot get bearer token: %s", exc)
         return
@@ -2093,7 +2073,7 @@ def _create_project_kpis(
     import requests as _req
 
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         logger.warning("Metrics KPIs: cannot get bearer token: %s", exc)
         return {}
