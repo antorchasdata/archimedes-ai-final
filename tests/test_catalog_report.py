@@ -191,3 +191,36 @@ def test_render_html_escapes_confidence_html():
     html = render_html(res, umap, client_name="Acme")
     assert "<b>X</b>" not in html
     assert "&lt;b&gt;X&lt;/b&gt;" in html
+
+
+import openpyxl
+from pipeline.catalog_report import render_xlsx
+
+def test_render_xlsx_writes_workbook_with_one_sheet(tmp_path):
+    res = {"entries": [
+        {"name": "L", "type": "Application", "status": "LINKED",  "confidence": "VERYHIGH", "external_id": "lx_APP_1", "suggested_name": "L Cloud", "suggested_score": 1.0},
+        {"name": "R", "type": "Application", "status": "CUSTOM",  "confidence": "HIGH",     "suggested_name": "R Buying", "suggested_score": 0.82},
+    ]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True},
+                        "Application::R": {"uuid": "rr-2", "created": True}}, "failed": []}
+    out = tmp_path / "report.xlsx"
+    render_xlsx(res, umap, client_name="Acme", out_path=out)
+    wb = openpyxl.load_workbook(out)
+    assert wb.sheetnames == ["Catalog Report"]
+    ws = wb["Catalog Report"]
+    headers = [c.value for c in ws[1]]
+    assert headers == ["Status", "Name", "Type", "Suggested match", "Suggested score", "externalId", "Open FS URL", "Search catalog URL"]
+    assert ws.max_row == 3
+
+def test_render_xlsx_open_fs_is_hyperlink(tmp_path):
+    res = {"entries": [{"name": "L", "type": "Application", "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True}}, "failed": []}
+    out = tmp_path / "report.xlsx"
+    render_xlsx(res, umap, client_name="Acme", out_path=out)
+    wb = openpyxl.load_workbook(out)
+    ws = wb["Catalog Report"]
+    cell = ws.cell(row=2, column=7)
+    assert cell.hyperlink is not None
+    assert "factsheet/Application/ll-1" in cell.hyperlink.target

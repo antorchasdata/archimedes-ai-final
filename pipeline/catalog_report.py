@@ -196,3 +196,46 @@ def render_html(resolution: dict, uuid_map: dict, client_name: str) -> str:
         n_custom=counts.get("CUSTOM", 0),
         rows=rows_html,
     )
+
+
+from pathlib import Path
+
+
+def render_xlsx(resolution: dict, uuid_map: dict, client_name: str, out_path: Path) -> None:
+    import openpyxl
+    from openpyxl.styles import Font
+
+    rows = sort_rows(build_rows(resolution, uuid_map))
+    base_url = (uuid_map or {}).get("base_url", "")
+    workspace = (uuid_map or {}).get("workspace", "")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Catalog Report"
+    ws.append(["Status", "Name", "Type", "Suggested match", "Suggested score", "externalId", "Open FS URL", "Search catalog URL"])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+
+    for r in rows:
+        status_label = {"LINKED": "LINKED", "REVIEW": "REVIEW", "CUSTOM": "CUSTOM"}[r.status]
+        if r.push_failed:
+            status_label = f"PUSH FAILED · {status_label}"
+        fs_url = build_fs_url(base_url, workspace, r.type, r.fs_uuid) or ""
+        search_url = build_catalog_search_url(base_url, workspace, r.name) if r.status == "REVIEW" else ""
+        ws.append([
+            status_label,
+            r.name,
+            r.type,
+            r.suggested_name or "",
+            r.suggested_score if r.suggested_score is not None else "",
+            r.external_id or "",
+            fs_url,
+            search_url,
+        ])
+        row_idx = ws.max_row
+        if fs_url:
+            ws.cell(row=row_idx, column=7).hyperlink = fs_url
+        if search_url:
+            ws.cell(row=row_idx, column=8).hyperlink = search_url
+
+    wb.save(str(out_path))
