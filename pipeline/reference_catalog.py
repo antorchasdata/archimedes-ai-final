@@ -8,10 +8,19 @@ Public API:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_name(name: str) -> str:
+    """Lower-case + collapse whitespace. Used for cache keys and exact-match."""
+    return _WHITESPACE_RE.sub(" ", name.strip().lower())
 
 
 @dataclass
