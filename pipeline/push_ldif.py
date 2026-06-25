@@ -114,6 +114,24 @@ def _ext_id(client_name: str, fs_type: str, name: str) -> dict:
     }
 
 
+def build_create_factsheet_payload(row: dict) -> dict:
+    """Build a GraphQL createFactSheet input from a row dict.
+
+    When the row carries a catalog ``externalId`` (e.g. ``lx_APP_000123``),
+    include it so the fact sheet is created already linked to the
+    Reference Catalog. Otherwise, omit it.
+    """
+    payload: dict = {
+        "name": row.get("name"),
+        "type": row.get("type"),
+    }
+    if row.get("externalId"):
+        payload["externalId"] = row["externalId"]
+    if row.get("description"):
+        payload["description"] = row["description"]
+    return payload
+
+
 def _build_bc_entry(row: dict, client_name: str) -> dict:
     name   = str(row.get("name") or "").strip()
     parent = str(row.get("relToParent") or "").strip()

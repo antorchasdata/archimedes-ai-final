@@ -120,3 +120,25 @@ def test_flag_on_resolver_failure_is_non_fatal(tmp_path, monkeypatch):
             client_name="ACME",
         )
     assert out.exists()
+
+
+def test_push_payload_includes_external_id_when_present():
+    """When a row carries externalId, the createFactSheet payload includes it."""
+    from pipeline.push_ldif import build_create_factsheet_payload
+
+    row = {
+        "name": "SAP S/4HANA",
+        "type": "Application",
+        "externalId": "lx_APP_000123",
+        "description": "ERP",
+    }
+    payload = build_create_factsheet_payload(row)
+    assert payload.get("externalId") == "lx_APP_000123"
+
+
+def test_push_payload_omits_external_id_when_absent():
+    from pipeline.push_ldif import build_create_factsheet_payload
+
+    row = {"name": "Custom App", "type": "Application", "description": ""}
+    payload = build_create_factsheet_payload(row)
+    assert "externalId" not in payload or payload["externalId"] in (None, "")
