@@ -99,3 +99,63 @@ def test_build_catalog_search_url_url_encodes_name():
         name="SAP Ariba Buying",
     )
     assert url == "https://demo-eu-3.leanix.net/demo-eu-3/inventory/referenceCatalog?q=SAP%20Ariba%20Buying"
+
+from pipeline.catalog_report import render_html
+
+def test_render_html_contains_title_and_counts():
+    res = {"entries": [
+        {"name": "L", "type": "Application", "status": "LINKED",  "confidence": "VERYHIGH", "external_id": "lx_APP_1", "suggested_name": "L Cloud", "suggested_score": 1.0},
+        {"name": "R", "type": "Application", "status": "CUSTOM",  "confidence": "HIGH",     "suggested_name": "R Buying", "suggested_score": 0.82},
+        {"name": "C", "type": "Application", "status": "CUSTOM",  "confidence": "NONE"},
+    ]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True},
+                        "Application::R": {"uuid": "rr-2", "created": True},
+                        "Application::C": {"uuid": "cc-3", "created": True}}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    assert "Catalog Linking Review" in html
+    assert "Acme" in html
+    assert "1 linked" in html
+    assert "1 to review" in html
+    assert "1 custom" in html
+
+def test_render_html_includes_fs_link_for_linked_row():
+    res = {"entries": [{"name": "L", "type": "Application", "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True}}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    assert "https://demo-eu-3.leanix.net/demo-eu-3/factsheet/Application/ll-1" in html
+
+def test_render_html_search_link_only_on_review_rows():
+    res = {"entries": [
+        {"name": "L", "type": "Application", "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"},
+        {"name": "R", "type": "Application", "status": "CUSTOM", "confidence": "HIGH",     "suggested_name": "R Buying"},
+        {"name": "C", "type": "Application", "status": "CUSTOM", "confidence": "NONE"},
+    ]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True},
+                        "Application::R": {"uuid": "rr-2", "created": True},
+                        "Application::C": {"uuid": "cc-3", "created": True}}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    # Only the REVIEW row should produce a referenceCatalog search link
+    assert html.count("/inventory/referenceCatalog?q=") == 1
+    assert "q=R" in html
+
+def test_render_html_uses_status_css_classes():
+    res = {"entries": [
+        {"name": "L", "type": "Application", "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"},
+        {"name": "R", "type": "Application", "status": "CUSTOM", "confidence": "HIGH"},
+        {"name": "C", "type": "Application", "status": "CUSTOM", "confidence": "NONE"},
+    ]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net", "entries": {}, "failed": []}
+    html = render_html(res, umap, client_name="Acme")
+    assert 'class="row row-linked"' in html
+    assert 'class="row row-review"' in html
+    assert 'class="row row-custom"' in html
+
+def test_render_html_push_failed_row_marked():
+    res = {"entries": [{"name": "Broken", "type": "Application", "status": "CUSTOM", "confidence": "NONE"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {}, "failed": [{"name": "Broken", "type": "Application", "error": "boom"}]}
+    html = render_html(res, umap, client_name="Acme")
+    assert "PUSH FAILED" in html
