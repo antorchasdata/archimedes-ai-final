@@ -31,6 +31,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from pipeline.leanix_auth import get_bearer
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -46,29 +48,6 @@ _LIFECYCLE_MAP = {
     "phaseOut":  "phaseOut",
     "endOfLife": "endOfLife",
 }
-
-# ── Token helpers (reuse write.py cache when available) ───────────────────────
-
-_token_cache: dict = {"token": None, "expires_at": 0.0}
-
-
-def _get_bearer(base_url: str, api_token: str) -> str:
-    """Return a valid Bearer token, refreshing if expired or about to expire."""
-    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
-        return _token_cache["token"]
-    resp = requests.post(
-        f"{base_url}/services/mtm/v1/oauth2/token",
-        data={"grant_type": "client_credentials"},
-        auth=("apitoken", api_token),
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    _token_cache["token"] = data["access_token"]
-    _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
-    logger.debug("LDIF: token refreshed (expires_in=%s s)", data.get("expires_in", 3600))
-    return _token_cache["token"]
-
 
 # ── Excel reader (mirrors write.py sheet reading logic) ───────────────────────
 
@@ -344,7 +323,7 @@ def push_leanix_ldif(
         ldif_path.write_text(json.dumps(ldif, indent=2, ensure_ascii=False))
         logger.info("LDIF saved to %s", ldif_path)
 
-    bearer  = _get_bearer(_base_url, _api_token)
+    bearer  = get_bearer(_base_url, _api_token)
     hdrs    = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
     url     = f"{_base_url}/services/integration-api/v1/synchronizationRuns/withConfig"
 
