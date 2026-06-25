@@ -141,3 +141,37 @@ def test_fetch_detail_http_error_returns_empty():
                return_value=_mk_response({}, status=500)):
         detail = r._fetch_detail("Application", "lx_APP_000123")
     assert detail == {}
+
+
+def test_probe_create_returns_uuid():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)) as post:
+        fs_id = r._probe_create("Application", "Probe Name")
+    assert fs_id == "probe-uuid-1"
+    body = post.call_args.kwargs["json"]
+    assert "createFactSheet" in body["query"]
+
+
+def test_probe_create_failure_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response({"errors": [{"message": "boom"}]})):
+        assert r._probe_create("Application", "X") is None
+
+
+def test_probe_rename_returns_true():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)):
+        assert r._probe_rename("probe-uuid-1", "New Name") is True
+
+
+def test_probe_archive_returns_true():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)):
+        assert r._probe_archive("probe-uuid-1") is True

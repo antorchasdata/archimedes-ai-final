@@ -139,6 +139,60 @@ class ReferenceCatalogResolver:
             "fields": fields_dict,
         }
 
+    # ── GraphQL probe lifecycle ────────────────────────────────────────────
+
+    def _gql(self, query: str, variables: dict | None = None) -> dict | None:
+        """POST to pathfinder GraphQL. Returns data dict on success, None on error."""
+        url = f"{self.base_url}/services/pathfinder/v1/graphql"
+        body = {"query": query, "variables": variables or {}}
+        try:
+            resp = requests.post(url, headers=self._headers(), json=body, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("errors"):
+                logger.warning("GraphQL errors: %s", payload["errors"])
+                return None
+            return payload.get("data")
+        except Exception as exc:
+            logger.warning("GraphQL call failed: %s", exc)
+            return None
+
+    def _probe_create(self, fs_type: str, name: str) -> str | None:
+        query = (
+            "mutation($name:String!,$type:FactSheetType!){"
+            "createFactSheet(input:{name:$name,type:$type}){factSheet{id}}}"
+        )
+        data = self._gql(query, {"name": name, "type": fs_type})
+        if not data:
+            return None
+        return ((data.get("createFactSheet") or {}).get("factSheet") or {}).get("id")
+
+    def _probe_rename(self, fs_id: str, new_name: str) -> bool:
+        query = (
+            "mutation($id:ID!,$patches:[Patch]!){"
+            "updateFactSheet(id:$id,patches:$patches,comment:\"probe rename\"){"
+            "factSheet{id}}}"
+        )
+        variables = {
+            "id": fs_id,
+            "patches": [{"op": "replace", "path": "/name", "value": new_name}],
+        }
+        data = self._gql(query, variables)
+        return bool(data and data.get("updateFactSheet"))
+
+    def _probe_archive(self, fs_id: str) -> bool:
+        query = (
+            "mutation($id:ID!,$patches:[Patch]!){"
+            "updateFactSheet(id:$id,patches:$patches,comment:\"probe cleanup\"){"
+            "factSheet{id}}}"
+        )
+        variables = {
+            "id": fs_id,
+            "patches": [{"op": "replace", "path": "/status", "value": "ARCHIVED"}],
+        }
+        data = self._gql(query, variables)
+        return bool(data and data.get("updateFactSheet"))
+
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
         return
