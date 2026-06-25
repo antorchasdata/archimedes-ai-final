@@ -224,3 +224,30 @@ def test_render_xlsx_open_fs_is_hyperlink(tmp_path):
     cell = ws.cell(row=2, column=7)
     assert cell.hyperlink is not None
     assert "factsheet/Application/ll-1" in cell.hyperlink.target
+
+
+import json
+import pytest
+from pipeline.catalog_report import generate_report
+
+def test_generate_report_writes_both_files(tmp_path):
+    res = {"entries": [{"name": "L", "type": "Application", "status": "LINKED", "confidence": "VERYHIGH", "external_id": "lx_APP_1"}]}
+    umap = {"workspace": "demo-eu-3", "base_url": "https://demo-eu-3.leanix.net",
+            "entries": {"Application::L": {"uuid": "ll-1", "created": True}}, "failed": []}
+    (tmp_path / "catalog_resolution_report.json").write_text(json.dumps(res))
+    (tmp_path / "push_uuid_map.json").write_text(json.dumps(umap))
+
+    generate_report(session_dir=tmp_path, client_name="Acme")
+
+    assert (tmp_path / "catalog_report.html").exists()
+    assert (tmp_path / "catalog_report.xlsx").exists()
+
+def test_generate_report_raises_when_resolution_missing(tmp_path):
+    (tmp_path / "push_uuid_map.json").write_text("{}")
+    with pytest.raises(FileNotFoundError, match="Resolution report missing"):
+        generate_report(tmp_path, "Acme")
+
+def test_generate_report_raises_when_uuid_map_missing(tmp_path):
+    (tmp_path / "catalog_resolution_report.json").write_text('{"entries": []}')
+    with pytest.raises(FileNotFoundError, match="UUID map missing"):
+        generate_report(tmp_path, "Acme")

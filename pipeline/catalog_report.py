@@ -239,3 +239,34 @@ def render_xlsx(resolution: dict, uuid_map: dict, client_name: str, out_path: Pa
             ws.cell(row=row_idx, column=8).hyperlink = search_url
 
     wb.save(str(out_path))
+
+
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def generate_report(session_dir: Path, client_name: str) -> tuple[Path, Path]:
+    """Read inputs from session_dir, write HTML + XLSX into the same dir.
+
+    Returns (html_path, xlsx_path).
+
+    Raises FileNotFoundError if either input is missing.
+    """
+    session_dir = Path(session_dir)
+    res_path = session_dir / "catalog_resolution_report.json"
+    umap_path = session_dir / "push_uuid_map.json"
+    if not res_path.exists():
+        raise FileNotFoundError(f"Resolution report missing: {res_path}")
+    if not umap_path.exists():
+        raise FileNotFoundError(f"UUID map missing: {umap_path}")
+    resolution = json.loads(res_path.read_text())
+    uuid_map = json.loads(umap_path.read_text())
+
+    html_path = session_dir / "catalog_report.html"
+    xlsx_path = session_dir / "catalog_report.xlsx"
+    html_path.write_text(render_html(resolution, uuid_map, client_name))
+    render_xlsx(resolution, uuid_map, client_name, xlsx_path)
+    logger.info("Catalog report written: %s + %s", html_path, xlsx_path)
+    return html_path, xlsx_path
