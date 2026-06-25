@@ -61,6 +61,15 @@ def test_external_id_prefix():
 from unittest.mock import patch, MagicMock
 
 
+@pytest.fixture(autouse=True)
+def _stub_get_bearer():
+    """Stub get_bearer in every resolver test so _headers() never reaches the
+    real OAuth handshake. The contract test test_headers_uses_get_bearer
+    overrides this with its own patch."""
+    with patch("pipeline.reference_catalog.get_bearer", return_value="STUB_JWT"):
+        yield
+
+
 def _mk_response(json_body, status=200):
     r = MagicMock()
     r.status_code = status
@@ -471,3 +480,13 @@ def test_cleanup_archive_failure_does_not_raise():
     r._probe_ids = {"Application": "probe-app"}
     with patch.object(r, "_probe_archive", return_value=False):
         r.cleanup()  # logs but does not raise
+
+
+def test_headers_uses_get_bearer():
+    """Resolver must call get_bearer() instead of using the raw API token."""
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.get_bearer",
+               return_value="JWT_FAKE") as gb:
+        headers = r._headers()
+    assert headers["Authorization"] == "Bearer JWT_FAKE"
+    gb.assert_called_once_with("https://x", "tok")

@@ -15,6 +15,8 @@ from typing import Any
 
 import requests
 
+from pipeline.leanix_auth import get_bearer
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,7 +103,7 @@ class ReferenceCatalogResolver:
 
     def _headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {self.api_token}",
+            "Authorization": f"Bearer {get_bearer(self.base_url, self.api_token)}",
             "Accept": "application/json",
         }
 
