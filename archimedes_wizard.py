@@ -1411,6 +1411,47 @@ async def download_file(session_id: str, key: str):
     return FileResponse(path=str(path), filename=path.name, media_type=media)
 
 
+@app.get("/api/session/{session_id}/catalog-report", response_class=HTMLResponse)
+async def catalog_report_html(session_id: str):
+    sess = _session(session_id)  # raises 404 if missing
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_path = session_dir / "push_uuid_map.json"
+    if not uuid_map_path.exists():
+        raise HTTPException(status_code=404, detail="push_uuid_map.json not found — run Step 7 first")
+
+    html_path = session_dir / "catalog_report.html"
+    if not html_path.exists():
+        # Render on demand
+        from pipeline.catalog_report import generate_report
+        try:
+            generate_report(session_dir=session_dir, client_name=sess.get("client_name") or "")
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+    return HTMLResponse(content=html_path.read_text())
+
+
+@app.get("/api/session/{session_id}/catalog-report.xlsx")
+async def catalog_report_xlsx(session_id: str):
+    sess = _session(session_id)
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_path = session_dir / "push_uuid_map.json"
+    if not uuid_map_path.exists():
+        raise HTTPException(status_code=404, detail="push_uuid_map.json not found — run Step 7 first")
+
+    xlsx_path = session_dir / "catalog_report.xlsx"
+    if not xlsx_path.exists():
+        from pipeline.catalog_report import generate_report
+        try:
+            generate_report(session_dir=session_dir, client_name=sess.get("client_name") or "")
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+    return FileResponse(
+        path=str(xlsx_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="catalog_report.xlsx",
+    )
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
