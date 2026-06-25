@@ -1,0 +1,473 @@
+"""Unit tests for pipeline.reference_catalog."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from pipeline.reference_catalog import ResolvedMatch, ReferenceCatalogResolver, _normalize_name, _source_for_type, _external_id_prefix
+import pytest
+
+
+def test_resolved_match_defaults():
+    m = ResolvedMatch(name="SAP S/4HANA")
+    assert m.name == "SAP S/4HANA"
+    assert m.external_id is None
+    assert m.catalog_uuid is None
+    assert m.display_name is None
+    assert m.confidence == "NONE"
+    assert m.status == "CUSTOM"
+    assert m.fields == {}
+
+
+def test_resolver_construct():
+    r = ReferenceCatalogResolver(base_url="https://example.com", api_token="tok")
+    assert r.base_url == "https://example.com"
+    assert r.api_token == "tok"
+    assert r.interactive is True
+
+
+def test_normalize_lowercases_and_collapses_whitespace():
+    assert _normalize_name("SAP S/4HANA") == "sap s/4hana"
+    assert _normalize_name("  SAP   S/4HANA  ") == "sap s/4hana"
+    assert _normalize_name("SAP\tS/4HANA\n") == "sap s/4hana"
+
+
+def test_normalize_idempotent():
+    once = _normalize_name("SAP S/4HANA")
+    twice = _normalize_name(once)
+    assert once == twice
+
+
+def test_source_for_type_application():
+    assert _source_for_type("Application") == "saas"
+
+
+def test_source_for_type_itcomponent():
+    assert _source_for_type("ITComponent") == "ltls"
+
+
+def test_source_for_type_invalid():
+    with pytest.raises(ValueError):
+        _source_for_type("BusinessCapability")
+
+
+def test_external_id_prefix():
+    assert _external_id_prefix("Application") == "lx_APP_"
+    assert _external_id_prefix("ITComponent") == "lx_ITC_"
+
+
+from unittest.mock import patch, MagicMock
+
+
+def _mk_response(json_body, status=200):
+    r = MagicMock()
+    r.status_code = status
+    r.json.return_value = json_body
+    r.raise_for_status = MagicMock()
+    if status >= 400:
+        r.raise_for_status.side_effect = Exception(f"HTTP {status}")
+    return r
+
+
+def test_search_by_name_returns_candidates():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = [
+        {
+            "alreadyLinked": False,
+            "factSheet": {
+                "id": "uuid-1",
+                "externalId": "lx_APP_000123",
+                "displayName": "SAP S/4HANA",
+                "type": "Application",
+            },
+        }
+    ]
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(payload)) as get:
+        candidates = r._search_by_name("Application", "SAP S/4HANA")
+    assert len(candidates) == 1
+    assert candidates[0]["factSheet"]["externalId"] == "lx_APP_000123"
+    called_url = get.call_args[0][0]
+    assert "/services/reference-data/v1/source/saas/fact-sheets" in called_url
+
+
+def test_search_by_name_http_error_returns_empty():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response({}, status=500)):
+        candidates = r._search_by_name("Application", "Anything")
+    assert candidates == []
+
+
+def test_search_by_name_short_query_skipped():
+    """API requires min 2 chars — a 1-char name must be skipped, not sent."""
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get") as get:
+        candidates = r._search_by_name("Application", "X")
+    assert candidates == []
+    get.assert_not_called()
+
+
+def test_fetch_detail_returns_fields():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {
+        "id": "uuid-1",
+        "externalId": "lx_APP_000123",
+        "displayName": "SAP S/4HANA",
+        "description": "ERP",
+        "fields": [
+            {"name": "lxHostingType", "value": "saas"},
+            {"name": "productCategory", "value": "ERP"},
+        ],
+        "relations": [
+            {"name": "relApplicationToProvider",
+             "targetFactSheet": {"displayName": "SAP"}},
+        ],
+    }
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(payload)):
+        detail = r._fetch_detail("Application", "lx_APP_000123")
+    assert detail["description"] == "ERP"
+    assert detail["fields"]["lxHostingType"] == "saas"
+    assert detail["fields"]["productCategory"] == "ERP"
+    assert detail["fields"]["provider"] == "SAP"
+
+
+def test_fetch_detail_http_error_returns_empty():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response({}, status=500)):
+        detail = r._fetch_detail("Application", "lx_APP_000123")
+    assert detail == {}
+
+
+def test_probe_create_returns_uuid():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)) as post:
+        fs_id = r._probe_create("Application", "Probe Name")
+    assert fs_id == "probe-uuid-1"
+    body = post.call_args.kwargs["json"]
+    assert "createFactSheet" in body["query"]
+
+
+def test_probe_create_failure_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response({"errors": [{"message": "boom"}]})):
+        assert r._probe_create("Application", "X") is None
+
+
+def test_probe_rename_returns_true():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)):
+        assert r._probe_rename("probe-uuid-1", "New Name") is True
+
+
+def test_probe_archive_returns_true():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    gql_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid-1"}}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(gql_resp)):
+        assert r._probe_archive("probe-uuid-1") is True
+
+
+def test_batch_links_returns_top_suggestion():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {
+        "data": {
+            "probe-uuid-1": {
+                "suggestions": [
+                    {
+                        "alreadyLinked": False,
+                        "factSheet": {
+                            "id": "cat-uuid-1",
+                            "displayName": "SAP S/4HANA Cloud",
+                            "externalId": "lx_APP_000999",
+                            "confidenceLevel": "HIGH",
+                        },
+                    }
+                ]
+            }
+        }
+    }
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(payload)):
+        top = r._batch_links("Application", "probe-uuid-1", "SAP S/4HANA")
+    assert top is not None
+    assert top["confidenceLevel"] == "HIGH"
+    assert top["externalId"] == "lx_APP_000999"
+
+
+def test_batch_links_no_suggestions_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {"data": {"probe-uuid-1": {"suggestions": []}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(payload)):
+        assert r._batch_links("Application", "probe-uuid-1", "X") is None
+
+
+def test_batch_links_error_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response({}, status=500)):
+        assert r._batch_links("Application", "probe-uuid-1", "X") is None
+
+
+import io
+
+
+def test_prompt_yes_returns_true(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("y\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("SAP S4", "SAP S/4HANA Cloud", "HIGH") is True
+
+
+def test_prompt_no_returns_false(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("n\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
+
+
+def test_prompt_skip_all_sets_flag_and_returns_false(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("s\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
+    assert r._skip_all_prompts is True
+    # subsequent call should not prompt at all
+    assert r._prompt_link("A", "B", "MEDIUM") is False
+
+
+def test_prompt_non_interactive_returns_false():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    assert r._prompt_link("X", "Y", "HIGH") is False
+
+
+def test_exact_match_skips_probe():
+    """Single candidate with displayName matching name → VERYHIGH, no batch-links."""
+    r = ReferenceCatalogResolver("https://x", "tok")
+    search_payload = [
+        {
+            "alreadyLinked": False,
+            "factSheet": {
+                "id": "uuid-1",
+                "externalId": "lx_APP_000123",
+                "displayName": "SAP S/4HANA",
+                "type": "Application",
+            },
+        }
+    ]
+    detail_payload = {
+        "id": "uuid-1",
+        "externalId": "lx_APP_000123",
+        "displayName": "SAP S/4HANA",
+        "description": "ERP suite",
+        "fields": [{"name": "lxHostingType", "value": "saas"}],
+        "relations": [],
+    }
+    with patch("pipeline.reference_catalog.requests.get",
+               side_effect=[_mk_response(search_payload),
+                            _mk_response(detail_payload)]), \
+         patch("pipeline.reference_catalog.requests.post") as post:
+        m = r._resolve_one("Application", "SAP S/4HANA")
+    assert m.status == "LINKED"
+    assert m.confidence == "VERYHIGH"
+    assert m.external_id == "lx_APP_000123"
+    assert m.display_name == "SAP S/4HANA"
+    assert m.fields["lxHostingType"] == "saas"
+    post.assert_not_called()  # no probe
+
+
+def test_zero_candidates_custom():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response([])):
+        m = r._resolve_one("Application", "Unknown App")
+    assert m.status == "CUSTOM"
+    assert m.confidence == "NONE"
+    assert m.external_id is None
+
+
+_PROBE_BASE_NAME_APP = "_archimedes_probe_application"
+
+
+def test_probe_veryhigh_auto_links():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    search_payload = [
+        # ambiguous: candidate displayName differs from input name
+        {"alreadyLinked": False,
+         "factSheet": {"id": "cat-uuid", "externalId": "lx_APP_111",
+                       "displayName": "SAP S/4HANA Cloud", "type": "Application"}}
+    ]
+    create_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    rename_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    batch_resp = {"data": {"probe-uuid": {"suggestions": [
+        {"factSheet": {"id": "cat-uuid", "externalId": "lx_APP_111",
+                       "displayName": "SAP S/4HANA Cloud",
+                       "confidenceLevel": "VERYHIGH"}}
+    ]}}}
+    detail_resp = {
+        "id": "cat-uuid", "externalId": "lx_APP_111",
+        "displayName": "SAP S/4HANA Cloud",
+        "description": "Cloud ERP",
+        "fields": [{"name": "lxHostingType", "value": "saas"}],
+        "relations": [],
+    }
+    with patch("pipeline.reference_catalog.requests.get",
+               side_effect=[_mk_response(search_payload),
+                            _mk_response(detail_resp)]), \
+         patch("pipeline.reference_catalog.requests.post",
+               side_effect=[_mk_response(create_resp),     # probe create
+                            _mk_response(rename_resp),     # probe rename
+                            _mk_response(batch_resp)]):    # batch-links
+        m = r._resolve_one("Application", "SAP S4 HANA")  # not exact match
+    assert m.status == "LINKED"
+    assert m.confidence == "VERYHIGH"
+    assert m.external_id == "lx_APP_111"
+    assert m.fields["lxHostingType"] == "saas"
+
+
+def test_probe_high_interactive_accept(monkeypatch):
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=True)
+    monkeypatch.setattr("sys.stdin", io.StringIO("y\n"))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    search_payload = [{"alreadyLinked": False, "factSheet": {
+        "id": "x", "externalId": "lx_APP_222", "displayName": "SomeOther",
+        "type": "Application"}}]
+    create_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    rename_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    batch_resp = {"data": {"probe-uuid": {"suggestions": [
+        {"factSheet": {"id": "cat-uuid", "externalId": "lx_APP_333",
+                       "displayName": "Best Guess",
+                       "confidenceLevel": "HIGH"}}
+    ]}}}
+    detail_resp = {"id": "cat-uuid", "externalId": "lx_APP_333",
+                   "displayName": "Best Guess", "description": "", "fields": [], "relations": []}
+    with patch("pipeline.reference_catalog.requests.get",
+               side_effect=[_mk_response(search_payload),
+                            _mk_response(detail_resp)]), \
+         patch("pipeline.reference_catalog.requests.post",
+               side_effect=[_mk_response(create_resp),
+                            _mk_response(rename_resp),
+                            _mk_response(batch_resp)]):
+        m = r._resolve_one("Application", "Something Ambiguous")
+    assert m.status == "LINKED"
+    assert m.confidence == "HIGH"
+    assert m.external_id == "lx_APP_333"
+
+
+def test_probe_high_non_interactive_falls_back_custom():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    search_payload = [{"alreadyLinked": False, "factSheet": {
+        "id": "x", "externalId": "lx_APP_222", "displayName": "SomeOther",
+        "type": "Application"}}]
+    create_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    rename_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    batch_resp = {"data": {"probe-uuid": {"suggestions": [
+        {"factSheet": {"id": "cat", "externalId": "lx_APP_999",
+                       "displayName": "Guess", "confidenceLevel": "HIGH"}}
+    ]}}}
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(search_payload)), \
+         patch("pipeline.reference_catalog.requests.post",
+               side_effect=[_mk_response(create_resp),
+                            _mk_response(rename_resp),
+                            _mk_response(batch_resp)]):
+        m = r._resolve_one("Application", "Something")
+    assert m.status == "CUSTOM"
+    assert m.confidence == "HIGH"  # informational
+    assert m.external_id is None
+
+
+def test_probe_low_returns_custom():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    search_payload = [{"alreadyLinked": False, "factSheet": {
+        "id": "x", "externalId": "lx_APP_222", "displayName": "SomeOther",
+        "type": "Application"}}]
+    create_resp = {"data": {"createFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    rename_resp = {"data": {"updateFactSheet": {"factSheet": {"id": "probe-uuid"}}}}
+    batch_resp = {"data": {"probe-uuid": {"suggestions": [
+        {"factSheet": {"id": "cat", "externalId": "lx_APP_999",
+                       "displayName": "Weak", "confidenceLevel": "LOW"}}
+    ]}}}
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(search_payload)), \
+         patch("pipeline.reference_catalog.requests.post",
+               side_effect=[_mk_response(create_resp),
+                            _mk_response(rename_resp),
+                            _mk_response(batch_resp)]):
+        m = r._resolve_one("Application", "Something")
+    assert m.status == "CUSTOM"
+    assert m.confidence == "LOW"
+    assert m.external_id is None
+
+
+def test_probe_create_failure_degrades_to_no_probe_mode():
+    r = ReferenceCatalogResolver("https://x", "tok", interactive=False)
+    search_payload = [{"alreadyLinked": False, "factSheet": {
+        "id": "x", "externalId": "lx_APP_222", "displayName": "SomeOther",
+        "type": "Application"}}]
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(search_payload)), \
+         patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response({"errors": [{"message": "no"}]})):
+        m = r._resolve_one("Application", "Something")
+    assert m.status == "CUSTOM"
+    assert r._no_probe_mode is True
+
+
+def test_resolve_returns_dict_keyed_by_original_name():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch.object(r, "_resolve_one",
+                      side_effect=lambda t, n: ResolvedMatch(
+                          name=n, external_id=f"lx_APP_{hash(n) % 1000:03d}",
+                          status="LINKED", confidence="VERYHIGH")):
+        out = r.resolve("Application", ["App A", "App B"])
+    assert set(out.keys()) == {"App A", "App B"}
+    assert all(m.status == "LINKED" for m in out.values())
+
+
+def test_resolve_uses_cache_on_repeat():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch.object(r, "_resolve_one",
+                      return_value=ResolvedMatch(
+                          name="App A", external_id="lx_APP_001",
+                          status="LINKED", confidence="VERYHIGH")) as inner:
+        r.resolve("Application", ["App A"])
+        r.resolve("Application", ["App A", "app a"])  # case-insensitive cache hit
+    assert inner.call_count == 1
+
+
+def test_resolve_empty_list():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    assert r.resolve("Application", []) == {}
+
+
+def test_cleanup_archives_all_probe_ids():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    r._probe_ids = {"Application": "probe-app", "ITComponent": "probe-itc"}
+    with patch.object(r, "_probe_archive", return_value=True) as arch:
+        r.cleanup()
+    assert arch.call_count == 2
+    assert r._probe_ids == {}
+
+
+def test_cleanup_idempotent_no_probes():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    # Should not raise
+    r.cleanup()
+
+
+def test_cleanup_archive_failure_does_not_raise():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    r._probe_ids = {"Application": "probe-app"}
+    with patch.object(r, "_probe_archive", return_value=False):
+        r.cleanup()  # logs but does not raise

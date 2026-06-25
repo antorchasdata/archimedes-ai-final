@@ -77,6 +77,19 @@ python3 run.py push <client_target_leanix.xlsx> --client <name>
 | `ENRICH_BATCH_SIZE` | No (default: `10`) | Requirements per batch |
 | `ENRICH_MAX_RETRIES` | No (default: `3`) | Retries on API error |
 | `LOG_LEVEL` | No (default: `INFO`) | Python logging level |
+| `ARCHIMEDES_USE_CATALOG_RESOLVER` | No (default: `false`) | Set to `true`/`1`/`yes` to resolve Application & ITComponent names against the LeanIX Reference Catalog **before** the staging Excel is written. When enabled, matched rows carry an `externalId` (e.g. `lx_APP_000123`) so fact sheets are created already linked to the official catalog entry. Requires `LEANIX_BASE_URL` + `LEANIX_API_TOKEN`. |
+
+### Reference Catalog resolver (optional)
+
+When `ARCHIMEDES_USE_CATALOG_RESOLVER=true`, the writer queries the LeanIX
+Reference Catalog (sources `saas` for Application, `ltls` for ITComponent)
+and decorates each row with the catalog `externalId` if a confident match
+is found. Two long-lived probe fact sheets named
+`_archimedes_probe_application` and `_archimedes_probe_itcomponent` are
+created on first use and archived at the end of the run (cleanup is
+idempotent). An audit JSON file `catalog_resolution_report.json` is
+written next to the staging Excel listing every resolved name with its
+confidence and `LINKED`/`CUSTOM` status.
 
 ---
 

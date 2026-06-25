@@ -36,6 +36,8 @@ from typing import Any
 import pandas as pd
 from dotenv import load_dotenv
 
+from pipeline.reference_catalog import ReferenceCatalogResolver, ResolvedMatch
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -357,6 +359,7 @@ _COLS_ITC = [
     ("id",          "ID",          "readonly",  36),
     ("type",        "Type",        "mandatory", 14),
     ("name",        "Name",        "mandatory", 40),
+    ("externalId",  "External ID", "optional",  20),
     ("description", "Description", "optional",  55),
     ("lxHostingType","Hosting Type","optional",  18),
     ("lxState",     "Quality Seal","optional",  14),
@@ -559,6 +562,51 @@ def write_leanix_excel(
                     }
         logger.info("Lift & Shift merged: +%d target apps, +%d prerequisites", len(lift_shift), len(seen_prereqs))
 
+    # ── Reference Catalog pre-resolution (feature-flagged) ─────────────────────
+    resolver: ReferenceCatalogResolver | None = None
+    app_matches: dict[str, ResolvedMatch] = {}
+    itc_matches: dict[str, ResolvedMatch] = {}
+    if os.environ.get("ARCHIMEDES_USE_CATALOG_RESOLVER", "").lower() in ("1", "true", "yes"):
+        try:
+            base_url, api_token = _resolver_credentials()
+            resolver = ReferenceCatalogResolver(
+                base_url=base_url,
+                api_token=api_token,
+                interactive=sys.stdin.isatty() if hasattr(sys.stdin, "isatty") else False,
+            )
+            app_matches = resolver.resolve("Application", list(seen_apps.keys()))
+            itc_matches = resolver.resolve("ITComponent", list(seen_itcs.keys()))
+            logger.info(
+                "Reference Catalog: %d/%d apps linked, %d/%d ITCs linked",
+                sum(1 for m in app_matches.values() if m.status == "LINKED"),
+                len(app_matches),
+                sum(1 for m in itc_matches.values() if m.status == "LINKED"),
+                len(itc_matches),
+            )
+            # Decorate seen_apps with catalog data
+            for app_name, match in app_matches.items():
+                entry = seen_apps.get(app_name)
+                if entry is None:
+                    continue
+                entry["externalId"] = match.external_id or ""
+                entry["catalog_confidence"] = match.confidence
+                entry["catalog_status"] = match.status
+                for k, v in match.fields.items():
+                    entry.setdefault(k, v)
+            # Decorate seen_itcs (str → dict upgrade)
+            for itc_name, match in itc_matches.items():
+                hosting = seen_itcs.get(itc_name) or ""
+                seen_itcs[itc_name] = {
+                    "hosting": hosting,
+                    "externalId": match.external_id or "",
+                    "catalog_confidence": match.confidence,
+                    "catalog_status": match.status,
+                    "fields": dict(match.fields),
+                }
+        except Exception as exc:
+            logger.warning("Reference Catalog resolver failed (%s) — continuing without catalog data", exc)
+            resolver = None
+
     tags = f"Target;{client_name}"
     wb = openpyxl.Workbook()
 
@@ -579,10 +627,10 @@ def write_leanix_excel(
         vals = {
             "id": "", "type": "Application", "name": app_name,
             "description": app_desc,
-            "alias": "", "externalId": "",
+            "alias": "", "externalId": app.get("externalId", ""),
             "lifecycle_phase": app_lifecycle, "lifecycle_startDate": "", "lifecycle_endDate": "",
             "businessCriticality": "businessCritical", "functionalSuitability": "",
-            "technicalSuitability": "", "lxHostingType": "saas", "lxState": "DRAFT",
+            "technicalSuitability": "", "lxHostingType": app.get("lxHostingType", "saas"), "lxState": "DRAFT",
             "tags": app_tags,
             "relApplicationToBusinessCapability": bcs_str,
             "relApplicationToITComponent": itcs_str, "relToParent": "",
@@ -680,9 +728,16 @@ def write_leanix_excel(
     _sheet_header(ws_itc, _COLS_ITC)
     keys_itc = [c[0] for c in _COLS_ITC]
 
-    for row_idx, (itc_name, hosting) in enumerate(sorted(seen_itcs.items()), start=3):
+    for row_idx, (itc_name, raw) in enumerate(sorted(seen_itcs.items()), start=3):
+        if isinstance(raw, dict):
+            hosting = raw.get("hosting", "")
+            external_id = raw.get("externalId", "")
+        else:
+            hosting = raw
+            external_id = ""
         vals = {
             "id": "", "type": "ITComponent", "name": itc_name,
+            "externalId": external_id,
             "description": f"SAP technology component supporting TO-BE applications. Client: {client_name}.",
             "lxHostingType": hosting, "lxState": "DRAFT", "tags": tags,
         }
@@ -726,6 +781,52 @@ def write_leanix_excel(
         "LeanIX target: %d apps, %d BCs, %d initiatives → %s",
         len(seen_apps), len(seen_bcs), len(initiatives), output_path,
     )
+
+    # ── Reference Catalog audit report ────────────────────────────────────────
+    # Writes catalog_resolution_report.json next to the Excel with per-type
+    # entries {name, external_id, confidence, status}. Always safe to call
+    # (empty dicts when the resolver flag is off → empty arrays in the JSON).
+    if app_matches or itc_matches:
+        report = {
+            "Application": [
+                {"name": m.name, "external_id": m.external_id,
+                 "confidence": m.confidence, "status": m.status}
+                for m in app_matches.values()
+            ],
+            "ITComponent": [
+                {"name": m.name, "external_id": m.external_id,
+                 "confidence": m.confidence, "status": m.status}
+                for m in itc_matches.values()
+            ],
+        }
+        try:
+            (Path(output_path).parent / "catalog_resolution_report.json").write_text(
+                json.dumps(report, ensure_ascii=False, indent=2)
+            )
+        except Exception as exc:
+            logger.warning("Could not write catalog_resolution_report.json: %s", exc)
+
+        def _count(matches: dict, key: str, value: str) -> int:
+            return sum(1 for m in matches.values() if getattr(m, key) == value)
+
+        logger.info(
+            "Reference Catalog Application: %d names — %d LINKED, %d CUSTOM",
+            len(app_matches),
+            _count(app_matches, "status", "LINKED"),
+            _count(app_matches, "status", "CUSTOM"),
+        )
+        logger.info(
+            "Reference Catalog ITComponent: %d names — %d LINKED, %d CUSTOM",
+            len(itc_matches),
+            _count(itc_matches, "status", "LINKED"),
+            _count(itc_matches, "status", "CUSTOM"),
+        )
+
+    if resolver is not None:
+        try:
+            resolver.cleanup()
+        except Exception as exc:
+            logger.warning("Reference Catalog cleanup failed (%s)", exc)
 
 
 # ── LeanIX writer ─────────────────────────────────────────────────────────────
@@ -833,6 +934,17 @@ _TIME_TO_FUNCTIONAL = {
 # refreshes 60 s before expiry so long-running pushes never hit an expired token.
 
 _token_cache: dict = {"token": None, "expires_at": 0.0}
+
+
+def _resolver_credentials() -> tuple[str, str]:
+    """Return (base_url, api_token) for the Reference Catalog resolver.
+
+    Reads LEANIX_BASE_URL and LEANIX_API_TOKEN from env. Patched in tests.
+    """
+    return (
+        os.environ["LEANIX_BASE_URL"].rstrip("/"),
+        os.environ["LEANIX_API_TOKEN"],
+    )
 
 
 def _get_bearer(base_url: str, api_token: str) -> str:
@@ -1733,7 +1845,16 @@ def write_leanix(
     # Only links when confidenceLevel == "VERYHIGH"; logs others for manual review.
     catalog_stats: dict = {}
     if app_id_cache or itc_id_cache:
-        catalog_stats = _link_apps_to_catalog(base_url, token, app_id_cache, itc_id_cache)
+        # Rows that already carry externalId were linked at create time via the
+        # pre-creation Reference Catalog resolver — skip them in the post-push linker.
+        rows_by_name = {
+            str(r.get("name") or "").strip(): r
+            for r in app_rows if r.get("name")
+        }
+        catalog_stats = _link_apps_to_catalog(
+            base_url, token, app_id_cache, itc_id_cache,
+            rows_by_name=rows_by_name,
+        )
 
     # ── Metrics API — project KPIs ────────────────────────────────────────────
     # Compute completeness KPIs from the pushed data and create them in LeanIX.
@@ -1771,6 +1892,7 @@ def _link_apps_to_catalog(
     api_token: str,
     app_id_cache: dict[str, str],
     itc_id_cache: dict[str, str] | None = None,
+    rows_by_name: dict[str, dict] | None = None,
 ) -> dict:
     """
     Auto-link workspace Applications and ITComponents to LeanIX Reference Catalog entries.
@@ -1786,7 +1908,24 @@ def _link_apps_to_catalog(
       - lxHostingType (if not already set on Application)
       - description   (if empty on Application)
     Logs productCategory and provider for info.
+
+    ``rows_by_name`` (optional): name → row dict. Any row with a truthy
+    ``externalId`` is skipped here because it was already linked at create
+    time via the pre-creation Reference Catalog resolver.
     """
+    rows_by_name = rows_by_name or {}
+    skipped = {
+        name for name, row in rows_by_name.items()
+        if row and row.get("externalId")
+    }
+    if skipped:
+        logger.debug(
+            "Reference Catalog post-push: skipping %d rows already linked at create",
+            len(skipped),
+        )
+    app_id_cache = {n: i for n, i in app_id_cache.items() if n not in skipped}
+    if itc_id_cache:
+        itc_id_cache = {n: i for n, i in itc_id_cache.items() if n not in skipped}
     try:
         bearer = _get_bearer(base_url, api_token)
     except Exception as exc:
