@@ -274,6 +274,24 @@ async def create_session(body: dict):
     return {"ok": True, "session_id": session_id, "client_name": client_name}
 
 
+@app.get("/api/session/{session_id}")
+async def session_state(session_id: str):
+    """Return session state, including the step8_available flag for the frontend sidebar."""
+    sess = _session(session_id)
+
+    resolver_enabled = (os.environ.get("ARCHIMEDES_USE_CATALOG_RESOLVER", "").lower() == "true")
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_present = (session_dir / "push_uuid_map.json").exists()
+    step8_available = resolver_enabled and uuid_map_present
+
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "client_name": sess.get("client_name"),
+        "step8_available": step8_available,
+    }
+
+
 # ── Step 1 — Catalog status ───────────────────────────────────────────────────
 
 @app.get("/api/session/{session_id}/catalog")
@@ -1409,6 +1427,47 @@ async def download_file(session_id: str, key: str):
     media = "application/json" if path.suffix == ".json" else \
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return FileResponse(path=str(path), filename=path.name, media_type=media)
+
+
+@app.get("/api/session/{session_id}/catalog-report", response_class=HTMLResponse)
+async def catalog_report_html(session_id: str):
+    sess = _session(session_id)  # raises 404 if missing
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_path = session_dir / "push_uuid_map.json"
+    if not uuid_map_path.exists():
+        raise HTTPException(status_code=404, detail="push_uuid_map.json not found — run Step 7 first")
+
+    html_path = session_dir / "catalog_report.html"
+    if not html_path.exists():
+        # Render on demand
+        from pipeline.catalog_report import generate_report
+        try:
+            generate_report(session_dir=session_dir, client_name=sess.get("client_name") or "")
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+    return HTMLResponse(content=html_path.read_text())
+
+
+@app.get("/api/session/{session_id}/catalog-report.xlsx")
+async def catalog_report_xlsx(session_id: str):
+    sess = _session(session_id)
+    session_dir = OUTPUT_DIR / session_id
+    uuid_map_path = session_dir / "push_uuid_map.json"
+    if not uuid_map_path.exists():
+        raise HTTPException(status_code=404, detail="push_uuid_map.json not found — run Step 7 first")
+
+    xlsx_path = session_dir / "catalog_report.xlsx"
+    if not xlsx_path.exists():
+        from pipeline.catalog_report import generate_report
+        try:
+            generate_report(session_dir=session_dir, client_name=sess.get("client_name") or "")
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+    return FileResponse(
+        path=str(xlsx_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="catalog_report.xlsx",
+    )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

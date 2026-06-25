@@ -92,6 +92,97 @@ def _ext_id(client_name: str, fs_type: str, name: str) -> dict:
     }
 
 
+def _resolve_uuids_for_ldif(
+    base_url: str,
+    bearer: str,
+    client_name: str,
+    app_names: list[str],
+    itc_names: list[str],
+) -> tuple[dict[str, str], dict[str, str], list[dict]]:
+    """After an LDIF push, fetch FS UUIDs by externalId.
+
+    Returns (app_id_cache, itc_id_cache, failed) where:
+      - app_id_cache: {app_name → workspace UUID}
+      - itc_id_cache: {itc_name → workspace UUID}
+      - failed:        list of {name, type, error} for rows not found
+    """
+    base = (base_url or "").rstrip("/")
+    url = f"{base}/services/pathfinder/v1/factSheets"
+    hdrs = {"Authorization": f"Bearer {bearer}"}
+
+    app_cache: dict[str, str] = {}
+    itc_cache: dict[str, str] = {}
+    failed: list[dict] = []
+
+    def _lookup(name: str, fs_type_short: str, ext_id_block: dict) -> str | None:
+        params = {
+            "externalId.externalId": ext_id_block["externalId"],
+            "externalId.externalType": ext_id_block["externalType"],
+        }
+        try:
+            resp = requests.get(url, headers=hdrs, params=params, timeout=30)
+            if resp.status_code != 200:
+                return None
+            data = (resp.json() or {}).get("data") or []
+            if not data:
+                return None
+            return data[0].get("id")
+        except Exception:
+            return None
+
+    for name in app_names:
+        ext = _ext_id(client_name, "APP", name)
+        uid = _lookup(name, "Application", ext)
+        if uid:
+            app_cache[name] = uid
+        else:
+            failed.append({"name": name, "type": "Application", "error": "not found by externalId"})
+
+    for name in itc_names:
+        ext = _ext_id(client_name, "ITC", name)
+        uid = _lookup(name, "ITComponent", ext)
+        if uid:
+            itc_cache[name] = uid
+        else:
+            failed.append({"name": name, "type": "ITComponent", "error": "not found by externalId"})
+
+    return app_cache, itc_cache, failed
+
+
+def _persist_ldif_uuid_map(
+    staging_path: Path,
+    ldif: dict,
+    client_name: str,
+    base_url: str,
+    bearer: str,
+) -> Path:
+    """Resolve UUIDs for all App/ITC entries in the LDIF and write push_uuid_map.json."""
+    app_names = [c["data"]["name"] for c in ldif["content"] if c.get("type") == "Application"]
+    itc_names = [c["data"]["name"] for c in ldif["content"] if c.get("type") == "ITComponent"]
+
+    apps, itcs, failed = _resolve_uuids_for_ldif(
+        base_url=base_url, bearer=bearer, client_name=client_name,
+        app_names=app_names, itc_names=itc_names,
+    )
+
+    from urllib.parse import urlparse
+    workspace = (urlparse(base_url).hostname or "").split(".")[0]
+    entries: dict[str, dict] = {}
+    for name, uid in apps.items():
+        entries[f"Application::{name}"] = {"uuid": uid, "created": True}
+    for name, uid in itcs.items():
+        entries[f"ITComponent::{name}"] = {"uuid": uid, "created": True}
+    payload = {
+        "workspace": workspace,
+        "base_url": base_url,
+        "entries": entries,
+        "failed": failed,
+    }
+    out_path = Path(staging_path).parent / "push_uuid_map.json"
+    out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    return out_path
+
+
 def build_create_factsheet_payload(row: dict) -> dict:
     """Build a GraphQL createFactSheet input from a row dict.
 
@@ -350,6 +441,18 @@ def push_leanix_ldif(
     if warnings:
         for w in warnings[:5]:
             logger.warning("  LDIF warning: %s", w)
+
+    # Capture UUID map for Step 8 Catalog Linking Review.
+    try:
+        _persist_ldif_uuid_map(
+            staging_path=staging_path,
+            ldif=ldif,
+            client_name=client_name,
+            base_url=_base_url,
+            bearer=bearer,
+        )
+    except Exception as exc:
+        logger.warning("Could not write push_uuid_map.json: %s", exc)
 
     return {
         "ok":       True,
