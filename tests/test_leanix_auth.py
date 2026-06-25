@@ -54,3 +54,26 @@ def test_get_bearer_returns_cached_within_window():
     assert first == "JWT1"
     assert second == "JWT1"
     assert post.call_count == 1
+
+
+def test_get_bearer_refreshes_when_near_expiry():
+    """When time() is past (expires_at - 60s), get_bearer must re-POST."""
+    first_resp = MagicMock()
+    first_resp.json.return_value = {"access_token": "JWT_OLD", "expires_in": 120}
+    first_resp.raise_for_status.return_value = None
+    second_resp = MagicMock()
+    second_resp.json.return_value = {"access_token": "JWT_NEW", "expires_in": 3600}
+    second_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.leanix_auth.requests.post",
+               side_effect=[first_resp, second_resp]) as post:
+        # First call at t=1000 → expires_at = 1120, refresh window starts at 1060
+        with patch("pipeline.leanix_auth.time.time", return_value=1000.0):
+            first = leanix_auth.get_bearer("https://x", "tok")
+        # Second call at t=1100 → inside the 60s safety margin, MUST refresh
+        with patch("pipeline.leanix_auth.time.time", return_value=1100.0):
+            second = leanix_auth.get_bearer("https://x", "tok")
+
+    assert first == "JWT_OLD"
+    assert second == "JWT_NEW"
+    assert post.call_count == 2
