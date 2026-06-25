@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,6 +74,33 @@ class ReferenceCatalogResolver:
     def resolve(self, fs_type: str, names: list[str]) -> dict[str, ResolvedMatch]:
         """Resolve a list of names. Returns dict keyed by original name."""
         raise NotImplementedError
+
+    # ── HTTP layer ─────────────────────────────────────────────────────────
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_token}",
+            "Accept": "application/json",
+        }
+
+    def _search_by_name(self, fs_type: str, name: str) -> list[dict]:
+        """GET /fact-sheets?q=<name>. Returns list (possibly empty) on success
+        or [] on any error. Never raises."""
+        if len(name.strip()) < 2:
+            return []
+        source = _source_for_type(fs_type)
+        url = (
+            f"{self.base_url}/services/reference-data/v1/source/{source}/fact-sheets"
+        )
+        params = {"q": name, "factSheetType": fs_type, "fuzzy": "false"}
+        try:
+            resp = requests.get(url, headers=self._headers(), params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            return data if isinstance(data, list) else []
+        except Exception as exc:
+            logger.warning("Catalog search failed for %r (%s)", name, exc)
+            return []
 
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""

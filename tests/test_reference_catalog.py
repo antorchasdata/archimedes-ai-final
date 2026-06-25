@@ -56,3 +56,55 @@ def test_source_for_type_invalid():
 def test_external_id_prefix():
     assert _external_id_prefix("Application") == "lx_APP_"
     assert _external_id_prefix("ITComponent") == "lx_ITC_"
+
+
+from unittest.mock import patch, MagicMock
+
+
+def _mk_response(json_body, status=200):
+    r = MagicMock()
+    r.status_code = status
+    r.json.return_value = json_body
+    r.raise_for_status = MagicMock()
+    if status >= 400:
+        r.raise_for_status.side_effect = Exception(f"HTTP {status}")
+    return r
+
+
+def test_search_by_name_returns_candidates():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = [
+        {
+            "alreadyLinked": False,
+            "factSheet": {
+                "id": "uuid-1",
+                "externalId": "lx_APP_000123",
+                "displayName": "SAP S/4HANA",
+                "type": "Application",
+            },
+        }
+    ]
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(payload)) as get:
+        candidates = r._search_by_name("Application", "SAP S/4HANA")
+    assert len(candidates) == 1
+    assert candidates[0]["factSheet"]["externalId"] == "lx_APP_000123"
+    called_url = get.call_args[0][0]
+    assert "/services/reference-data/v1/source/saas/fact-sheets" in called_url
+
+
+def test_search_by_name_http_error_returns_empty():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response({}, status=500)):
+        candidates = r._search_by_name("Application", "Anything")
+    assert candidates == []
+
+
+def test_search_by_name_short_query_skipped():
+    """API requires min 2 chars — a 1-char name must be skipped, not sent."""
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get") as get:
+        candidates = r._search_by_name("Application", "X")
+    assert candidates == []
+    get.assert_not_called()
