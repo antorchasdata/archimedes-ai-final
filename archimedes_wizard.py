@@ -215,8 +215,8 @@ async def validate_workspace(body: dict):
 
     import requests as _req
     try:
-        from pipeline.write import _get_bearer
-        bearer = await asyncio.to_thread(_get_bearer, base_url, api_token)
+        from pipeline.leanix_auth import get_bearer
+        bearer = await asyncio.to_thread(get_bearer, base_url, api_token)
         hdrs = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
         gql_url = f"{base_url}/services/pathfinder/v1/graphql"
         payload = {"query": '{ allFactSheets(filter:{facetFilters:[{facetKey:"FactSheetTypes",keys:["Application"]}]}) { totalCount } }'}
@@ -1080,10 +1080,10 @@ async def get_transformations(session_id: str):
         return {"ok": True, "transformations": [], "warning": "LeanIX not configured"}
 
     import requests as _req
-    from pipeline.write import _get_bearer
+    from pipeline.leanix_auth import get_bearer
 
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         return {"ok": False, "transformations": [], "error": str(exc)}
 
@@ -1167,10 +1167,10 @@ async def get_projections(session_id: str, date: Optional[str] = None):
         return {"ok": True, "impacts": [], "warning": "LeanIX not configured"}
 
     import requests as _req
-    from pipeline.write import _get_bearer
+    from pipeline.leanix_auth import get_bearer
 
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         return {"ok": False, "impacts": [], "error": str(exc)}
 
@@ -1288,10 +1288,10 @@ async def get_synclog(session_id: str):
         return {"ok": True, "synchronizations": [], "warning": "LeanIX not configured"}
 
     import requests as _req
-    from pipeline.write import _get_bearer
+    from pipeline.leanix_auth import get_bearer
 
     try:
-        bearer = _get_bearer(base_url, api_token)
+        bearer = get_bearer(base_url, api_token)
     except Exception as exc:
         return {"ok": False, "synchronizations": [], "error": str(exc)}
 
