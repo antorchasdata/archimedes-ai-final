@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
+from urllib.parse import quote
 
 
 Status = Literal["LINKED", "REVIEW", "CUSTOM"]
@@ -88,4 +89,16 @@ def count_rows(rows: list[ReportRow]) -> dict[str, int]:
     for r in rows:
         out[r.status] = out.get(r.status, 0) + 1
     return out
+
+
+def build_fs_url(base_url: str, workspace: str, fs_type: str, uuid: str | None) -> str | None:
+    if not uuid:
+        return None
+    base = (base_url or "").rstrip("/")
+    return f"{base}/{workspace}/factsheet/{fs_type}/{uuid}"
+
+
+def build_catalog_search_url(base_url: str, workspace: str, name: str) -> str:
+    base = (base_url or "").rstrip("/")
+    return f"{base}/{workspace}/inventory/referenceCatalog?q={quote(name)}"
 

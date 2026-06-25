@@ -77,3 +77,25 @@ def test_counters():
     ]}
     counts = count_rows(build_rows(res, _UUID_MAP_EMPTY))
     assert counts == {"LINKED": 2, "REVIEW": 1, "CUSTOM": 1}
+
+from pipeline.catalog_report import build_fs_url, build_catalog_search_url
+
+def test_build_fs_url_uses_base_and_uuid():
+    url = build_fs_url(
+        base_url="https://demo-eu-3.leanix.net",
+        workspace="demo-eu-3",
+        fs_type="Application",
+        uuid="abc123",
+    )
+    assert url == "https://demo-eu-3.leanix.net/demo-eu-3/factsheet/Application/abc123"
+
+def test_build_fs_url_returns_none_without_uuid():
+    assert build_fs_url("https://demo-eu-3.leanix.net", "demo-eu-3", "Application", None) is None
+
+def test_build_catalog_search_url_url_encodes_name():
+    url = build_catalog_search_url(
+        base_url="https://demo-eu-3.leanix.net",
+        workspace="demo-eu-3",
+        name="SAP Ariba Buying",
+    )
+    assert url == "https://demo-eu-3.leanix.net/demo-eu-3/inventory/referenceCatalog?q=SAP%20Ariba%20Buying"
