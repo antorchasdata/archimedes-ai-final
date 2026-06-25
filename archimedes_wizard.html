@@ -1550,8 +1550,10 @@ function showNav() {
   btnSkip.style.display = s.skippable ? '' : 'none';
   btnSkip.textContent   = t('skip');
 
-  if (currentStep === STEPS.length - 1) {
+  if (s.id === 'import') {
     btnNext.textContent = leanixOk ? t('import_btn') : t('finish');
+  } else if (currentStep === STEPS.length - 1) {
+    btnNext.textContent = t('finish');
   } else {
     btnNext.textContent = t('continue');
   }
