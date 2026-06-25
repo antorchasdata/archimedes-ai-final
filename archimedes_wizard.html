@@ -658,7 +658,7 @@ const LANGS = {
     pipeline_done: 'Pipeline complete',
     new_pipeline: 'New pipeline',
     // step labels
-    steps: ['Client','Catalogs','Baseline','Requirements','PDF','Images','Generate','Reference','Import'],
+    steps: ['Client','Catalogs','Baseline','Requirements','PDF','Images','Generate','Reference','Import','Catalog Review'],
     // step 0
     s0_eye: (n, total) => `Step ${n} of ${total}`,
     s0_title: 'Client name',
@@ -838,7 +838,7 @@ const LANGS = {
     step_of: (n, total) => `Paso ${n} de ${total}`,
     pipeline_done: 'Pipeline completado',
     new_pipeline: 'Nuevo pipeline',
-    steps: ['Cliente','Catálogos','Baseline','Reqs','PDF','Imágenes','Generar','Referencia','Importar'],
+    steps: ['Cliente','Catálogos','Baseline','Reqs','PDF','Imágenes','Generar','Referencia','Importar','Revisión Catálogo'],
     s0_eye: (n, total) => `Paso ${n} de ${total}`,
     s0_title: 'Nombre del cliente',
     s0_desc: 'Introduce el nombre del cliente. Se usará como prefijo en los ficheros generados y como tag en LeanIX.',
@@ -1006,7 +1006,7 @@ const LANGS = {
     step_of: (n, total) => `Étape ${n} sur ${total}`,
     pipeline_done: 'Pipeline terminé',
     new_pipeline: 'Nouveau pipeline',
-    steps: ['Client','Catalogues','Baseline','Exigences','PDF','Images','Générer','Référence','Importer'],
+    steps: ['Client','Catalogues','Baseline','Exigences','PDF','Images','Générer','Référence','Importer','Revue Catalogue'],
     s0_eye: (n, total) => `Étape ${n} sur ${total}`,
     s0_title: 'Nom du client',
     s0_desc: 'Saisissez le nom du client. Il sera utilisé comme préfixe dans les fichiers générés et comme tag dans LeanIX.',
@@ -1149,7 +1149,7 @@ const LANGS = {
     step_of: (n, total) => `Passo ${n} di ${total}`,
     pipeline_done: 'Pipeline completata',
     new_pipeline: 'Nuova pipeline',
-    steps: ['Cliente','Cataloghi','Baseline','Requisiti','PDF','Immagini','Genera','Riferimento','Importa'],
+    steps: ['Cliente','Cataloghi','Baseline','Requisiti','PDF','Immagini','Genera','Riferimento','Importa','Revisione Catalogo'],
     s0_eye: (n, total) => `Passo ${n} di ${total}`,
     s0_title: 'Nome del cliente',
     s0_desc: 'Inserisci il nome del cliente. Verrà usato come prefisso nei file generati e come tag in LeanIX.',
@@ -1291,7 +1291,7 @@ const LANGS = {
     step_of: (n, total) => `Vaihe ${n} / ${total}`,
     pipeline_done: 'Pipeline valmis',
     new_pipeline: 'Uusi pipeline',
-    steps: ['Asiakas','Katalogit','Baseline','Vaatimukset','PDF','Kuvat','Luo','Viitearkkitehtuuri','Tuo'],
+    steps: ['Asiakas','Katalogit','Baseline','Vaatimukset','PDF','Kuvat','Luo','Viitearkkitehtuuri','Tuo','Katalogin tarkistus'],
     s0_eye: (n, total) => `Vaihe ${n} / ${total}`,
     s0_title: 'Asiakkaan nimi',
     s0_desc: 'Syötä asiakkaan nimi. Sitä käytetään luotujen tiedostojen etuliitteenä ja tunnisteena LeanIX:ssä.',
@@ -1432,15 +1432,16 @@ const LANGS = {
 // ── Config ────────────────────────────────────────────────────────────────────
 const API = '';  // same origin
 const STEPS = [
-  { id: 'client',    skippable: false },
-  { id: 'catalog',   skippable: false },
-  { id: 'baseline',  skippable: true  },
-  { id: 'reqs',      skippable: true  },
-  { id: 'pdf',       skippable: true  },
-  { id: 'images',    skippable: true  },
-  { id: 'generate',  skippable: false },
-  { id: 'reference', skippable: true  },
-  { id: 'import',    skippable: true  },
+  { id: 'client',         skippable: false },
+  { id: 'catalog',        skippable: false },
+  { id: 'baseline',       skippable: true  },
+  { id: 'reqs',           skippable: true  },
+  { id: 'pdf',            skippable: true  },
+  { id: 'images',         skippable: true  },
+  { id: 'generate',       skippable: false },
+  { id: 'reference',      skippable: true  },
+  { id: 'import',         skippable: true  },
+  { id: 'catalog_review', skippable: true  },
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -1457,6 +1458,7 @@ let liftShiftData    = { resolved: [], modes: [], conversions: [], selectedConve
 let workspaceName      = '';   // display name of validated workspace
 let workspaceUrl       = '';   // base_url
 let workspaceValidated = false;
+let step8Available     = false;  // whether Step 8 (Catalog Linking Review) is available for current session
 
 // ── i18n ─────────────────────────────────────────────────────────────────────
 function t(key, ...args) {
@@ -1489,6 +1491,8 @@ function setLang(lang) {
     leanixOk = true;
     currentStep = Math.max(1, resumeStep);
     for (let i = 0; i < currentStep; i++) stepDone[i] = true;
+    // For resumed sessions, learn whether the Catalog Linking Review is available
+    refreshSessionState();
   }
 
   renderProgress();
@@ -1508,12 +1512,14 @@ function renderProgress() {
   const labels = t('steps');
   const el = document.getElementById('progress-steps');
   el.innerHTML = STEPS.map((s, i) => {
+    // Step 8 (catalog_review) is hidden until backend reports step8_available
+    if (s.id === 'catalog_review' && !step8Available) return '';
     const isDone   = i < currentStep;
     const isActive = i === currentStep;
     const cls      = isDone ? 'done' : isActive ? 'active' : '';
     const click    = isDone ? `onclick="jumpToStep(${i})"` : '';
     return `
-    <div class="progress-step ${cls}" ${click}>
+    <div class="progress-step ${cls}" ${click} data-step-id="${s.id}">
       <div class="step-circle">${isDone ? '✓' : i + 1}</div>
       <div class="step-label">${labels[i]}</div>
     </div>`;
@@ -1582,6 +1588,10 @@ function skipStep() {
 
 function advance() {
   let next = currentStep + 1;
+  // Skip Step 8 (catalog_review) when backend hasn't marked it available yet
+  while (next < STEPS.length && STEPS[next].id === 'catalog_review' && !step8Available) {
+    next++;
+  }
   if (next >= STEPS.length) {
     showDone();
     return;
@@ -1618,16 +1628,37 @@ function toggleLiftShift(enabled) {
 // ── Step runner (API calls) ───────────────────────────────────────────────────
 async function runStep(step) {
   const id = STEPS[step]?.id;
-  if (id === 'client')    return runStepClient();
-  if (id === 'catalog')   return;   // auto-loaded
-  if (id === 'baseline')  return runStepBaseline();
-  if (id === 'liftshift') return runStepLiftShift();
-  if (id === 'reqs')      { await runStepRequirements(); return runHelpContrast(); }
-  if (id === 'pdf')       return runStepPdf();
-  if (id === 'images')    return runStepImages();
-  if (id === 'generate')  return runStepGenerate();
-  if (id === 'reference') return;   // user-driven
-  if (id === 'import')    return runStepPush();
+  if (id === 'client')         return runStepClient();
+  if (id === 'catalog')        return;   // auto-loaded
+  if (id === 'baseline')       return runStepBaseline();
+  if (id === 'liftshift')      return runStepLiftShift();
+  if (id === 'reqs')           { await runStepRequirements(); return runHelpContrast(); }
+  if (id === 'pdf')            return runStepPdf();
+  if (id === 'images')         return runStepImages();
+  if (id === 'generate')       return runStepGenerate();
+  if (id === 'reference')      return;   // user-driven
+  if (id === 'import')         return runStepPush();
+  if (id === 'catalog_review') return;   // user-driven, iframe-based
+}
+
+// ── Step 8 visibility ─────────────────────────────────────────────────────────
+// Pull session state to learn whether the Catalog Linking Review report exists
+// (set by the backend after a successful Step 7 push when the catalog resolver
+// is enabled). Updates `step8Available` and re-renders the progress bar.
+async function refreshSessionState() {
+  if (!sessionId) return;
+  try {
+    const state = await apiFetch(`/api/session/${sessionId}`);
+    updateStep8Visibility(state);
+  } catch(e) { /* silent */ }
+}
+
+function updateStep8Visibility(state) {
+  const wasAvailable = step8Available;
+  step8Available = !!(state && state.step8_available);
+  if (step8Available !== wasAvailable) {
+    renderProgress();
+  }
 }
 
 // ── Workspace helpers ─────────────────────────────────────────────────────────
@@ -2775,6 +2806,9 @@ async function runStepPush() {
       const tr = await apiFetch(`/api/session/${sessionId}/transformations`);
       rc.innerHTML += _renderTransformationsTable(tr.transformations || []);
     } catch(e) { /* non-fatal */ }
+    // Step 8 (Catalog Linking Review) becomes available once push has produced
+    // the catalog report; refresh session state so the progress bar reveals it.
+    refreshSessionState();
   } else {
     rc.className = 'result-card error show';
     rc.innerHTML = `
@@ -2895,6 +2929,34 @@ async function runKpiImport() {
   }
 }
 
+// ── Step 9 — Catalog Linking Review ──────────────────────────────────────────
+// Embeds the HTML catalog report served by the backend at
+// `/api/session/<id>/catalog-report` and exposes a download link for the
+// matching `.xlsx` export. Only reachable when `step8_available` is true.
+function renderStepCatalogReview() {
+  const idx = STEPS.findIndex(s => s.id === 'catalog_review');
+  const reportUrl  = sessionId ? `/api/session/${sessionId}/catalog-report` : 'about:blank';
+  const xlsxUrl    = sessionId ? `/api/session/${sessionId}/catalog-report.xlsx` : '#';
+  return `
+    <div>
+      <div class="step-eyebrow">Step ${idx + 1} of ${STEPS.length}</div>
+      <h1 class="step-title">Catalog Linking Review</h1>
+      <p class="step-desc">
+        Review which fact sheets were linked automatically to the Reference Catalog,
+        which have suggested matches worth reviewing in LeanIX, and which were created
+        as custom.
+      </p>
+      <p>
+        <a id="step8-download-xlsx" class="btn-secondary" href="${xlsxUrl}" target="_blank"
+           style="display:inline-block;padding:8px 14px;text-decoration:none">Download .xlsx</a>
+      </p>
+      <iframe id="step8-iframe" src="${reportUrl}"
+              style="width:100%; height:75vh; border:1px solid #ddd; border-radius:4px;">
+      </iframe>
+    </div>
+  `;
+}
+
 // ── Done screen ───────────────────────────────────────────────────────────────
 function showDone() {
   currentStep = STEPS.length;
@@ -2928,16 +2990,17 @@ function renderStep(n) {
   }
   const id = STEPS[n]?.id;
   const rendererMap = {
-    client:    renderStep0,
-    catalog:   renderStep1,
-    baseline:  renderStep2,
-    liftshift: renderStepLiftShift,
-    reqs:      renderStep3,
-    pdf:       renderStep4,
-    images:    renderStep5,
-    generate:  renderStep6,
-    reference: renderStep7,
-    import:    renderStep8,
+    client:         renderStep0,
+    catalog:        renderStep1,
+    baseline:       renderStep2,
+    liftshift:      renderStepLiftShift,
+    reqs:           renderStep3,
+    pdf:            renderStep4,
+    images:         renderStep5,
+    generate:       renderStep6,
+    reference:      renderStep7,
+    import:         renderStep8,
+    catalog_review: renderStepCatalogReview,
   };
   const html = (rendererMap[id] || (() => ''))();
   document.getElementById('main-content').innerHTML = `<div class="step-card">${html}</div>`;
