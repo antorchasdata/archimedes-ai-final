@@ -74,7 +74,28 @@ class ReferenceCatalogResolver:
 
     def resolve(self, fs_type: str, names: list[str]) -> dict[str, ResolvedMatch]:
         """Resolve a list of names. Returns dict keyed by original name."""
-        raise NotImplementedError
+        out: dict[str, ResolvedMatch] = {}
+        for name in names:
+            if not name or not name.strip():
+                continue
+            key = (fs_type, _normalize_name(name))
+            cached = self._cache.get(key)
+            if cached is not None:
+                # Preserve the original `name` field on the returned match
+                out[name] = ResolvedMatch(
+                    name=name,
+                    external_id=cached.external_id,
+                    catalog_uuid=cached.catalog_uuid,
+                    display_name=cached.display_name,
+                    confidence=cached.confidence,
+                    status=cached.status,
+                    fields=dict(cached.fields),
+                )
+                continue
+            match = self._resolve_one(fs_type, name)
+            self._cache[key] = match
+            out[name] = match
+        return out
 
     # ── HTTP layer ─────────────────────────────────────────────────────────
 

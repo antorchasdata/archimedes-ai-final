@@ -422,3 +422,30 @@ def test_probe_create_failure_degrades_to_no_probe_mode():
         m = r._resolve_one("Application", "Something")
     assert m.status == "CUSTOM"
     assert r._no_probe_mode is True
+
+
+def test_resolve_returns_dict_keyed_by_original_name():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch.object(r, "_resolve_one",
+                      side_effect=lambda t, n: ResolvedMatch(
+                          name=n, external_id=f"lx_APP_{hash(n) % 1000:03d}",
+                          status="LINKED", confidence="VERYHIGH")):
+        out = r.resolve("Application", ["App A", "App B"])
+    assert set(out.keys()) == {"App A", "App B"}
+    assert all(m.status == "LINKED" for m in out.values())
+
+
+def test_resolve_uses_cache_on_repeat():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch.object(r, "_resolve_one",
+                      return_value=ResolvedMatch(
+                          name="App A", external_id="lx_APP_001",
+                          status="LINKED", confidence="VERYHIGH")) as inner:
+        r.resolve("Application", ["App A"])
+        r.resolve("Application", ["App A", "app a"])  # case-insensitive cache hit
+    assert inner.call_count == 1
+
+
+def test_resolve_empty_list():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    assert r.resolve("Application", []) == {}
