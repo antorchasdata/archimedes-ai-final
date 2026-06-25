@@ -108,3 +108,36 @@ def test_search_by_name_short_query_skipped():
         candidates = r._search_by_name("Application", "X")
     assert candidates == []
     get.assert_not_called()
+
+
+def test_fetch_detail_returns_fields():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {
+        "id": "uuid-1",
+        "externalId": "lx_APP_000123",
+        "displayName": "SAP S/4HANA",
+        "description": "ERP",
+        "fields": [
+            {"name": "lxHostingType", "value": "saas"},
+            {"name": "productCategory", "value": "ERP"},
+        ],
+        "relations": [
+            {"name": "relApplicationToProvider",
+             "targetFactSheet": {"displayName": "SAP"}},
+        ],
+    }
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response(payload)):
+        detail = r._fetch_detail("Application", "lx_APP_000123")
+    assert detail["description"] == "ERP"
+    assert detail["fields"]["lxHostingType"] == "saas"
+    assert detail["fields"]["productCategory"] == "ERP"
+    assert detail["fields"]["provider"] == "SAP"
+
+
+def test_fetch_detail_http_error_returns_empty():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.get",
+               return_value=_mk_response({}, status=500)):
+        detail = r._fetch_detail("Application", "lx_APP_000123")
+    assert detail == {}

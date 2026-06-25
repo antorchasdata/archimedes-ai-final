@@ -102,6 +102,43 @@ class ReferenceCatalogResolver:
             logger.warning("Catalog search failed for %r (%s)", name, exc)
             return []
 
+    _FIELDS_TO_COPY = ("description", "lxHostingType", "productCategory")
+
+    def _fetch_detail(self, fs_type: str, external_id: str) -> dict[str, Any]:
+        """GET /fact-sheets/<id>. Returns flattened dict:
+            { 'description': ..., 'fields': {'lxHostingType': ..., 'productCategory': ..., 'provider': ...} }
+        Returns {} on any error. Never raises."""
+        source = _source_for_type(fs_type)
+        url = (
+            f"{self.base_url}/services/reference-data/v1/source/{source}/fact-sheets/"
+            f"{external_id}"
+        )
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=30)
+            resp.raise_for_status()
+            body = resp.json()
+        except Exception as exc:
+            logger.warning("Catalog detail fetch failed for %s (%s)", external_id, exc)
+            return {}
+
+        fields_dict: dict[str, Any] = {}
+        for entry in body.get("fields", []) or []:
+            n = entry.get("name")
+            if n in self._FIELDS_TO_COPY:
+                fields_dict[n] = entry.get("value")
+
+        # Provider lives in relations
+        for rel in body.get("relations", []) or []:
+            if rel.get("name") in ("relApplicationToProvider", "relITComponentToProvider"):
+                target = rel.get("targetFactSheet") or {}
+                fields_dict["provider"] = target.get("displayName")
+                break
+
+        return {
+            "description": body.get("description"),
+            "fields": fields_dict,
+        }
+
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
         return
