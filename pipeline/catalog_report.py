@@ -38,13 +38,13 @@ def build_rows(resolution: dict, uuid_map: dict) -> list[ReportRow]:
         return []
     uuid_entries = (uuid_map or {}).get("entries") or {}
     failed_keys = {
-        f"{f.get('type')}::{f.get('name')}"
+        _entry_key(f)
         for f in (uuid_map or {}).get("failed", []) or []
     }
 
     rows: list[ReportRow] = []
     for e in entries:
-        key = f"{e.get('type')}::{e.get('name')}"
+        key = _entry_key(e)
         uuid_entry = uuid_entries.get(key) or {}
         status = _classify(e)
         rows.append(ReportRow(
@@ -59,6 +59,11 @@ def build_rows(resolution: dict, uuid_map: dict) -> list[ReportRow]:
             push_failed=key in failed_keys,
         ))
     return rows
+
+
+def _entry_key(entry: dict) -> str:
+    """Canonical join key between resolution entries and uuid_map entries."""
+    return f"{entry.get('type')}::{entry.get('name')}"
 
 
 def _classify(entry: dict) -> Status:
