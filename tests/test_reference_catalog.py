@@ -449,3 +449,25 @@ def test_resolve_uses_cache_on_repeat():
 def test_resolve_empty_list():
     r = ReferenceCatalogResolver("https://x", "tok")
     assert r.resolve("Application", []) == {}
+
+
+def test_cleanup_archives_all_probe_ids():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    r._probe_ids = {"Application": "probe-app", "ITComponent": "probe-itc"}
+    with patch.object(r, "_probe_archive", return_value=True) as arch:
+        r.cleanup()
+    assert arch.call_count == 2
+    assert r._probe_ids == {}
+
+
+def test_cleanup_idempotent_no_probes():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    # Should not raise
+    r.cleanup()
+
+
+def test_cleanup_archive_failure_does_not_raise():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    r._probe_ids = {"Application": "probe-app"}
+    with patch.object(r, "_probe_archive", return_value=False):
+        r.cleanup()  # logs but does not raise

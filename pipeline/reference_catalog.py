@@ -370,4 +370,11 @@ class ReferenceCatalogResolver:
 
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
-        return
+        for fs_type, fs_id in list(self._probe_ids.items()):
+            ok = self._probe_archive(fs_id)
+            if not ok:
+                logger.warning(
+                    "Failed to archive probe FS %s (%s) — manual cleanup may be needed",
+                    fs_type, fs_id,
+                )
+            self._probe_ids.pop(fs_type, None)
