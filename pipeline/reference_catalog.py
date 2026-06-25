@@ -193,6 +193,35 @@ class ReferenceCatalogResolver:
         data = self._gql(query, variables)
         return bool(data and data.get("updateFactSheet"))
 
+    def _batch_links(
+        self, fs_type: str, probe_id: str, name: str
+    ) -> dict | None:
+        """POST /batch-links. Returns the top suggestion's factSheet dict
+        (with confidenceLevel) or None on no match / any error."""
+        source = _source_for_type(fs_type)
+        url = (
+            f"{self.base_url}/services/reference-data/v1/source/{source}/batch-links"
+        )
+        body = {
+            "factSheets": [
+                {"id": probe_id, "name": name, "catalogStatus": "n/a"}
+            ],
+            "numMatches": 3,
+        }
+        try:
+            resp = requests.post(url, headers=self._headers(), json=body, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:
+            logger.warning("batch-links failed for %r (%s)", name, exc)
+            return None
+
+        entry = (payload.get("data") or {}).get(probe_id) or {}
+        suggestions = entry.get("suggestions") or []
+        if not suggestions:
+            return None
+        return suggestions[0].get("factSheet")
+
     def cleanup(self) -> None:
         """Archive probe fact sheets. Always safe to call (idempotent)."""
         return

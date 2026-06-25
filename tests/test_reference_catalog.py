@@ -175,3 +175,45 @@ def test_probe_archive_returns_true():
     with patch("pipeline.reference_catalog.requests.post",
                return_value=_mk_response(gql_resp)):
         assert r._probe_archive("probe-uuid-1") is True
+
+
+def test_batch_links_returns_top_suggestion():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {
+        "data": {
+            "probe-uuid-1": {
+                "suggestions": [
+                    {
+                        "alreadyLinked": False,
+                        "factSheet": {
+                            "id": "cat-uuid-1",
+                            "displayName": "SAP S/4HANA Cloud",
+                            "externalId": "lx_APP_000999",
+                            "confidenceLevel": "HIGH",
+                        },
+                    }
+                ]
+            }
+        }
+    }
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(payload)):
+        top = r._batch_links("Application", "probe-uuid-1", "SAP S/4HANA")
+    assert top is not None
+    assert top["confidenceLevel"] == "HIGH"
+    assert top["externalId"] == "lx_APP_000999"
+
+
+def test_batch_links_no_suggestions_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    payload = {"data": {"probe-uuid-1": {"suggestions": []}}}
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response(payload)):
+        assert r._batch_links("Application", "probe-uuid-1", "X") is None
+
+
+def test_batch_links_error_returns_none():
+    r = ReferenceCatalogResolver("https://x", "tok")
+    with patch("pipeline.reference_catalog.requests.post",
+               return_value=_mk_response({}, status=500)):
+        assert r._batch_links("Application", "probe-uuid-1", "X") is None
