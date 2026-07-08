@@ -11,7 +11,6 @@ Claude Code skill that orchestrates a Playwright MCP browser:
 from __future__ import annotations
 
 import fnmatch
-import os
 import re
 import time
 from pathlib import Path
@@ -52,22 +51,25 @@ def snapshot_dir(download_dir: Path) -> set[str]:
     return {p.name for p in download_dir.iterdir() if p.is_file() and p.suffix == ".xlsx"}
 
 
+def _list_new_xlsx(download_dir: Path, before: set[str]) -> list[Path]:
+    if not download_dir.exists():
+        return []
+    new_files = [
+        p
+        for p in download_dir.iterdir()
+        if p.is_file() and p.suffix == ".xlsx" and p.name not in before
+    ]
+    new_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return new_files
+
+
 def find_new_matching_file(
     download_dir: Path, before: set[str], pattern: str
 ) -> Path | None:
-    if not download_dir.exists():
-        return None
-    candidates = [
-        p
-        for p in download_dir.iterdir()
-        if p.is_file()
-        and p.suffix == ".xlsx"
-        and p.name not in before
-        and fnmatch.fnmatch(p.name, pattern)
-    ]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    for p in _list_new_xlsx(download_dir, before):
+        if fnmatch.fnmatch(p.name, pattern):
+            return p
+    return None
 
 
 def detect_new_file(
@@ -79,21 +81,15 @@ def detect_new_file(
 ) -> Path:
     deadline = time.monotonic() + timeout
     while True:
-        match = find_new_matching_file(download_dir, before, pattern)
-        if match is not None:
-            return match
-        # Detect unexpected new .xlsx files (wrong file downloaded)
-        if download_dir.exists():
-            new_files = [
-                p.name
-                for p in download_dir.iterdir()
-                if p.is_file() and p.suffix == ".xlsx" and p.name not in before
-            ]
-            wrong = [name for name in new_files if not fnmatch.fnmatch(name, pattern)]
-            if wrong:
-                raise ValueError(
-                    f"Unexpected download {wrong[0]!r} does not match pattern {pattern!r}"
-                )
+        new_files = _list_new_xlsx(download_dir, before)
+        matching = [p for p in new_files if fnmatch.fnmatch(p.name, pattern)]
+        if matching:
+            return matching[0]
+        wrong = [p for p in new_files if not fnmatch.fnmatch(p.name, pattern)]
+        if wrong:
+            raise ValueError(
+                f"Unexpected download {wrong[0].name!r} does not match pattern {pattern!r}"
+            )
         if time.monotonic() >= deadline:
             raise TimeoutError(
                 f"No file matching {pattern!r} appeared in {download_dir} within {timeout}s"

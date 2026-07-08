@@ -143,3 +143,16 @@ def test_detect_new_file_wrong_file_raises(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as exc_info:
         detect_new_file(tmp_path, before, FILENAME_PATTERNS["cloud"], timeout=1)
     assert "Wrong-File.xlsx" in str(exc_info.value)
+
+
+def test_detect_new_file_prefers_match_over_wrong_when_both_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda *a, **kw: None)
+    before: set[str] = set()
+    wrong = tmp_path / "Wrong-File.xlsx"
+    wrong.write_bytes(b"")
+    match = tmp_path / "Cloud-Systems-Table-2024-01-15.xlsx"
+    match.write_bytes(b"")
+    result = detect_new_file(
+        tmp_path, before, FILENAME_PATTERNS["cloud"], timeout=0.1, poll_interval=0.05
+    )
+    assert result == match
