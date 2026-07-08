@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "archimedes-browser": {
+      "command": "${CLAUDE_PLUGIN_ROOT:-/Users/I519409/dev/archimedes-ai}/bin/launch-browser.sh",
+      "args": []
+    }
+  }
+}

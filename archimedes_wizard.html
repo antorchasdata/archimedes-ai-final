@@ -710,6 +710,17 @@ const LANGS = {
     s2_busy: 'Generating baseline…',
     s2_ok: 'Baseline generated',
     s2_download: '⬇ Download baseline.xlsx',
+    s2_tab_upload: 'Upload files',
+    s2_tab_one360: 'Extract from ONE360',
+    s2_one360_intro: 'Let Claude drive an internal SAP ONE360 browser session to pull the Cloud, OnPrem and Contracts exports automatically.',
+    s2_one360_cmd_label: 'Run this in Claude Code:',
+    s2_one360_wait: 'Waiting for files to land in the download folder…',
+    s2_one360_dir_label: 'Download folder:',
+    s2_one360_status_cloud: 'Cloud Systems',
+    s2_one360_status_onprem: 'OnPrem Landscape',
+    s2_one360_status_contracts: 'Purchased Solutions',
+    s2_one360_auto_running: 'All files detected — generating baseline…',
+    s2_one360_manual_btn: 'Generate baseline now',
     // step 3
     s3_eye: (n, total) => `Step ${n} of ${total}`,
     s3_title: 'Requirements Excel',
@@ -887,6 +898,17 @@ const LANGS = {
     s2_busy: 'Generando baseline…',
     s2_ok: 'Baseline generado',
     s2_download: '⬇ Descargar baseline.xlsx',
+    s2_tab_upload: 'Subir ficheros',
+    s2_tab_one360: 'Extraer desde ONE360',
+    s2_one360_intro: 'Deja que Claude conduzca un navegador ONE360 (SAP interno) para descargar Cloud, OnPrem y Contratos automáticamente.',
+    s2_one360_cmd_label: 'Ejecuta esto en Claude Code:',
+    s2_one360_wait: 'Esperando a que aparezcan los ficheros en la carpeta de descargas…',
+    s2_one360_dir_label: 'Carpeta de descargas:',
+    s2_one360_status_cloud: 'Sistemas Cloud',
+    s2_one360_status_onprem: 'Landscape OnPrem',
+    s2_one360_status_contracts: 'Purchased Solutions',
+    s2_one360_auto_running: 'Ficheros detectados — generando baseline…',
+    s2_one360_manual_btn: 'Generar baseline ahora',
     s3_eye: (n, total) => `Paso ${n} de ${total}`,
     s3_title: 'Excel de Requerimientos',
     s3_desc: 'Sube el fichero Excel con los requerimientos del cliente. Si ya está enriquecido (columnas O/P rellenas) se usará directamente. Si no, se procesará con Claude API + catálogos RBA/RSA.',
@@ -1055,6 +1077,17 @@ const LANGS = {
     s2_busy: 'Génération du baseline…',
     s2_ok: 'Baseline généré',
     s2_download: '⬇ Télécharger baseline.xlsx',
+    s2_tab_upload: 'Charger les fichiers',
+    s2_tab_one360: 'Extraire depuis ONE360',
+    s2_one360_intro: 'Laissez Claude piloter une session ONE360 (SAP interne) pour télécharger automatiquement Cloud, OnPrem et Contrats.',
+    s2_one360_cmd_label: 'Exécutez ceci dans Claude Code :',
+    s2_one360_wait: 'En attente des fichiers dans le dossier de téléchargement…',
+    s2_one360_dir_label: 'Dossier de téléchargement :',
+    s2_one360_status_cloud: 'Systèmes Cloud',
+    s2_one360_status_onprem: 'Paysage OnPrem',
+    s2_one360_status_contracts: 'Purchased Solutions',
+    s2_one360_auto_running: 'Fichiers détectés — génération du baseline…',
+    s2_one360_manual_btn: 'Générer le baseline',
     s3_eye: (n, total) => `Étape ${n} sur ${total}`,
     s3_title: 'Excel des exigences',
     s3_desc: 'Importez le fichier Excel des exigences client. S\'il est déjà enrichi (colonnes O/P remplies) il sera utilisé directement. Sinon, il sera traité avec Claude API + catalogues RBA/RSA.',
@@ -1198,6 +1231,17 @@ const LANGS = {
     s2_busy: 'Generazione baseline…',
     s2_ok: 'Baseline generato',
     s2_download: '⬇ Scarica baseline.xlsx',
+    s2_tab_upload: 'Carica file',
+    s2_tab_one360: 'Estrai da ONE360',
+    s2_one360_intro: 'Lascia che Claude piloti una sessione ONE360 (SAP interno) per scaricare automaticamente Cloud, OnPrem e Contratti.',
+    s2_one360_cmd_label: 'Esegui questo in Claude Code:',
+    s2_one360_wait: 'In attesa dei file nella cartella di download…',
+    s2_one360_dir_label: 'Cartella di download:',
+    s2_one360_status_cloud: 'Sistemi Cloud',
+    s2_one360_status_onprem: 'Landscape OnPrem',
+    s2_one360_status_contracts: 'Purchased Solutions',
+    s2_one360_auto_running: 'File rilevati — generazione baseline…',
+    s2_one360_manual_btn: 'Genera baseline ora',
     s3_eye: (n, total) => `Passo ${n} di ${total}`,
     s3_title: 'Excel dei requisiti',
     s3_desc: 'Carica il file Excel con i requisiti del cliente. Se già arricchito (colonne O/P compilate) verrà usato direttamente. Altrimenti sarà elaborato con Claude API + cataloghi RBA/RSA.',
@@ -1340,6 +1384,17 @@ const LANGS = {
     s2_busy: 'Luodaan baselinea…',
     s2_ok: 'Baseline luotu',
     s2_download: '⬇ Lataa baseline.xlsx',
+    s2_tab_upload: 'Lataa tiedostot',
+    s2_tab_one360: 'Nouda ONE360:sta',
+    s2_one360_intro: 'Anna Clauden ajaa sisäistä SAP ONE360 -selainistuntoa ja ladata Cloud-, OnPrem- ja Contracts-viennit automaattisesti.',
+    s2_one360_cmd_label: 'Suorita tämä Claude Codessa:',
+    s2_one360_wait: 'Odotetaan tiedostoja lataushakemistoon…',
+    s2_one360_dir_label: 'Lataushakemisto:',
+    s2_one360_status_cloud: 'Cloud-järjestelmät',
+    s2_one360_status_onprem: 'OnPrem-maisema',
+    s2_one360_status_contracts: 'Purchased Solutions',
+    s2_one360_auto_running: 'Tiedostot havaittu — luodaan baselinea…',
+    s2_one360_manual_btn: 'Luo baseline nyt',
     s3_eye: (n, total) => `Vaihe ${n} / ${total}`,
     s3_title: 'Vaatimusten Excel',
     s3_desc: 'Lataa asiakkaan vaatimukset sisältävä Excel-tiedosto. Jos se on jo rikastettu (sarakkeet O/P täytetty), se käytetään suoraan. Muuten se käsitellään Claude API:lla + RBA/RSA-katalogeilla.',
@@ -1956,6 +2011,9 @@ function catalogCard(cls, badge, title, info) {
 }
 
 // ── Step 2 — Baseline ────────────────────────────────────────────────────────
+let one360PollTimer = null;
+let one360AutoTriggered = false;
+
 function renderStep2() {
   return `
     <div class="step-eyebrow">${t('s2_eye', 3, STEPS.length)}</div>
@@ -1965,9 +2023,37 @@ function renderStep2() {
       💡 <strong>${t('s2_inbox_tip_title')}</strong><br>
       <span style="color:var(--text-secondary)">${t('s2_inbox_tip_body')}</span>
     </div>
-    <div class="drop-grid">
-      ${dropZone('onprem', '🖥️', 'OnPrem Systems.xlsx', t('s2_onprem_hint'), '.xlsx')}
-      ${dropZone('cloud',  '☁️', 'Cloud Systems.xlsx',  t('s2_cloud_hint'), '.xlsx')}
+    <div class="s2-tabs" style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px">
+      <button id="s2-tab-upload" class="s2-tab active" onclick="showS2Tab('upload')"
+        style="padding:8px 16px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--sap-blue);color:var(--text-primary)">
+        ${t('s2_tab_upload')}
+      </button>
+      <button id="s2-tab-one360" class="s2-tab" onclick="showS2Tab('one360')"
+        style="padding:8px 16px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary)">
+        ${t('s2_tab_one360')}
+      </button>
+    </div>
+    <div id="s2-panel-upload">
+      <div class="drop-grid">
+        ${dropZone('onprem', '🖥️', 'OnPrem Systems.xlsx', t('s2_onprem_hint'), '.xlsx')}
+        ${dropZone('cloud',  '☁️', 'Cloud Systems.xlsx',  t('s2_cloud_hint'), '.xlsx')}
+      </div>
+    </div>
+    <div id="s2-panel-one360" style="display:none">
+      <p style="margin:0 0 12px;color:var(--text-secondary);font-size:13px;line-height:1.5">${t('s2_one360_intro')}</p>
+      <div style="padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">${t('s2_one360_cmd_label')}</div>
+        <code id="s2-one360-cmd" style="display:block;padding:8px 10px;background:var(--code-bg,#1e1e1e);color:#d4d4d4;border-radius:6px;font-family:'SF Mono',Menlo,monospace;font-size:12px;user-select:all">/archimedes:one360-extract ${sessionId || '&lt;session&gt;'}</code>
+      </div>
+      <div id="s2-one360-status" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+        ${t('s2_one360_wait')}
+      </div>
+      <div id="s2-one360-checklist" style="display:grid;gap:6px;margin-bottom:12px"></div>
+      <div id="s2-one360-dir" style="font-size:11px;color:var(--text-secondary);font-family:'SF Mono',Menlo,monospace"></div>
+      <button id="s2-one360-run" onclick="runStepBaselineFromOne360()" disabled
+        style="margin-top:12px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--sap-blue);background:var(--sap-blue);color:#fff;opacity:0.5">
+        ${t('s2_one360_manual_btn')}
+      </button>
     </div>
     <div class="spinner-wrap" id="step2-spinner">
       <div class="spinner"></div><span class="spinner-text">${t('s2_busy')}</span>
@@ -1984,6 +2070,119 @@ function renderStep2() {
       </label>
     </div>
   `;
+}
+
+function showS2Tab(which) {
+  const upload = document.getElementById('s2-panel-upload');
+  const one360 = document.getElementById('s2-panel-one360');
+  const tabU   = document.getElementById('s2-tab-upload');
+  const tabO   = document.getElementById('s2-tab-one360');
+  if (!upload || !one360 || !tabU || !tabO) return;
+  const isOne = which === 'one360';
+  upload.style.display = isOne ? 'none' : '';
+  one360.style.display = isOne ? '' : 'none';
+  tabU.style.borderBottomColor = isOne ? 'transparent' : 'var(--sap-blue)';
+  tabU.style.color = isOne ? 'var(--text-secondary)' : 'var(--text-primary)';
+  tabO.style.borderBottomColor = isOne ? 'var(--sap-blue)' : 'transparent';
+  tabO.style.color = isOne ? 'var(--text-primary)' : 'var(--text-secondary)';
+  if (isOne) {
+    startOne360Polling();
+  } else {
+    stopOne360Polling();
+  }
+}
+
+let one360LastPaths = { onprem: null, cloud: null, contracts: null };
+
+function startOne360Polling() {
+  if (one360PollTimer) return;
+  one360AutoTriggered = false;
+  pollOne360Once();
+  one360PollTimer = setInterval(pollOne360Once, 3000);
+}
+
+function stopOne360Polling() {
+  if (one360PollTimer) { clearInterval(one360PollTimer); one360PollTimer = null; }
+}
+
+async function pollOne360Once() {
+  if (!sessionId) return;
+  try {
+    const d = await apiFetch(`/api/session/${sessionId}/baseline/one360-status`);
+    renderOne360Checklist(d);
+    one360LastPaths = d.paths || {};
+    const btn = document.getElementById('s2-one360-run');
+    const hasAny = d.downloaded.cloud || d.downloaded.onprem;
+    if (btn) {
+      btn.disabled = !hasAny;
+      btn.style.opacity = hasAny ? '1' : '0.5';
+    }
+    // Auto-trigger once all 3 files are present
+    if (d.downloaded.cloud && d.downloaded.onprem && d.downloaded.contracts && !one360AutoTriggered) {
+      one360AutoTriggered = true;
+      const status = document.getElementById('s2-one360-status');
+      if (status) status.textContent = t('s2_one360_auto_running');
+      stopOne360Polling();
+      await runStepBaselineFromOne360();
+    }
+  } catch (e) {
+    // Silent — user may not be logged in yet, keep polling
+  }
+}
+
+function renderOne360Checklist(d) {
+  const el = document.getElementById('s2-one360-checklist');
+  if (!el) return;
+  const row = (key, label) => {
+    const ok = d.downloaded[key];
+    const icon = ok ? '✅' : '⏳';
+    return `<div style="display:flex;gap:8px;align-items:center;font-size:13px">
+      <span>${icon}</span><span style="color:${ok ? 'var(--text-primary)' : 'var(--text-secondary)'}">${label}</span>
+    </div>`;
+  };
+  el.innerHTML = row('cloud', t('s2_one360_status_cloud'))
+    + row('onprem', t('s2_one360_status_onprem'))
+    + row('contracts', t('s2_one360_status_contracts'));
+  const dirEl = document.getElementById('s2-one360-dir');
+  if (dirEl) dirEl.textContent = `${t('s2_one360_dir_label')} ${d.dir}`;
+}
+
+async function runStepBaselineFromOne360() {
+  const body = {};
+  if (one360LastPaths.onprem)    body.onprem_path    = one360LastPaths.onprem;
+  if (one360LastPaths.cloud)     body.cloud_path     = one360LastPaths.cloud;
+  if (one360LastPaths.contracts) body.contracts_path = one360LastPaths.contracts;
+  if (!body.onprem_path && !body.cloud_path) return;
+
+  stopOne360Polling();
+  setBusy(true, t('s2_busy'));
+  try {
+    const data = await apiFetch(`/api/session/${sessionId}/baseline/from-one360`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    setBusy(false);
+    if (!data.skipped) {
+      stepDone[currentStep] = true;
+      const rc = document.getElementById('step2-result');
+      rc.className = 'result-card success show';
+      rc.innerHTML = `
+        <div class="result-header">✅ ${t('s2_ok')}</div>
+        <div class="result-stats">
+          ${statPill(data.n_onprem, 'On-Prem')}
+          ${statPill(data.n_cloud, 'Cloud')}
+          ${statPill(data.n_total, 'Total Apps')}
+        </div>
+        <a href="${data.download_url}" download class="btn-download" style="display:inline-block;margin-top:4px;text-decoration:none">${t('s2_download')}</a>
+      `;
+    }
+  } catch (e) {
+    setBusy(false);
+    const rc = document.getElementById('step2-result');
+    rc.className = 'result-card error show';
+    rc.innerHTML = `<div class="result-header">⚠ ${esc(e.message || String(e))}</div>`;
+  }
 }
 
 async function runStepBaseline() {
@@ -2984,6 +3183,8 @@ function showDone() {
 // ── Render step ───────────────────────────────────────────────────────────────
 function renderStep(n) {
   pendingImages = [];
+  // Stop any Step-2 ONE360 polling when navigating away
+  if (typeof stopOne360Polling === 'function') stopOne360Polling();
   // Remove Cookie Monster from viewport when leaving step 8
   const importIdx = STEPS.findIndex(s => s.id === 'import');
   if (n !== importIdx) {

@@ -416,6 +416,111 @@ async def run_baseline(
     }
 
 
+# ── Step 2 — Baseline from ONE360-extracted files ─────────────────────────────
+
+from pipeline.one360_extractor import FILENAME_PATTERNS, find_new_matching_file
+
+
+def _one360_dir() -> Path:
+    """Resolve the ONE360 download directory used by the Playwright MCP skill."""
+    env = os.environ.get("ARCHIMEDES_ONE360_DIR")
+    if env:
+        return Path(env)
+    return BASE_DIR / "downloads" / "one360"
+
+
+@app.post("/api/session/{session_id}/baseline/from-one360")
+async def run_baseline_from_one360(session_id: str, body: dict):
+    """
+    Same as /baseline, but takes filesystem paths (produced by the ONE360
+    extractor skill via Playwright MCP) instead of HTTP file uploads.
+
+    Body: { onprem_path?: str, cloud_path?: str, contracts_path?: str }
+    """
+    sess = _session(session_id)
+
+    onprem_src   = body.get("onprem_path")
+    cloud_src    = body.get("cloud_path")
+    contracts_src = body.get("contracts_path")
+
+    if not onprem_src and not cloud_src:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one of onprem_path or cloud_path must be provided.",
+        )
+
+    out_dir = sess["output_dir"]
+    onprem_path = cloud_path = None
+
+    if onprem_src:
+        src = Path(onprem_src)
+        if not src.exists():
+            raise HTTPException(status_code=400, detail=f"onprem_path not found: {src}")
+        onprem_path = out_dir / "onprem_systems.xlsx"
+        shutil.copyfile(src, onprem_path)
+
+    if cloud_src:
+        src = Path(cloud_src)
+        if not src.exists():
+            raise HTTPException(status_code=400, detail=f"cloud_path not found: {src}")
+        cloud_path = out_dir / "cloud_systems.xlsx"
+        shutil.copyfile(src, cloud_path)
+
+    if contracts_src:
+        src = Path(contracts_src)
+        if not src.exists():
+            raise HTTPException(status_code=400, detail=f"contracts_path not found: {src}")
+        contracts_path = out_dir / "purchased_solutions.xlsx"
+        shutil.copyfile(src, contracts_path)
+        sess["contracts_source"] = contracts_path
+
+    client_name  = sess["client_name"]
+    baseline_out = out_dir / f"{client_name}_baseline.xlsx"
+
+    try:
+        result = await asyncio.to_thread(
+            generate_baseline,
+            output_path=baseline_out,
+            client_name=client_name,
+            onprem_path=onprem_path,
+            cloud_path=cloud_path,
+        )
+    except Exception as exc:
+        logger.exception("Baseline (from ONE360) error")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    sess["baseline_result"] = result
+    sess["out_baseline"]    = baseline_out
+
+    return {
+        "ok":           True,
+        "skipped":      False,
+        "n_onprem":     result["n_onprem"],
+        "n_cloud":      result["n_cloud"],
+        "n_total":      result["n_total"],
+        "download_url": f"/api/session/{session_id}/download/baseline",
+    }
+
+
+@app.get("/api/session/{session_id}/baseline/one360-status")
+async def one360_status(session_id: str):
+    """Report which ONE360 exports have landed in the shared download dir.
+
+    Used by the wizard UI to poll while the user drives the Playwright MCP
+    browser (skill: /archimedes:one360-extract).
+    """
+    _session(session_id)  # 404 if unknown
+    dl_dir = _one360_dir()
+    empty: set[str] = set()
+    paths: dict[str, Optional[str]] = {}
+    downloaded: dict[str, bool] = {}
+    for key, pattern in FILENAME_PATTERNS.items():
+        match = find_new_matching_file(dl_dir, empty, pattern) if dl_dir.exists() else None
+        paths[key] = str(match) if match else None
+        downloaded[key] = match is not None
+    return {"downloaded": downloaded, "paths": paths, "dir": str(dl_dir)}
+
+
 # ── Step 2 — Register pre-built baseline (admin/debug) ────────────────────────
 
 @app.post("/api/session/{session_id}/baseline/register")
