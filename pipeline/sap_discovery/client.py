@@ -14,6 +14,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import requests
+
+from pipeline.leanix_auth import get_bearer
+
 
 @dataclass
 class DiscoveryItem:
@@ -58,3 +62,18 @@ class Client:
     def __init__(self, base_url: str, api_token: str) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_token = api_token
+
+    def create_integration(self, crm_id: str) -> dict:
+        """POST /services/discovery-sap-extension/v1/integrations.
+
+        Returns the integration record as JSON. Raises requests.HTTPError on 4xx/5xx.
+        """
+        token = get_bearer(self.base_url, self.api_token)
+        resp = requests.post(
+            f"{self.base_url}/services/discovery-sap-extension/v1/integrations",
+            json={"customerIdentifiers": [{"type": "CRM", "id": crm_id}]},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
