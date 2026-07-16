@@ -194,7 +194,7 @@ ph = cover.placeholders[0]
 ph.text = "Archimedes AI\nAutomated LeanIX Population"
 for shape in cover.shapes:
     if shape.has_text_frame and shape.name == "Spaker name - Dynamic":
-        shape.text_frame.paragraphs[0].runs[0].text = "SAP Enterprise Architecture"
+        shape.text_frame.paragraphs[0].runs[0].text = "SAP Advisory Architecture"
     if shape.has_text_frame and shape.name == "Date - Dynamic":
         shape.text_frame.paragraphs[0].runs[0].text = "May 2026"
 
