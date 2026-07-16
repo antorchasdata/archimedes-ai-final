@@ -71,3 +71,75 @@ def test_create_integration_raises_on_409_conflict():
          patch("pipeline.sap_discovery.client.requests.post", return_value=mock_resp):
         with pytest.raises(_rq.HTTPError):
             client.create_integration(crm_id="0001234567")
+
+
+def test_set_autolinking_puts_expected_body():
+    client = _mk_client()
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"autoLinking": True}
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
+        client.set_autolinking(origin="sap-extension", enabled=True)
+
+    args, kwargs = p.call_args
+    assert args[0] == (
+        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/settings/autoLinking"
+    )
+    assert kwargs["json"] == {"enabled": True}
+
+
+def test_discover_origin_returns_first_candidate_that_answers_2xx():
+    client = _mk_client()
+
+    def _fake_get(url, **_kw):
+        m = MagicMock()
+        # sap-extension answers 404, internal-sap answers 200
+        if "internal-sap" in url:
+            m.status_code = 200
+            m.raise_for_status.return_value = None
+        else:
+            m.status_code = 404
+            import requests as _rq
+            m.raise_for_status.side_effect = _rq.HTTPError("404")
+        return m
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.get", side_effect=_fake_get):
+        origin = client.discover_origin()
+    assert origin == "internal-sap"
+
+
+def test_list_inbox_returns_parsed_discovery_items():
+    client = _mk_client()
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "items": [
+            {
+                "id": "d1",
+                "displayName": "SAP S/4HANA Cloud - PROD",
+                "classification": "SaaS_ERP",
+                "product": "SAP S/4HANA Cloud",
+                "systemRole": "PROD",
+                "status": "action_needed",
+                "suggestedLinks": {"application": [], "itcomponent": [], "provider": []},
+            }
+        ]
+    }
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.get", return_value=mock_resp) as p:
+        items = client.list_inbox(origin="sap-extension", status="action_needed")
+
+    args, kwargs = p.call_args
+    assert args[0] == (
+        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems"
+    )
+    assert kwargs["params"] == {"status": "action_needed"}
+    assert len(items) == 1
+    assert items[0].id == "d1"
+    assert items[0].classification == "SaaS_ERP"

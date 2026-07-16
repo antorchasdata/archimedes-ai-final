@@ -59,9 +59,14 @@ class DiscoveryItem:
 class Client:
     """LeanIX discovery REST client. All HTTP calls live in this class."""
 
+    _ORIGIN_CANDIDATES = ("sap-extension", "internal-sap", "sap-landscape")
+
     def __init__(self, base_url: str, api_token: str) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_token = api_token
+
+    def _auth_header(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {get_bearer(self.base_url, self.api_token)}"}
 
     def create_integration(self, crm_id: str) -> dict:
         """POST /services/discovery-sap-extension/v1/integrations.
@@ -77,3 +82,44 @@ class Client:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def set_autolinking(self, origin: str, enabled: bool) -> None:
+        resp = requests.put(
+            f"{self.base_url}/services/discovery-linking/v2/{origin}/settings/autoLinking",
+            json={"enabled": enabled},
+            headers=self._auth_header(),
+            timeout=30,
+        )
+        resp.raise_for_status()
+
+    def discover_origin(self) -> str:
+        """Probe origin candidates. Return the first that returns 2xx to a HEAD-equivalent GET.
+
+        Raises RuntimeError if none respond.
+        """
+        for candidate in self._ORIGIN_CANDIDATES:
+            resp = requests.get(
+                f"{self.base_url}/services/discovery-linking/v2/{candidate}/discoveryItems",
+                params={"limit": 1},
+                headers=self._auth_header(),
+                timeout=30,
+            )
+            if resp.status_code < 400:
+                return candidate
+        raise RuntimeError(
+            f"No SAP discovery origin resolved. Tried: {', '.join(self._ORIGIN_CANDIDATES)}"
+        )
+
+    def list_inbox(self, origin: str, status: str | None = None) -> list[DiscoveryItem]:
+        params: dict[str, str] = {}
+        if status:
+            params["status"] = status
+        resp = requests.get(
+            f"{self.base_url}/services/discovery-linking/v2/{origin}/discoveryItems",
+            params=params,
+            headers=self._auth_header(),
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        return [DiscoveryItem.from_api(x) for x in data.get("items", [])]
