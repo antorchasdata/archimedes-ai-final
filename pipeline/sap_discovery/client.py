@@ -123,3 +123,28 @@ class Client:
         resp.raise_for_status()
         data = resp.json() or {}
         return [DiscoveryItem.from_api(x) for x in data.get("items", [])]
+
+    def bulk_link(self, origin: str, decisions: list[dict]) -> dict:
+        """PUT /discovery-linking/v2/{origin}/discoveryItems/link.
+
+        Each decision: {"itemId": str, "targetType": str, "targetId": str}.
+        Returns the API response verbatim ({"applied": [...], "failed": [...]}).
+        """
+        resp = requests.put(
+            f"{self.base_url}/services/discovery-linking/v2/{origin}/discoveryItems/link",
+            json={"decisions": decisions},
+            headers=self._auth_header(),
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def bulk_reject(self, origin: str, item_ids: list[str]) -> dict:
+        resp = requests.put(
+            f"{self.base_url}/services/discovery-linking/v2/{origin}/discoveryItems/reject",
+            json={"itemIds": item_ids},
+            headers=self._auth_header(),
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()

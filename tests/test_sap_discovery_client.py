@@ -143,3 +143,45 @@ def test_list_inbox_returns_parsed_discovery_items():
     assert len(items) == 1
     assert items[0].id == "d1"
     assert items[0].classification == "SaaS_ERP"
+
+
+def test_bulk_link_puts_decisions_and_returns_result():
+    client = _mk_client()
+    decisions = [
+        {"itemId": "d1", "targetType": "Application", "targetId": "fs-app-1"},
+        {"itemId": "d2", "targetType": "ITComponent", "targetId": "fs-itc-2"},
+    ]
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"applied": ["d1", "d2"], "failed": []}
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
+        result = client.bulk_link(origin="sap-extension", decisions=decisions)
+
+    args, kwargs = p.call_args
+    assert args[0] == (
+        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems/link"
+    )
+    assert kwargs["json"] == {"decisions": decisions}
+    assert result == {"applied": ["d1", "d2"], "failed": []}
+
+
+def test_bulk_reject_puts_item_ids():
+    client = _mk_client()
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"applied": ["d3"], "failed": []}
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
+        result = client.bulk_reject(origin="sap-extension", item_ids=["d3"])
+
+    args, kwargs = p.call_args
+    assert args[0] == (
+        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems/reject"
+    )
+    assert kwargs["json"] == {"itemIds": ["d3"]}
+    assert result == {"applied": ["d3"], "failed": []}
