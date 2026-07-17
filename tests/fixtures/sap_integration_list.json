@@ -1,14 +1,16 @@
-[
-  {
-    "id": "afdae8b4-c707-4924-b1d9-e550d696288e",
-    "service": "SLIS",
-    "name": "Internal SAP Landscape Data",
-    "active": true,
-    "dataSync": {
-      "status": "ACTIVE",
-      "lastRun": "2026-07-17T05:00:00Z",
-      "lastSuccesfulRun": "2026-07-17T05:00:00Z"
-    },
-    "selectedCustomers": ["37327"]
-  }
-]
+{
+  "data": [
+    {
+      "id": "afdae8b4-c707-4924-b1d9-e550d696288e",
+      "service": "SLIS",
+      "name": "Internal SAP Landscape Data",
+      "active": true,
+      "dataSync": {
+        "status": "ACTIVE",
+        "lastRun": "2026-07-17T05:00:00Z",
+        "lastSuccesfulRun": "2026-07-17T05:00:00Z"
+      },
+      "selectedCustomers": ["37327"]
+    }
+  ]
+}

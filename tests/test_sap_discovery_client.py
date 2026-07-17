@@ -97,6 +97,21 @@ def test_find_active_slis_integration_ignores_inactive(client):
 
 
 # ---------------------------------------------------------------------------
+# 3b. list_integrations — accepts legacy flat-array payload
+# ---------------------------------------------------------------------------
+def test_list_integrations_accepts_flat_array(client):
+    payload = [
+        {"id": "x", "service": "SLIS", "active": True, "name": "Legacy shape"},
+    ]
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=payload)
+
+        result = client.find_active_slis_integration()
+
+    assert result["id"] == "x"
+
+
+# ---------------------------------------------------------------------------
 # 4. list_inbox — unwraps {"data":{"discoveryItems":[...]}} envelope
 # ---------------------------------------------------------------------------
 def test_list_inbox_unwraps_data_envelope(client):

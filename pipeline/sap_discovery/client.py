@@ -158,7 +158,11 @@ class Client:
             timeout=30,
         )
         r.raise_for_status()
-        return r.json() or []
+        payload = r.json() or {}
+        # LeanIX wraps the list in {"data":[...]}. Accept both shapes defensively.
+        if isinstance(payload, dict):
+            return payload.get("data") or []
+        return payload or []
 
     def find_active_slis_integration(self) -> dict:
         matches = [
