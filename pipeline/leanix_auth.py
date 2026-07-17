@@ -12,19 +12,23 @@ import time
 
 import requests
 
-_token_cache: dict = {"token": None, "expires_at": 0.0}
+_token_cache: dict[tuple[str, str], dict] = {}
 
 
 def get_bearer(base_url: str, api_token: str) -> str:
     """Return a valid Bearer JWT for LeanIX REST calls.
 
-    Caches the token at module level and refreshes when within 60s of
-    expiry. Raises requests.HTTPError on token-endpoint failure —
-    callers decide what to do (most wrap in try/except and degrade
-    gracefully).
+    Caches the token at module level keyed by (base_url, api_token) and
+    refreshes when within 60s of expiry. Keying by workspace prevents a
+    process that validates multiple workspaces in sequence from reusing
+    the first workspace's bearer for subsequent workspaces. Raises
+    requests.HTTPError on token-endpoint failure — callers decide what
+    to do (most wrap in try/except and degrade gracefully).
     """
-    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
-        return _token_cache["token"]
+    key = (base_url, api_token)
+    entry = _token_cache.get(key)
+    if entry and time.time() < entry["expires_at"] - 60:
+        return entry["token"]
     resp = requests.post(
         f"{base_url.rstrip('/')}/services/mtm/v1/oauth2/token",
         data={"grant_type": "client_credentials"},
@@ -33,6 +37,8 @@ def get_bearer(base_url: str, api_token: str) -> str:
     )
     resp.raise_for_status()
     data = resp.json()
-    _token_cache["token"] = data["access_token"]
-    _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
-    return _token_cache["token"]
+    _token_cache[key] = {
+        "token": data["access_token"],
+        "expires_at": time.time() + data.get("expires_in", 3600),
+    }
+    return _token_cache[key]["token"]

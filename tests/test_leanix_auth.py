@@ -12,11 +12,9 @@ from pipeline import leanix_auth
 @pytest.fixture(autouse=True)
 def _reset_token_cache():
     """Reset the module-level token cache before every test."""
-    leanix_auth._token_cache["token"] = None
-    leanix_auth._token_cache["expires_at"] = 0.0
+    leanix_auth._token_cache.clear()
     yield
-    leanix_auth._token_cache["token"] = None
-    leanix_auth._token_cache["expires_at"] = 0.0
+    leanix_auth._token_cache.clear()
 
 
 def test_get_bearer_calls_token_endpoint_with_basic_auth():
@@ -89,7 +87,7 @@ def test_get_bearer_raises_on_http_error():
             leanix_auth.get_bearer("https://x", "bad")
 
     # Cache must remain empty after a failed handshake
-    assert leanix_auth._token_cache["token"] is None
+    assert leanix_auth._token_cache == {}
 
 
 def test_get_bearer_handles_missing_expires_in():
@@ -103,4 +101,23 @@ def test_get_bearer_handles_missing_expires_in():
         token = leanix_auth.get_bearer("https://x", "tok")
 
     assert token == "JWT"
-    assert leanix_auth._token_cache["expires_at"] == 1000.0 + 3600
+    assert leanix_auth._token_cache[("https://x", "tok")]["expires_at"] == 1000.0 + 3600
+
+
+def test_get_bearer_isolates_cache_per_workspace():
+    """Different (base_url, api_token) pairs must NOT share the cached bearer."""
+    resp_a = MagicMock()
+    resp_a.json.return_value = {"access_token": "JWT_A", "expires_in": 3600}
+    resp_a.raise_for_status.return_value = None
+    resp_b = MagicMock()
+    resp_b.json.return_value = {"access_token": "JWT_B", "expires_in": 3600}
+    resp_b.raise_for_status.return_value = None
+
+    with patch("pipeline.leanix_auth.requests.post",
+               side_effect=[resp_a, resp_b]) as post:
+        token_a = leanix_auth.get_bearer("https://a.leanix.net", "tok_a")
+        token_b = leanix_auth.get_bearer("https://b.leanix.net", "tok_b")
+
+    assert token_a == "JWT_A"
+    assert token_b == "JWT_B"
+    assert post.call_count == 2
