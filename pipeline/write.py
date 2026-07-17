@@ -986,6 +986,68 @@ def _resolver_credentials() -> tuple[str, str]:
     )
 
 
+def _gql_toplevel(query: str, variables: dict, _max_retries: int = 3) -> dict:
+    """Minimal GraphQL POST for module-level callers (no closure over write_leanix scope).
+
+    Uses env-based auth (LEANIX_BASE_URL / LEANIX_API_TOKEN) and retries on 429.
+    """
+    import requests
+    base_url = os.environ["LEANIX_BASE_URL"].rstrip("/")
+    token    = os.environ["LEANIX_API_TOKEN"]
+    gql_url  = f"{base_url}/services/pathfinder/v1/graphql"
+    for attempt in range(1, _max_retries + 1):
+        hdrs = {"Authorization": f"Bearer {get_bearer(base_url, token)}",
+                "Content-Type": "application/json"}
+        resp = requests.post(
+            gql_url,
+            json={"query": query, "variables": variables},
+            headers=hdrs,
+            timeout=30,
+        )
+        if resp.status_code == 429 and attempt < _max_retries:
+            time.sleep(int(resp.headers.get("Retry-After", 2 ** attempt)))
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise RuntimeError("GraphQL retries exhausted")
+
+
+def create_factsheet(type_: str, name: str, attributes: dict | None = None) -> dict:
+    """Create a fact sheet and (optionally) patch scalar attributes.
+
+    Public wrapper used by pipeline.sap_discovery.make_create_factsheet_bridge()
+    and any other caller that needs a top-level fact-sheet creation entrypoint
+    without instantiating the full write_leanix pipeline.
+
+    Args:
+        type_: FactSheetType (e.g. "Application", "ITComponent").
+        name: display name.
+        attributes: optional dict of scalar field→value to patch after creation.
+            Non-fatal: patch failures are logged and swallowed. ``None`` values
+            are skipped so callers can pass optional fields without pre-filtering.
+
+    Returns:
+        ``{"id": <new fact sheet id>}``
+    """
+    result = _gql_toplevel(_MUTATION_CREATE_FS, {"type": type_, "name": name})
+    fs_id = result["data"]["createFactSheet"]["factSheet"]["id"]
+    if attributes:
+        for path, value in attributes.items():
+            if value is None:
+                continue
+            try:
+                _gql_toplevel(_MUTATION_PATCH_FS, {
+                    "id": fs_id,
+                    "patches": [{"op": "add", "path": f"/{path}", "value": str(value)}],
+                })
+            except Exception as exc:
+                logger.warning(
+                    "create_factsheet: skipping attribute %s on %s — %s",
+                    path, fs_id, exc,
+                )
+    return {"id": fs_id}
+
+
 def _backup_workspace(base_url: str, api_token: str, output_dir: Path) -> Path | None:
     """
     Trigger a LeanIX full-export backup before a push and download the result.

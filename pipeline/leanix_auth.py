@@ -26,7 +26,7 @@ def get_bearer(base_url: str, api_token: str) -> str:
     if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
         return _token_cache["token"]
     resp = requests.post(
-        f"{base_url}/services/mtm/v1/oauth2/token",
+        f"{base_url.rstrip('/')}/services/mtm/v1/oauth2/token",
         data={"grant_type": "client_credentials"},
         auth=("apitoken", api_token),
         timeout=30,

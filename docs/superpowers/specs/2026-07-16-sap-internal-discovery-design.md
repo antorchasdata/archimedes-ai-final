@@ -4,6 +4,14 @@
 **Author:** SAP EA Practice (Archimedes AI)
 **Status:** Draft — pending user review
 
+> **Implementation status (as of Task 16 completion):** unit tests green.
+> Runtime validation pending against a live demo workspace with
+> Internal SAP Landscape Data enabled. Blockers to close v1:
+> 1. Verify `{origin}` candidate list; adjust `Client._ORIGIN_CANDIDATES` if needed.
+> 2. Verify body schema of `POST /discovery-sap-extension/v1/integrations`
+>    against the workspace's `/v3/api-docs`.
+> 3. Verify v2 Beta enabled in workspace, else confirm v1 fallback covers bulk_link/reject as well.
+
 ## Context
 
 SAP LeanIX EA Delivery workspaces (internal-only) now support the **Internal SAP Landscape Data** integration, which replaces Cloud ALM for internal use cases. It populates the SAP Discovery inbox with System fact sheets discovered across the SAP corporate landscape for a given customer (identified by CRM ID / ERP ID).
