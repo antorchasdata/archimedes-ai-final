@@ -14,30 +14,28 @@ from pipeline.sap_discovery.client import (
     Client,
     DiscoveryItem,
 )
-
-# TODO: Import additional modules as they are implemented
-# from pipeline.sap_discovery.matcher import (
-#     MatchDecision,
-#     decide,
-# )
-# from pipeline.sap_discovery.orchestrator import (
-#     apply_review,
-#     poll_status,
-#     process_inbox,
-#     start_integration,
-# )
-# from pipeline.sap_discovery.report import build
+from pipeline.sap_discovery.matcher import (
+    MatchDecision,
+    decide,
+)
+from pipeline.sap_discovery.orchestrator import (
+    apply_review,
+    poll_status,
+    process_inbox,
+    start_integration,
+)
+from pipeline.sap_discovery.report import build
 
 __all__ = [
     "Client",
     "DiscoveryItem",
-    # "MatchDecision",
-    # "apply_review",
-    # "build",
-    # "decide",
-    # "poll_status",
-    # "process_inbox",
-    # "start_integration",
+    "MatchDecision",
+    "apply_review",
+    "build",
+    "decide",
+    "poll_status",
+    "process_inbox",
+    "start_integration",
 ]
 
 
