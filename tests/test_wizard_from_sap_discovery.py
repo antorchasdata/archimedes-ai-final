@@ -57,3 +57,24 @@ def test_from_sap_discovery_starts_integration_and_returns_pending():
     assert body["status"] == "pending"
     assert body["integration_id"] == "int-42"
     assert body["eta_seconds"] == 600
+
+
+def test_sap_discovery_status_returns_orchestrator_result():
+    sid, session_dir = _make_session()
+    (session_dir / "sap_discovery").mkdir(parents=True, exist_ok=True)
+    (session_dir / "sap_discovery" / "integration.json").write_text(
+        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
+    )
+    tc = TestClient(app)
+
+    with patch("archimedes_wizard.sap_discovery") as sd_mod:
+        sd_mod.Client.return_value = MagicMock()
+        sd_mod.poll_status.return_value = {
+            "status": "ready", "inbox_count": 5,
+            "action_needed": 4, "review_needed": 1,
+        }
+        r = tc.get(f"/api/session/{sid}/baseline/sap-discovery/status")
+
+    assert r.status_code == 200
+    assert r.json()["status"] == "ready"
+    assert r.json()["inbox_count"] == 5

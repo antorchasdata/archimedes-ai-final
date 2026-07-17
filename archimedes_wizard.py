@@ -581,6 +581,17 @@ async def from_sap_discovery(session_id: str, body: dict):
     return {**state, "eta_seconds": 600}
 
 
+@app.get("/api/session/{session_id}/baseline/sap-discovery/status")
+async def sap_discovery_status(session_id: str):
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    client = _sap_discovery_client(session_id)
+    return sap_discovery.poll_status(
+        session_dir=_sap_discovery_dir(session_id),
+        client=client,
+    )
+
+
 # ── Step 2b — Lift & Shift: Resolve ───────────────────────────────────────────
 
 @app.post("/api/session/{session_id}/lift-shift/resolve")
