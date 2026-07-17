@@ -2032,6 +2032,10 @@ function renderStep2() {
         style="padding:8px 16px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary)">
         ${t('s2_tab_one360')}
       </button>
+      <button id="s2-tab-sap-discovery" class="s2-tab" onclick="showS2Tab('sap-discovery')"
+        style="padding:8px 16px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary)">
+        SAP Internal Discovery
+      </button>
     </div>
     <div id="s2-panel-upload">
       <div class="drop-grid">
@@ -2055,6 +2059,42 @@ function renderStep2() {
         ${t('s2_one360_manual_btn')}
       </button>
     </div>
+    <div id="s2-panel-sap-discovery" style="display:none">
+      <p style="margin:0 0 12px;color:var(--text-secondary);font-size:13px;line-height:1.5">
+        Configure the LeanIX Internal SAP Landscape Data integration for an SAP customer.
+      </p>
+      <div style="display:grid;gap:10px;margin-bottom:12px">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)">
+          CRM ID / ERP ID
+          <input type="text" id="sap-discovery-crm-id" placeholder="0001234567"
+            style="padding:6px 10px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:'SF Mono',Menlo,monospace">
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="sap-discovery-autolinking" checked style="accent-color:var(--sap-blue)">
+          Enable autolinking
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button id="sap-discovery-start"
+          style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--sap-blue);background:var(--sap-blue);color:#fff">
+          Start integration
+        </button>
+        <button id="sap-discovery-check" disabled
+          style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-primary);opacity:0.5">
+          Check inbox
+        </button>
+        <button id="sap-discovery-process" disabled
+          style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-primary);opacity:0.5">
+          Process inbox
+        </button>
+        <a id="sap-discovery-report-link" href="#" hidden target="_blank"
+          style="padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px;border:1px solid var(--sap-blue);color:var(--sap-blue);align-self:center">
+          Open review report
+        </a>
+      </div>
+      <pre id="sap-discovery-log"
+        style="max-height:200px;overflow:auto;padding:10px;background:var(--code-bg,#1e1e1e);color:#d4d4d4;border-radius:6px;font-family:'SF Mono',Menlo,monospace;font-size:11px;margin:0;white-space:pre-wrap"></pre>
+    </div>
     <div class="spinner-wrap" id="step2-spinner">
       <div class="spinner"></div><span class="spinner-text">${t('s2_busy')}</span>
     </div>
@@ -2075,20 +2115,31 @@ function renderStep2() {
 function showS2Tab(which) {
   const upload = document.getElementById('s2-panel-upload');
   const one360 = document.getElementById('s2-panel-one360');
+  const sapDisc = document.getElementById('s2-panel-sap-discovery');
   const tabU   = document.getElementById('s2-tab-upload');
   const tabO   = document.getElementById('s2-tab-one360');
+  const tabS   = document.getElementById('s2-tab-sap-discovery');
   if (!upload || !one360 || !tabU || !tabO) return;
   const isOne = which === 'one360';
-  upload.style.display = isOne ? 'none' : '';
-  one360.style.display = isOne ? '' : 'none';
-  tabU.style.borderBottomColor = isOne ? 'transparent' : 'var(--sap-blue)';
-  tabU.style.color = isOne ? 'var(--text-secondary)' : 'var(--text-primary)';
+  const isSap = which === 'sap-discovery';
+  upload.style.display  = (isOne || isSap) ? 'none' : '';
+  one360.style.display  = isOne ? '' : 'none';
+  if (sapDisc) sapDisc.style.display = isSap ? '' : 'none';
+  tabU.style.borderBottomColor = (isOne || isSap) ? 'transparent' : 'var(--sap-blue)';
+  tabU.style.color = (isOne || isSap) ? 'var(--text-secondary)' : 'var(--text-primary)';
   tabO.style.borderBottomColor = isOne ? 'var(--sap-blue)' : 'transparent';
   tabO.style.color = isOne ? 'var(--text-primary)' : 'var(--text-secondary)';
+  if (tabS) {
+    tabS.style.borderBottomColor = isSap ? 'var(--sap-blue)' : 'transparent';
+    tabS.style.color = isSap ? 'var(--text-primary)' : 'var(--text-secondary)';
+  }
   if (isOne) {
     startOne360Polling();
   } else {
     stopOne360Polling();
+  }
+  if (isSap) {
+    initSapDiscoveryHandlers();
   }
 }
 
@@ -2183,6 +2234,81 @@ async function runStepBaselineFromOne360() {
     rc.className = 'result-card error show';
     rc.innerHTML = `<div class="result-header">⚠ ${esc(e.message || String(e))}</div>`;
   }
+}
+
+// --- SAP Internal Discovery (LeanIX Internal SAP Landscape Data) ---
+let sapDiscoveryHandlersBound = false;
+function sapDiscoveryLog(msg) {
+  const el = document.getElementById('sap-discovery-log');
+  if (!el) return;
+  const ts = new Date().toISOString().slice(11, 19);
+  el.textContent += `[${ts}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+function initSapDiscoveryHandlers() {
+  if (sapDiscoveryHandlersBound) return;
+  const startBtn = document.getElementById('sap-discovery-start');
+  const checkBtn = document.getElementById('sap-discovery-check');
+  const processBtn = document.getElementById('sap-discovery-process');
+  if (!startBtn || !checkBtn || !processBtn) return;
+
+  const enable = (btn, on) => {
+    btn.disabled = !on;
+    btn.style.opacity = on ? '1' : '0.5';
+  };
+
+  startBtn.addEventListener('click', async () => {
+    const crm = (document.getElementById('sap-discovery-crm-id') || {}).value;
+    const crmTrim = (crm || '').trim();
+    const auto = (document.getElementById('sap-discovery-autolinking') || {}).checked;
+    if (!crmTrim) { alert('CRM ID required'); return; }
+    sapDiscoveryLog('Starting integration…');
+    try {
+      const body = await apiFetch(`/api/session/${sessionId}/baseline/from-sap-discovery`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ crm_id: crmTrim, enable_autolinking: auto }),
+      });
+      sapDiscoveryLog('Integration: ' + JSON.stringify(body));
+      enable(checkBtn, true);
+    } catch (e) {
+      sapDiscoveryLog('Integration error: ' + (e.message || String(e)));
+    }
+  });
+
+  checkBtn.addEventListener('click', async () => {
+    try {
+      const body = await apiFetch(`/api/session/${sessionId}/baseline/sap-discovery/status`);
+      sapDiscoveryLog('Status: ' + JSON.stringify(body));
+      if (body && body.status === 'ready') {
+        enable(processBtn, true);
+      }
+    } catch (e) {
+      sapDiscoveryLog('Status error: ' + (e.message || String(e)));
+    }
+  });
+
+  processBtn.addEventListener('click', async () => {
+    sapDiscoveryLog('Processing inbox…');
+    try {
+      const catalog = window.__ARCHI_CATALOG__ || {};
+      const body = await apiFetch(`/api/session/${sessionId}/baseline/sap-discovery/process`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ catalog: catalog }),
+      });
+      sapDiscoveryLog('Process result: ' + JSON.stringify(body));
+      const a = document.getElementById('sap-discovery-report-link');
+      if (a && body && body.report_url) {
+        a.href = body.report_url;
+        a.hidden = false;
+      }
+    } catch (e) {
+      sapDiscoveryLog('Process error: ' + (e.message || String(e)));
+    }
+  });
+
+  sapDiscoveryHandlersBound = true;
 }
 
 async function runStepBaseline() {
