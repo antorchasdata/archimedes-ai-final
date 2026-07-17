@@ -1,0 +1,133 @@
+{
+  "data": {
+    "discoveryItems": [
+      {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "displayName": "SAP S/4HANA Cloud (auto-linkable)",
+        "priority": "high",
+        "linkingStatus": "not_linked",
+        "linkingStatusCommitted": false,
+        "reviewStatus": null,
+        "source": {"system": "SLIS", "originId": "SID001"},
+        "discoveryDetails": [
+          {"key": "systemNumber", "keyDisplayName": "System Number", "type": "TEXT", "value": "SID001"}
+        ],
+        "nodes": [
+          {
+            "nodeId": "node-app-1",
+            "nodeType": "Application",
+            "nodeName": "SAP S/4HANA Cloud",
+            "catalogName": "SAP S/4HANA Cloud",
+            "nodeCategory": "SoftwareProduct",
+            "isSelected": {"value": true},
+            "isSelectionLocked": {"value": false, "reason": null},
+            "canBeEdited": true,
+            "suggestions": [
+              {
+                "factSheetType": "Application",
+                "factSheetId": "fs-app-001",
+                "factSheetName": "SAP S/4HANA Cloud",
+                "factSheetDisplayName": "SAP S/4HANA Cloud",
+                "factSheetSubtype": null
+              }
+            ]
+          },
+          {
+            "nodeId": "node-itc-1",
+            "nodeType": "ITComponent",
+            "nodeName": "SAP HANA",
+            "catalogName": "SAP HANA",
+            "nodeCategory": "Software",
+            "isSelected": {"value": true},
+            "isSelectionLocked": {"value": true, "reason": "Catalog"},
+            "canBeEdited": false,
+            "suggestions": [
+              {
+                "factSheetType": "ITComponent",
+                "factSheetId": "fs-itc-001",
+                "factSheetName": "SAP HANA",
+                "factSheetDisplayName": "SAP HANA",
+                "factSheetSubtype": null
+              }
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "id": "rel-1",
+            "fromNodeId": "node-app-1",
+            "toNodeId": "node-itc-1",
+            "relationType": "relApplicationToITComponent"
+          }
+        ]
+      },
+      {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "displayName": "Ambiguous System (multiple candidates)",
+        "priority": "medium",
+        "linkingStatus": "not_linked",
+        "linkingStatusCommitted": false,
+        "reviewStatus": "action_needed",
+        "source": {"system": "SLIS", "originId": "SID002"},
+        "discoveryDetails": [
+          {"key": "systemNumber", "keyDisplayName": "System Number", "type": "TEXT", "value": "SID002"}
+        ],
+        "nodes": [
+          {
+            "nodeId": "node-app-2",
+            "nodeType": "Application",
+            "nodeName": "SAP ERP",
+            "catalogName": "SAP ERP",
+            "nodeCategory": "SoftwareProduct",
+            "isSelected": {"value": false},
+            "isSelectionLocked": {"value": false, "reason": null},
+            "canBeEdited": true,
+            "suggestions": [
+              {
+                "factSheetType": "Application",
+                "factSheetId": "fs-app-002a",
+                "factSheetName": "SAP ERP — Finance",
+                "factSheetDisplayName": "SAP ERP — Finance",
+                "factSheetSubtype": null
+              },
+              {
+                "factSheetType": "Application",
+                "factSheetId": "fs-app-002b",
+                "factSheetName": "SAP ERP — HR",
+                "factSheetDisplayName": "SAP ERP — HR",
+                "factSheetSubtype": null
+              }
+            ]
+          }
+        ],
+        "relations": []
+      },
+      {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "displayName": "Unknown System (no candidates)",
+        "priority": "low",
+        "linkingStatus": "not_linked",
+        "linkingStatusCommitted": false,
+        "reviewStatus": null,
+        "source": {"system": "SLIS", "originId": "SID003"},
+        "discoveryDetails": [
+          {"key": "systemNumber", "keyDisplayName": "System Number", "type": "TEXT", "value": "SID003"}
+        ],
+        "nodes": [
+          {
+            "nodeId": "node-app-3",
+            "nodeType": "Application",
+            "nodeName": "Unknown Custom App",
+            "catalogName": null,
+            "nodeCategory": null,
+            "isSelected": {"value": false},
+            "isSelectionLocked": {"value": false, "reason": null},
+            "canBeEdited": true,
+            "suggestions": []
+          }
+        ],
+        "relations": []
+      }
+    ]
+  }
+}

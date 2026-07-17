@@ -2,15 +2,33 @@
 
 **Date:** 2026-07-16
 **Author:** SAP EA Practice (Archimedes AI)
-**Status:** Draft — pending user review
+**Status:** v2 empirical — wired against the real `discovery-sap` API (2026-07-17)
 
-> **Implementation status (as of Task 16 completion):** unit tests green.
-> Runtime validation pending against a live demo workspace with
-> Internal SAP Landscape Data enabled. Blockers to close v1:
-> 1. Verify `{origin}` candidate list; adjust `Client._ORIGIN_CANDIDATES` if needed.
-> 2. Verify body schema of `POST /discovery-sap-extension/v1/integrations`
->    against the workspace's `/v3/api-docs`.
-> 3. Verify v2 Beta enabled in workspace, else confirm v1 fallback covers bulk_link/reject as well.
+> **Blockers (resolved empirically 2026-07-17 against INDRA demo-eu-11):**
+> 1. **Origin** — real value is `discovery_sap` (snake_case, single). The `_ORIGIN_CANDIDATES` probing list has been removed; the client uses the fixed origin constant.
+> 2. **Integration creation** — the integration is created and configured **in the LeanIX UI** under Discover → Internal SAP Landscape Data. Archimedes does NOT call `POST /integrations`; instead `Client.find_active_slis_integration()` reads the pre-existing SLIS integration and raises `IntegrationNotFoundError` (surfaced as HTTP 409) if none is active.
+> 3. **v2 endpoints** — v2 is active in the target workspaces; no v1 fallback needed. Real routes documented below in "API Contract (verified against INDRA)".
+
+## API Contract (verified against INDRA 2026-07-17)
+
+Service prefix: `/services/discovery-sap/v1` (integrations)
+Service prefix: `/services/discovery-linking/v2/discovery_sap` (items)
+
+| Verb | Path | Purpose |
+|------|------|---------|
+| GET  | `/services/discovery-sap/v1/integrations` | List active SLIS integrations (UI-configured). |
+| GET  | `/services/discovery-linking/v2/discovery_sap/discoveryItems` | List inbox; response envelope `{"data":{"discoveryItems":[...]}}`. Supports `linkingStatus`, `limit` query params. |
+| GET  | `/services/discovery-linking/v2/discovery_sap/discoveryItems/{id}` | Full item detail with `discoveryDetails[]` + `nodes[]` (each with `suggestions[]`) + `relations[]`. |
+| PUT  | `/services/discovery-linking/v2/discovery_sap/discoveryItems/{id}/link` | Record per-node selection: body `{linksPerNode: {nodeId: {factSheetId|factSheetName+factSheetType}}, crossItemLinks: {}}`. Does NOT apply — just stores the selection. |
+| PUT  | `/services/discovery-linking/v2/discovery_sap/discoveryItems/link` | Apply previously-recorded selections in bulk: body `{"ids": [uuid, ...]}`. |
+| PUT  | `/services/discovery-linking/v2/discovery_sap/discoveryItems/reject` | Bulk reject: body `{"ids": [uuid, ...]}`. |
+| POST | `/services/discovery-linking/v2/discovery_sap/discoveryItems/{id}/preview` | Preview the impact of a selection before applying (optional; used by the review UI). |
+
+**Item lifecycle fields:** `linkingStatus` (`not_linked` / `linked` / `reviewed`), `linkingStatusCommitted` (bool), `reviewStatus` (`action_needed` / `null`).
+**Node structure:** `nodeType` in `{Application, ITComponent, Provider, LxSystemSystem}`, `isSelected.value`, `isSelectionLocked.value` + `reason` (`Catalog`/`Root`), `canBeEdited`, `suggestions[]` with `factSheetType`, optional `factSheetId` (present → link existing; missing → `create_and_link` candidate), `factSheetName`, `factSheetDisplayName`.
+**Reference catalog:** LeanIX now pre-computes `suggestions[]` server-side using its own catalog — the client no longer joins with RBA/RSA locally.
+
+## Original design (superseded sections kept for history)
 
 ## Context
 

@@ -9,22 +9,32 @@ from pipeline.sap_discovery import report
 
 def _seed(session_dir: Path) -> None:
     (session_dir / "integration.json").write_text(json.dumps({
-        "integration_id": "int-42", "crm_id": "0001234567",
-        "origin": "sap-extension", "autolinking_enabled": True,
-        "status": "pending",
+        "id": "afdae8b4-c707-4924-b1d9-e550d696288e",
+        "service": "SLIS",
+        "name": "Internal SAP Landscape Data",
+        "active": True,
+        "dataSync": {
+            "status": "ACTIVE",
+            "lastSuccesfulRun": "2026-07-17T09:00:00Z",
+        },
+        "selectedCustomers": ["37327"],
     }))
     (session_dir / "decisions.json").write_text(json.dumps([
         {
-            "item_id": "d-high", "action": "link",
-            "target_type": "Application", "target_id": "fs-app-1",
-            "create_payload": None, "confidence": "HIGH",
-            "reason": "Single existing Application match: S/4",
+            "item_id": "d-high",
+            "action": "link",
+            "links_per_node": {"n-app": {"factSheetId": "fs-app-1"}},
+            "creates": [],
+            "confidence": "HIGH",
+            "reason": "All editable nodes have a single existing candidate",
         },
         {
-            "item_id": "d-low", "action": "review",
-            "target_type": "Application", "target_id": None,
-            "create_payload": None, "confidence": "LOW",
-            "reason": "Ambiguous or unknown product",
+            "item_id": "d-low",
+            "action": "review",
+            "links_per_node": {},
+            "creates": [],
+            "confidence": "LOW",
+            "reason": "Missing or heterogeneous suggestions across editable nodes",
         },
     ]))
     (session_dir / "execution_log.json").write_text(json.dumps({

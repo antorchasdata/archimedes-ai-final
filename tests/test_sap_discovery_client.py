@@ -1,215 +1,217 @@
-"""Tests for pipeline.sap_discovery.client — REST client + DiscoveryItem parsing."""
+"""Unit tests for pipeline.sap_discovery.client (rewired to real discovery-sap API)."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pipeline.sap_discovery.client import Client, DiscoveryItem
+from pipeline.sap_discovery.client import (
+    Client,
+    DiscoveryDetail,
+    DiscoveryItem,
+    IntegrationNotFoundError,
+    Node,
+    Relation,
+    Suggestion,
+)
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _mk_client() -> Client:
-    return Client(base_url="https://demo.leanix.net", api_token="tok")
+def _load(name: str) -> dict:
+    return json.loads((FIXTURES / name).read_text())
 
 
-def test_discovery_item_from_api_payload_populates_all_fields():
-    payload = {
-        "id": "disc-1",
-        "displayName": "SAP S/4HANA Cloud - PROD",
-        "classification": "SaaS_ERP",
-        "product": "SAP S/4HANA Cloud",
-        "systemRole": "PROD",
-        "status": "action_needed",
-        "suggestedLinks": {
-            "application": [
-                {"factSheetId": "fs-app-1", "name": "S/4HANA", "label": "existing"}
-            ],
-            "itcomponent": [],
-            "provider": [],
-        },
-    }
-    item = DiscoveryItem.from_api(payload)
-    assert item.id == "disc-1"
-    assert item.display_name == "SAP S/4HANA Cloud - PROD"
-    assert item.classification == "SaaS_ERP"
-    assert item.product == "SAP S/4HANA Cloud"
-    assert item.system_role == "PROD"
-    assert item.status == "action_needed"
-    assert item.suggested_links["application"][0]["factsheet_id"] == "fs-app-1"
-    assert item.suggested_links["application"][0]["label"] == "existing"
-    assert item.raw == payload
+def _mock_response(status_code: int = 200, json_data=None):
+    r = MagicMock()
+    r.status_code = status_code
+    r.raise_for_status = MagicMock()
+    r.json = MagicMock(return_value=json_data if json_data is not None else {})
+    return r
 
 
-def test_create_integration_posts_expected_body_and_returns_id():
-    client = _mk_client()
-
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"id": "int-abc", "status": "PROVISIONING"}
-    mock_resp.raise_for_status.return_value = None
-
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.post", return_value=mock_resp) as p:
-        result = client.create_integration(crm_id="0001234567")
-
-    p.assert_called_once()
-    args, kwargs = p.call_args
-    assert args[0] == "https://demo.leanix.net/services/discovery-sap-extension/v1/integrations"
-    assert kwargs["json"] == {"customerIdentifiers": [{"type": "CRM", "id": "0001234567"}]}
-    assert kwargs["headers"]["Authorization"] == "Bearer BEARER"
-    assert result == {"id": "int-abc", "status": "PROVISIONING"}
+@pytest.fixture
+def client():
+    return Client("https://demo.leanix.net/", "LXT_TESTTOKEN")
 
 
-def test_create_integration_raises_on_409_conflict():
-    client = _mk_client()
-    import requests as _rq
-
-    mock_resp = MagicMock()
-    mock_resp.status_code = 409
-    mock_resp.raise_for_status.side_effect = _rq.HTTPError("409 Conflict")
-
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.post", return_value=mock_resp):
-        with pytest.raises(_rq.HTTPError):
-            client.create_integration(crm_id="0001234567")
+@pytest.fixture(autouse=True)
+def _mock_bearer():
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER123"):
+        yield
 
 
-def test_set_autolinking_puts_expected_body():
-    client = _mk_client()
+# ---------------------------------------------------------------------------
+# 1. find_active_slis_integration — happy path
+# ---------------------------------------------------------------------------
+def test_find_active_slis_integration_returns_first(client):
+    payload = _load("sap_integration_list.json")
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=payload)
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"autoLinking": True}
-    mock_resp.raise_for_status.return_value = None
+        result = client.find_active_slis_integration()
 
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
-        client.set_autolinking(origin="sap-extension", enabled=True)
+    assert result["service"] == "SLIS"
+    assert result["active"] is True
+    assert result["name"] == "Internal SAP Landscape Data"
 
-    args, kwargs = p.call_args
-    assert args[0] == (
-        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/settings/autoLinking"
-    )
-    assert kwargs["json"] == {"enabled": True}
+    # URL: trailing slash on base_url was stripped in constructor
+    called_url = mget.call_args.args[0] if mget.call_args.args else mget.call_args.kwargs.get("url")
+    assert called_url == "https://demo.leanix.net/services/discovery-sap/v1/integrations"
 
-
-def test_discover_origin_returns_first_candidate_that_answers_2xx():
-    client = _mk_client()
-
-    def _fake_get(url, **_kw):
-        m = MagicMock()
-        # sap-extension answers 404, internal-sap answers 200
-        if "internal-sap" in url:
-            m.status_code = 200
-            m.raise_for_status.return_value = None
-        else:
-            m.status_code = 404
-            import requests as _rq
-            m.raise_for_status.side_effect = _rq.HTTPError("404")
-        return m
-
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.get", side_effect=_fake_get):
-        origin = client.discover_origin()
-    assert origin == "internal-sap"
+    # Headers: Bearer + JSON content-type
+    headers = mget.call_args.kwargs.get("headers", {})
+    assert headers.get("Authorization", "").startswith("Bearer ")
+    assert headers.get("Content-Type") == "application/json"
 
 
-def test_list_inbox_returns_parsed_discovery_items():
-    client = _mk_client()
+# ---------------------------------------------------------------------------
+# 2. find_active_slis_integration — empty list raises
+# ---------------------------------------------------------------------------
+def test_find_active_slis_integration_raises_when_none(client):
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=[])
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        "items": [
-            {
-                "id": "d1",
-                "displayName": "SAP S/4HANA Cloud - PROD",
-                "classification": "SaaS_ERP",
-                "product": "SAP S/4HANA Cloud",
-                "systemRole": "PROD",
-                "status": "action_needed",
-                "suggestedLinks": {"application": [], "itcomponent": [], "provider": []},
-            }
-        ]
-    }
-    mock_resp.raise_for_status.return_value = None
+        with pytest.raises(IntegrationNotFoundError) as excinfo:
+            client.find_active_slis_integration()
 
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.get", return_value=mock_resp) as p:
-        items = client.list_inbox(origin="sap-extension", status="action_needed")
-
-    args, kwargs = p.call_args
-    assert args[0] == (
-        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems"
-    )
-    assert kwargs["params"] == {"status": "action_needed"}
-    assert len(items) == 1
-    assert items[0].id == "d1"
-    assert items[0].classification == "SaaS_ERP"
+    msg = str(excinfo.value)
+    assert "Internal SAP Landscape Data" in msg or "SLIS" in msg
 
 
-def test_bulk_link_puts_decisions_and_returns_result():
-    client = _mk_client()
-    decisions = [
-        {"itemId": "d1", "targetType": "Application", "targetId": "fs-app-1"},
-        {"itemId": "d2", "targetType": "ITComponent", "targetId": "fs-itc-2"},
+# ---------------------------------------------------------------------------
+# 3. find_active_slis_integration — ignores inactive / wrong-service entries
+# ---------------------------------------------------------------------------
+def test_find_active_slis_integration_ignores_inactive(client):
+    payload = [
+        {"id": "a", "service": "SLIS", "active": False},
+        {"id": "b", "service": "OTHER", "active": True},
     ]
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=payload)
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"applied": ["d1", "d2"], "failed": []}
-    mock_resp.raise_for_status.return_value = None
+        with pytest.raises(IntegrationNotFoundError):
+            client.find_active_slis_integration()
 
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
-        result = client.bulk_link(origin="sap-extension", decisions=decisions)
 
-    args, kwargs = p.call_args
-    assert args[0] == (
-        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems/link"
+# ---------------------------------------------------------------------------
+# 4. list_inbox — unwraps {"data":{"discoveryItems":[...]}} envelope
+# ---------------------------------------------------------------------------
+def test_list_inbox_unwraps_data_envelope(client):
+    payload = _load("sap_inbox_list.json")
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=payload)
+
+        items = client.list_inbox()
+
+    assert isinstance(items, list)
+    assert len(items) == 3
+    assert all(isinstance(i, DiscoveryItem) for i in items)
+    first = items[0]
+    assert first.linking_status == "not_linked"
+    assert len(first.nodes) > 0
+
+
+# ---------------------------------------------------------------------------
+# 5. list_inbox — forwards status → linkingStatus + limit via params
+# ---------------------------------------------------------------------------
+def test_list_inbox_forwards_status_as_linkingStatus_param(client):
+    empty_payload = {"data": {"discoveryItems": []}}
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=empty_payload)
+
+        client.list_inbox(status="not_linked", limit=25)
+
+    params = mget.call_args.kwargs.get("params", {})
+    assert params.get("linkingStatus") == "not_linked"
+    assert params.get("limit") == 25
+
+    called_url = mget.call_args.args[0] if mget.call_args.args else mget.call_args.kwargs.get("url")
+    assert called_url == (
+        "https://demo.leanix.net/services/discovery-linking/v2/"
+        "discovery_sap/discoveryItems"
     )
-    assert kwargs["json"] == {"decisions": decisions}
-    assert result == {"applied": ["d1", "d2"], "failed": []}
 
 
-def test_bulk_reject_puts_item_ids():
-    client = _mk_client()
+# ---------------------------------------------------------------------------
+# 6. get_item — parses the full DiscoveryItem dataclass from fixture
+# ---------------------------------------------------------------------------
+def test_get_item_returns_full_dataclass(client):
+    raw = _load("sap_item_detail.json")
+    # The captured fixture is wrapped in {"data": {...}}; the client also unwraps
+    # via .get("data", {}). If fixture were bare object we'd wrap manually.
+    if "data" in raw and isinstance(raw["data"], dict) and "id" in raw["data"]:
+        payload = raw
+    else:
+        payload = {"data": raw}
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"applied": ["d3"], "failed": []}
-    mock_resp.raise_for_status.return_value = None
+    item_id = "01517494-3ae2-4a3f-bf76-c467c680aecb"
+    with patch("pipeline.sap_discovery.client.requests.get") as mget:
+        mget.return_value = _mock_response(200, json_data=payload)
 
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.put", return_value=mock_resp) as p:
-        result = client.bulk_reject(origin="sap-extension", item_ids=["d3"])
+        item = client.get_item(item_id)
 
-    args, kwargs = p.call_args
-    assert args[0] == (
-        "https://demo.leanix.net/services/discovery-linking/v2/sap-extension/discoveryItems/reject"
-    )
-    assert kwargs["json"] == {"itemIds": ["d3"]}
-    assert result == {"applied": ["d3"], "failed": []}
+    assert isinstance(item, DiscoveryItem)
+    assert item.display_name
+    assert len(item.nodes) >= 1
+    for node in item.nodes:
+        assert isinstance(node, Node)
+        assert node.node_id
+        assert isinstance(node.suggestions, list)
+
+    called_url = mget.call_args.args[0] if mget.call_args.args else mget.call_args.kwargs.get("url")
+    assert called_url.endswith(f"/discoveryItems/{item_id}")
 
 
-def test_list_inbox_falls_back_to_v1_when_v2_404(monkeypatch):
-    """If v2 returns 404, client should retry against discovery-linking v1."""
-    client = _mk_client()
+# ---------------------------------------------------------------------------
+# 7. bulk_link + bulk_reject — send {"ids": [...]} to the right endpoints
+# ---------------------------------------------------------------------------
+def test_bulk_link_uses_ids_body(client):
+    with patch("pipeline.sap_discovery.client.requests.put") as mput:
+        mput.return_value = _mock_response(200, json_data={"applied": [], "failed": []})
 
-    call_log: list[str] = []
+        client.bulk_link(["a", "b", "c"])
 
-    def _fake_get(url, **_kw):
-        call_log.append(url)
-        m = MagicMock()
-        if "/v2/" in url:
-            m.status_code = 404
-            import requests as _rq
-            m.raise_for_status.side_effect = _rq.HTTPError("404")
-        else:
-            m.status_code = 200
-            m.json.return_value = {"items": []}
-            m.raise_for_status.return_value = None
-        return m
+        link_url = mput.call_args.args[0] if mput.call_args.args else mput.call_args.kwargs.get("url")
+        assert link_url.endswith(
+            "/services/discovery-linking/v2/discovery_sap/discoveryItems/link"
+        )
+        assert mput.call_args.kwargs.get("json") == {"ids": ["a", "b", "c"]}
 
-    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
-         patch("pipeline.sap_discovery.client.requests.get", side_effect=_fake_get):
-        items = client.list_inbox(origin="sap-extension")
+        # Same test also covers bulk_reject
+        mput.reset_mock()
+        mput.return_value = _mock_response(200, json_data={"applied": [], "failed": []})
+        client.bulk_reject(["x"])
 
-    assert items == []
-    assert any("/v2/" in u for u in call_log)
-    assert any("/v1/" in u for u in call_log)
+        reject_url = mput.call_args.args[0] if mput.call_args.args else mput.call_args.kwargs.get("url")
+        assert reject_url.endswith(
+            "/services/discovery-linking/v2/discovery_sap/discoveryItems/reject"
+        )
+        assert mput.call_args.kwargs.get("json") == {"ids": ["x"]}
+
+
+# ---------------------------------------------------------------------------
+# 8. set_link_selection — PUT /discoveryItems/{id}/link with linksPerNode body
+# ---------------------------------------------------------------------------
+def test_set_link_selection_puts_links_per_node(client):
+    links = {
+        "n1": {"factSheetId": "fs1"},
+        "n2": {"factSheetName": "New", "factSheetType": "ITComponent"},
+    }
+
+    with patch("pipeline.sap_discovery.client.requests.put") as mput:
+        mput.return_value = _mock_response(200, json_data={})
+
+        client.set_link_selection("item-1", links_per_node=links, cross_item_links=None)
+
+    called_url = mput.call_args.args[0] if mput.call_args.args else mput.call_args.kwargs.get("url")
+    assert called_url.endswith("/discoveryItems/item-1/link")
+
+    body = mput.call_args.kwargs.get("json")
+    assert body == {"linksPerNode": links, "crossItemLinks": {}}
+
+    headers = mput.call_args.kwargs.get("headers", {})
+    assert headers.get("Authorization", "").startswith("Bearer ")
+    assert headers.get("Content-Type") == "application/json"

@@ -1,4 +1,4 @@
-"""Tests for pipeline.sap_discovery.orchestrator — two-phase flow."""
+"""Tests for pipeline.sap_discovery.orchestrator — real discovery-sap flow."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,50 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.sap_discovery import orchestrator
-from pipeline.sap_discovery.client import DiscoveryItem
+from pipeline.sap_discovery.client import (
+    DiscoveryItem,
+    IntegrationNotFoundError,
+    Node,
+    Suggestion,
+)
+
+
+# --- fixture helpers -------------------------------------------------------
+
+def _sugg(fs_id: str | None = "fs-app-1", name: str = "SAP S/4HANA",
+          ftype: str = "Application") -> Suggestion:
+    return Suggestion(
+        factsheet_type=ftype, factsheet_id=fs_id,
+        factsheet_name=name, factsheet_display_name=name,
+    )
+
+
+def _node(node_id: str = "n-1", ntype: str = "Application",
+          suggestions: list[Suggestion] | None = None,
+          can_edit: bool = True, locked: bool = False) -> Node:
+    return Node(
+        node_id=node_id, node_type=ntype, node_name="X",
+        catalog_name=None, node_category=None,
+        is_selected=True, is_selection_locked=locked, lock_reason=None,
+        can_be_edited=can_edit,
+        suggestions=suggestions if suggestions is not None else [],
+    )
+
+
+def _item(item_id: str, *, linking_status: str = "not_linked",
+          committed: bool = False, review_status: str | None = None,
+          nodes: list[Node] | None = None) -> DiscoveryItem:
+    return DiscoveryItem(
+        id=item_id, display_name=f"item-{item_id}", priority="medium",
+        linking_status=linking_status,
+        linking_status_committed=committed,
+        review_status=review_status,
+        source={"system": "SLIS", "originId": item_id},
+        discovery_details=[],
+        nodes=nodes if nodes is not None else [],
+        relations=[],
+        raw={"id": item_id},
+    )
 
 
 def _session_dir(tmp_path: Path) -> Path:
@@ -17,208 +60,133 @@ def _session_dir(tmp_path: Path) -> Path:
     return d
 
 
-def test_start_integration_persists_integration_json_and_returns_state(tmp_path):
-    fake_client = MagicMock()
-    fake_client.create_integration.return_value = {"id": "int-42", "status": "PROVISIONING"}
-    fake_client.discover_origin.return_value = "sap-extension"
-    fake_client.set_autolinking.return_value = None
+# --- discover_integration --------------------------------------------------
 
-    state = orchestrator.start_integration(
-        session_dir=_session_dir(tmp_path),
-        client=fake_client,
-        crm_id="0001234567",
-        enable_autolinking=True,
-    )
-
-    assert state["integration_id"] == "int-42"
-    assert state["crm_id"] == "0001234567"
-    assert state["origin"] == "sap-extension"
-    assert state["autolinking_enabled"] is True
-    assert state["status"] == "pending"
-
-    persisted = json.loads((_session_dir(tmp_path) / "integration.json").read_text())
-    assert persisted == state
-
-    fake_client.create_integration.assert_called_once_with(crm_id="0001234567")
-    fake_client.set_autolinking.assert_called_once_with(origin="sap-extension", enabled=True)
-
-
-def test_start_integration_without_autolinking(tmp_path):
-    fake_client = MagicMock()
-    fake_client.create_integration.return_value = {"id": "int-43"}
-    fake_client.discover_origin.return_value = "sap-extension"
-
-    orchestrator.start_integration(
-        session_dir=_session_dir(tmp_path),
-        client=fake_client,
-        crm_id="0001234567",
-        enable_autolinking=False,
-    )
-
-    fake_client.set_autolinking.assert_not_called()
-
-
-def test_poll_status_ready_when_inbox_has_items(tmp_path):
+def test_discover_integration_persists_json_and_returns_it(tmp_path):
     session_dir = _session_dir(tmp_path)
-    (session_dir / "integration.json").write_text(
-        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
-    )
+    integ = {
+        "id": "afdae8b4-c707-4924-b1d9-e550d696288e",
+        "service": "SLIS", "name": "Internal SAP Landscape Data",
+        "active": True,
+        "dataSync": {"status": "ACTIVE", "lastSuccesfulRun": "2026-07-17T09:00:00Z"},
+    }
+    fake_client = MagicMock()
+    fake_client.find_active_slis_integration.return_value = integ
 
+    result = orchestrator.discover_integration(fake_client, session_dir)
+
+    assert result == integ
+    persisted = json.loads((session_dir / "integration.json").read_text())
+    assert persisted == integ
+    fake_client.find_active_slis_integration.assert_called_once_with()
+
+
+def test_discover_integration_raises_and_writes_no_file(tmp_path):
+    session_dir = _session_dir(tmp_path)
+    fake_client = MagicMock()
+    fake_client.find_active_slis_integration.side_effect = IntegrationNotFoundError("nope")
+
+    with pytest.raises(IntegrationNotFoundError):
+        orchestrator.discover_integration(fake_client, session_dir)
+
+    assert not (session_dir / "integration.json").exists()
+
+
+# --- process_inbox ---------------------------------------------------------
+
+def test_process_inbox_dry_run_does_no_writes(tmp_path):
+    session_dir = _session_dir(tmp_path)
     fake_client = MagicMock()
     fake_client.list_inbox.return_value = [
-        DiscoveryItem(
-            id="d1", display_name="x", classification="SaaS_ERP",
-            product="p", system_role=None, status="action_needed",
-            suggested_links={"application": [], "itcomponent": [], "provider": []},
-        )
+        _item("d-high", nodes=[_node(suggestions=[_sugg("fs-app-1")])]),
     ]
 
-    result = orchestrator.poll_status(session_dir=session_dir, client=fake_client)
-    assert result["status"] == "ready"
-    assert result["inbox_count"] >= 1
+    log = orchestrator.process_inbox(fake_client, session_dir, dry_run=True)
 
-
-def test_poll_status_pending_when_inbox_empty(tmp_path):
-    session_dir = _session_dir(tmp_path)
-    (session_dir / "integration.json").write_text(
-        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
-    )
-    fake_client = MagicMock()
-    fake_client.list_inbox.return_value = []
-
-    result = orchestrator.poll_status(session_dir=session_dir, client=fake_client)
-    assert result["status"] == "pending"
-    assert result["inbox_count"] == 0
-
-
-def test_process_inbox_links_high_confidence_items_and_creates_medium(tmp_path):
-    session_dir = _session_dir(tmp_path)
-    (session_dir / "integration.json").write_text(
-        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
-    )
-
-    fake_client = MagicMock()
-    fake_client.list_inbox.return_value = [
-        DiscoveryItem(
-            id="d-high", display_name="S/4", classification="SaaS_ERP",
-            product="SAP S/4HANA Cloud", system_role="PROD", status="action_needed",
-            suggested_links={
-                "application": [
-                    {"factsheet_id": "fs-app-1", "name": "S/4", "label": "existing"}
-                ],
-                "itcomponent": [], "provider": [],
-            },
-        ),
-        DiscoveryItem(
-            id="d-med", display_name="Ariba", classification="SaaS_Product",
-            product="SAP Ariba", system_role=None, status="action_needed",
-            suggested_links={
-                "application": [
-                    {"factsheet_id": None, "name": "Ariba", "label": "create_and_link"}
-                ],
-                "itcomponent": [], "provider": [],
-            },
-        ),
-        DiscoveryItem(
-            id="d-low", display_name="Weird", classification="SaaS_Product",
-            product="Unknown ZZZ", system_role=None, status="review_needed",
-            suggested_links={
-                "application": [
-                    {"factsheet_id": None, "name": "?", "label": "create_and_link"}
-                ],
-                "itcomponent": [], "provider": [],
-            },
-        ),
-    ]
-    fake_client.bulk_link.return_value = {"applied": ["d-high", "d-med"], "failed": []}
-
-    def _fake_create_fs(payload):
-        return {"id": "fs-app-2"}
-
-    log = orchestrator.process_inbox(
-        session_dir=session_dir,
-        client=fake_client,
-        catalog={"SAP S/4HANA Cloud": {}, "SAP Ariba": {}},
-        create_factsheet=_fake_create_fs,
-    )
-
-    assert log["applied"] == ["d-high", "d-med"]
-    assert log["pending_review"] == ["d-low"]
-    assert log["failed"] == []
-
-    args, kwargs = fake_client.bulk_link.call_args
-    decisions = kwargs["decisions"]
-    assert {d["itemId"] for d in decisions} == {"d-high", "d-med"}
-    # medium item should have been resolved to the created fact sheet id
-    med = next(d for d in decisions if d["itemId"] == "d-med")
-    assert med["targetId"] == "fs-app-2"
-    assert med["targetType"] == "Application"
-
+    assert log["dry_run"] is True
+    assert log["applied"] == []
+    fake_client.set_link_selection.assert_not_called()
+    fake_client.bulk_link.assert_not_called()
+    fake_client.bulk_reject.assert_not_called()
     assert (session_dir / "inbox_snapshot.json").exists()
     assert (session_dir / "decisions.json").exists()
     assert (session_dir / "execution_log.json").exists()
 
 
-def test_process_inbox_records_partial_bulk_link_failures(tmp_path):
+def test_process_inbox_calls_set_link_then_bulk_link(tmp_path):
     session_dir = _session_dir(tmp_path)
-    (session_dir / "integration.json").write_text(
-        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
-    )
     fake_client = MagicMock()
     fake_client.list_inbox.return_value = [
-        DiscoveryItem(
-            id="d1", display_name="x", classification="SaaS_ERP",
-            product="SAP S/4HANA Cloud", system_role=None, status="action_needed",
-            suggested_links={
-                "application": [
-                    {"factsheet_id": "fs-app-1", "name": "S/4", "label": "existing"}
-                ],
-                "itcomponent": [], "provider": [],
-            },
-        )
+        _item("d-high", nodes=[_node("n-app", suggestions=[_sugg("fs-app-1")])]),
     ]
-    fake_client.bulk_link.return_value = {
-        "applied": [],
-        "failed": [{"itemId": "d1", "error": "target not found"}],
-    }
+    fake_client.bulk_link.return_value = {"applied": ["d-high"], "failed": []}
 
-    log = orchestrator.process_inbox(
-        session_dir=session_dir, client=fake_client,
-        catalog={"SAP S/4HANA Cloud": {}}, create_factsheet=lambda p: {"id": "unused"},
+    log = orchestrator.process_inbox(fake_client, session_dir)
+
+    fake_client.set_link_selection.assert_called_once_with(
+        "d-high", links_per_node={"n-app": {"factSheetId": "fs-app-1"}}
     )
-    assert log["applied"] == []
-    assert log["failed"][0]["itemId"] == "d1"
+    fake_client.bulk_link.assert_called_once_with(["d-high"])
+    fake_client.bulk_reject.assert_not_called()
+    assert log["applied"] == ["d-high"]
+    assert log["failed"] == []
+    assert log["pending_review"] == []
 
 
-def test_apply_review_dispatches_link_and_reject(tmp_path):
+def test_process_inbox_rejects_and_creates_in_correct_order(tmp_path):
     session_dir = _session_dir(tmp_path)
-    (session_dir / "integration.json").write_text(
-        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
+    already_linked = _item("d-linked", linking_status="linked")
+    create_item = _item(
+        "d-create",
+        nodes=[_node("n-app", suggestions=[_sugg(fs_id=None, name="NewApp")])],
     )
-    (session_dir / "execution_log.json").write_text(
-        json.dumps({"applied": [], "failed": [], "pending_review": ["d-a", "d-b"]})
-    )
+    review_item = _item("d-review", nodes=[_node("n-app", suggestions=[])])
 
     fake_client = MagicMock()
-    fake_client.bulk_link.return_value = {"applied": ["d-a"], "failed": []}
-    fake_client.bulk_reject.return_value = {"applied": ["d-b"], "failed": []}
+    fake_client.list_inbox.return_value = [already_linked, create_item, review_item]
+    fake_client.bulk_link.return_value = {"applied": ["d-create"], "failed": []}
+    fake_client.bulk_reject.return_value = {"applied": [], "failed": []}
 
-    log = orchestrator.apply_review(
-        session_dir=session_dir,
-        client=fake_client,
-        decisions=[
-            {"item_id": "d-a", "action": "link", "target_type": "Application", "target_id": "fs-1"},
-            {"item_id": "d-b", "action": "reject"},
-        ],
+    created_calls: list[dict] = []
+
+    def _fake_create(payload: dict) -> dict:
+        created_calls.append(payload)
+        return {"id": "fs-new-1"}
+
+    log = orchestrator.process_inbox(
+        fake_client, session_dir, create_factsheet=_fake_create
     )
-    assert set(log["applied"]) == {"d-a", "d-b"}
 
-    args, kwargs = fake_client.bulk_link.call_args
-    assert kwargs["decisions"] == [
-        {"itemId": "d-a", "targetType": "Application", "targetId": "fs-1"}
+    # d-linked HIGH "already linked" → skipped (no re-reject)
+    fake_client.bulk_reject.assert_not_called()
+
+    # d-create → factsheet created, then set_link_selection with new id, then bulk_link
+    assert created_calls == [{"type": "Application", "name": "NewApp", "attributes": {}}]
+    fake_client.set_link_selection.assert_called_once_with(
+        "d-create", links_per_node={"n-app": {"factSheetId": "fs-new-1"}}
+    )
+    fake_client.bulk_link.assert_called_once_with(["d-create"])
+
+    # d-review stays pending
+    assert log["pending_review"] == ["d-review"]
+    assert log["applied"] == ["d-create"]
+
+
+def test_execution_log_reflects_applied_and_failed(tmp_path):
+    session_dir = _session_dir(tmp_path)
+    fake_client = MagicMock()
+    fake_client.list_inbox.return_value = [
+        _item("d-ok", nodes=[_node("n-app", suggestions=[_sugg("fs-app-1")])]),
+        _item("d-bad", nodes=[_node("n-app", suggestions=[_sugg("fs-app-2")])]),
     ]
-    fake_client.bulk_reject.assert_called_once_with(origin="sap-extension", item_ids=["d-b"])
+    fake_client.bulk_link.return_value = {
+        "applied": ["d-ok"],
+        "failed": [{"itemId": "d-bad", "reason": "target not found"}],
+    }
 
-    log_persisted = json.loads((session_dir / "execution_log.json").read_text())
-    assert set(log_persisted["applied"]) == {"d-a", "d-b"}
-    assert log_persisted["pending_review"] == []
+    log = orchestrator.process_inbox(fake_client, session_dir)
+
+    persisted = json.loads((session_dir / "execution_log.json").read_text())
+    assert persisted == log
+    assert log["applied"] == ["d-ok"]
+    assert log["failed"] == [{"itemId": "d-bad", "reason": "target not found"}]

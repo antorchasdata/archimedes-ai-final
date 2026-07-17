@@ -566,24 +566,20 @@ def _sap_discovery_client(session_id: str) -> sap_discovery.Client:
 
 
 @app.post("/api/session/{session_id}/baseline/from-sap-discovery")
-async def from_sap_discovery(session_id: str, body: dict):
+async def from_sap_discovery(session_id: str, body: Optional[dict] = None):
     if session_id not in _sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    crm_id = (body or {}).get("crm_id", "").strip()
-    if not crm_id:
-        raise HTTPException(status_code=400, detail="crm_id is required")
-    enable_autolinking = bool((body or {}).get("enable_autolinking", True))
 
     session_dir = _sap_discovery_dir(session_id)
     session_dir.mkdir(parents=True, exist_ok=True)
     client = _sap_discovery_client(session_id)
-    state = sap_discovery.start_integration(
-        session_dir=session_dir,
-        client=client,
-        crm_id=crm_id,
-        enable_autolinking=enable_autolinking,
-    )
-    return {**state, "eta_seconds": 600}
+    try:
+        integ = sap_discovery.discover_integration(
+            client=client, session_dir=session_dir,
+        )
+    except sap_discovery.IntegrationNotFoundError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"integration": integ}
 
 
 @app.get("/api/session/{session_id}/baseline/sap-discovery/status")
@@ -592,25 +588,28 @@ async def sap_discovery_status(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     client = _sap_discovery_client(session_id)
     return sap_discovery.poll_status(
-        session_dir=_sap_discovery_dir(session_id),
-        client=client,
+        client,
+        _sap_discovery_dir(session_id),
     )
 
 
 @app.post("/api/session/{session_id}/baseline/sap-discovery/process")
-async def sap_discovery_process(session_id: str, body: dict):
+async def sap_discovery_process(session_id: str, body: Optional[dict] = None):
     if session_id not in _sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    catalog = (body or {}).get("catalog", {})
+    dry_run = bool((body or {}).get("dry_run", False))
     session_dir = _sap_discovery_dir(session_id)
     client = _sap_discovery_client(session_id)
-    create_fs = sap_discovery.make_create_factsheet_bridge()
+    try:
+        create_fs = sap_discovery.make_create_factsheet_bridge()
+    except AttributeError:
+        create_fs = None
 
     log = sap_discovery.process_inbox(
-        session_dir=session_dir,
-        client=client,
-        catalog=catalog,
+        client,
+        session_dir,
         create_factsheet=create_fs,
+        dry_run=dry_run,
     )
     sap_discovery.build(session_dir=session_dir)
     return {
@@ -629,7 +628,7 @@ async def sap_discovery_apply_review(session_id: str, body: dict):
     session_dir = _sap_discovery_dir(session_id)
     client = _sap_discovery_client(session_id)
     log = sap_discovery.apply_review(
-        session_dir=session_dir, client=client, decisions=decisions
+        client, session_dir, decisions
     )
     sap_discovery.build(session_dir=session_dir)
     return {

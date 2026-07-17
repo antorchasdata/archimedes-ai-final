@@ -37,26 +37,25 @@ def test_from_sap_discovery_starts_integration_and_returns_pending():
     sid, session_dir = _make_session()
     tc = TestClient(app)
 
-    fake_state = {
-        "integration_id": "int-42",
-        "crm_id": "0001234567",
-        "origin": "sap-extension",
-        "autolinking_enabled": True,
-        "status": "pending",
-        "created_at": "2026-07-16T00:00:00Z",
+    fake_integ = {
+        "id": "afdae8b4-c707-4924-b1d9-e550d696288e",
+        "service": "SLIS",
+        "name": "Internal SAP Landscape Data",
+        "active": True,
+        "dataSync": {"status": "ACTIVE", "lastSuccesfulRun": "2026-07-17T09:00:00Z"},
+        "selectedCustomers": ["37327"],
     }
 
     with patch("archimedes_wizard.sap_discovery") as sd_mod:
         sd_mod.Client.return_value = MagicMock()
-        sd_mod.start_integration.return_value = fake_state
+        sd_mod.discover_integration.return_value = fake_integ
 
         r = tc.post(f"/api/session/{sid}/baseline/from-sap-discovery",
-                    json={"crm_id": "0001234567"})
+                    json={})
     assert r.status_code == 200
     body = r.json()
-    assert body["status"] == "pending"
-    assert body["integration_id"] == "int-42"
-    assert body["eta_seconds"] == 600
+    assert body["integration"]["id"] == fake_integ["id"]
+    assert body["integration"]["service"] == "SLIS"
 
 
 def test_sap_discovery_status_returns_orchestrator_result():
@@ -135,4 +134,5 @@ def test_sap_discovery_apply_review_forwards_decisions():
 
     assert r.status_code == 200
     call = sd_mod.apply_review.call_args
-    assert call.kwargs["decisions"] == decisions
+    # apply_review is now called positionally: (client, session_dir, decisions)
+    assert call.args[2] == decisions

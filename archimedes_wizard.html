@@ -2061,23 +2061,13 @@ function renderStep2() {
     </div>
     <div id="s2-panel-sap-discovery" style="display:none">
       <p style="margin:0 0 12px;color:var(--text-secondary);font-size:13px;line-height:1.5">
-        Configure the LeanIX Internal SAP Landscape Data integration for an SAP customer.
+        Consume the LeanIX <strong>Internal SAP Landscape Data</strong> integration. The integration must first be configured in
+        LeanIX → <em>Discover → Internal SAP Landscape Data</em>. Archimedes only reads it.
       </p>
-      <div style="display:grid;gap:10px;margin-bottom:12px">
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)">
-          CRM ID / ERP ID
-          <input type="text" id="sap-discovery-crm-id" placeholder="0001234567"
-            style="padding:6px 10px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:'SF Mono',Menlo,monospace">
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" id="sap-discovery-autolinking" checked style="accent-color:var(--sap-blue)">
-          Enable autolinking
-        </label>
-      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <button id="sap-discovery-start"
+        <button id="sap-discovery-detect"
           style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--sap-blue);background:var(--sap-blue);color:#fff">
-          Start integration
+          Detect Internal SAP Landscape Data
         </button>
         <button id="sap-discovery-check" disabled
           style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-primary);opacity:0.5">
@@ -2092,6 +2082,10 @@ function renderStep2() {
           Open review report
         </a>
       </div>
+      <div id="sap-discovery-integration-card" hidden
+        style="margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:13px"></div>
+      <div id="sap-discovery-banner" hidden
+        style="margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;border:1px solid #d9534f;background:#fdecea;color:#7f1d1d"></div>
       <pre id="sap-discovery-log"
         style="max-height:200px;overflow:auto;padding:10px;background:var(--code-bg,#1e1e1e);color:#d4d4d4;border-radius:6px;font-family:'SF Mono',Menlo,monospace;font-size:11px;margin:0;white-space:pre-wrap"></pre>
     </div>
@@ -2247,32 +2241,61 @@ function sapDiscoveryLog(msg) {
 }
 function initSapDiscoveryHandlers() {
   if (sapDiscoveryHandlersBound) return;
-  const startBtn = document.getElementById('sap-discovery-start');
+  const detectBtn = document.getElementById('sap-discovery-detect');
   const checkBtn = document.getElementById('sap-discovery-check');
   const processBtn = document.getElementById('sap-discovery-process');
-  if (!startBtn || !checkBtn || !processBtn) return;
+  if (!detectBtn || !checkBtn || !processBtn) return;
 
   const enable = (btn, on) => {
     btn.disabled = !on;
     btn.style.opacity = on ? '1' : '0.5';
   };
+  const showBanner = (msg) => {
+    const b = document.getElementById('sap-discovery-banner');
+    if (!b) return;
+    b.textContent = msg;
+    b.hidden = false;
+  };
+  const hideBanner = () => {
+    const b = document.getElementById('sap-discovery-banner');
+    if (b) b.hidden = true;
+  };
+  const renderCard = (integ) => {
+    const card = document.getElementById('sap-discovery-integration-card');
+    if (!card) return;
+    const name = integ.name || integ.service || 'Internal SAP Landscape Data';
+    const ds = integ.dataSync || {};
+    const last = ds.lastSuccesfulRun ? new Date(ds.lastSuccesfulRun).toLocaleString() : '—';
+    const customers = Array.isArray(integ.selectedCustomers) ? integ.selectedCustomers.join(', ') : '—';
+    card.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px">${esc(name)}</div>
+      <div style="color:var(--text-secondary);font-size:12px;line-height:1.5">
+        Status: <strong>${esc(ds.status || 'unknown')}</strong> ·
+        Last sync: <strong>${esc(last)}</strong> ·
+        Customers: <strong>${esc(customers)}</strong>
+      </div>
+    `;
+    card.hidden = false;
+  };
 
-  startBtn.addEventListener('click', async () => {
-    const crm = (document.getElementById('sap-discovery-crm-id') || {}).value;
-    const crmTrim = (crm || '').trim();
-    const auto = (document.getElementById('sap-discovery-autolinking') || {}).checked;
-    if (!crmTrim) { alert('CRM ID required'); return; }
-    sapDiscoveryLog('Starting integration…');
+  detectBtn.addEventListener('click', async () => {
+    hideBanner();
+    sapDiscoveryLog('Detecting active Internal SAP Landscape Data integration…');
     try {
       const body = await apiFetch(`/api/session/${sessionId}/baseline/from-sap-discovery`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ crm_id: crmTrim, enable_autolinking: auto }),
+        body: JSON.stringify({}),
       });
-      sapDiscoveryLog('Integration: ' + JSON.stringify(body));
+      const integ = (body && body.integration) || {};
+      renderCard(integ);
+      sapDiscoveryLog('Integration detected: ' + (integ.id || '(no id)'));
       enable(checkBtn, true);
+      enable(processBtn, true);
     } catch (e) {
-      sapDiscoveryLog('Integration error: ' + (e.message || String(e)));
+      const msg = e && e.message ? e.message : String(e);
+      showBanner(msg);
+      sapDiscoveryLog('Detect error: ' + msg);
     }
   });
 
@@ -2280,9 +2303,6 @@ function initSapDiscoveryHandlers() {
     try {
       const body = await apiFetch(`/api/session/${sessionId}/baseline/sap-discovery/status`);
       sapDiscoveryLog('Status: ' + JSON.stringify(body));
-      if (body && body.status === 'ready') {
-        enable(processBtn, true);
-      }
     } catch (e) {
       sapDiscoveryLog('Status error: ' + (e.message || String(e)));
     }
@@ -2291,11 +2311,10 @@ function initSapDiscoveryHandlers() {
   processBtn.addEventListener('click', async () => {
     sapDiscoveryLog('Processing inbox…');
     try {
-      const catalog = window.__ARCHI_CATALOG__ || {};
       const body = await apiFetch(`/api/session/${sessionId}/baseline/sap-discovery/process`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ catalog: catalog }),
+        body: JSON.stringify({}),
       });
       sapDiscoveryLog('Process result: ' + JSON.stringify(body));
       const a = document.getElementById('sap-discovery-report-link');

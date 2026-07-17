@@ -1,22 +1,20 @@
-"""pipeline.sap_discovery.orchestrator — two-phase flow (start + poll + process + apply).
+"""pipeline.sap_discovery.orchestrator — flow for real LeanIX Internal SAP Landscape Data.
 
 Uses:
 - Client (injected) for all REST I/O
-- pipeline.write.create_factsheet for fact sheet creation
 - pipeline.sap_discovery.matcher.decide for pure decision logic
+- create_factsheet callable (usually built via make_create_factsheet_bridge)
 
 All state persisted under session_dir/ as JSON.
 """
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import asdict
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from pipeline.sap_discovery.client import Client, DiscoveryItem
+from pipeline.sap_discovery.client import Client, DiscoveryItem, IntegrationNotFoundError
 from pipeline.sap_discovery.matcher import MatchDecision, decide
 
 
@@ -29,122 +27,130 @@ def _read_json(path: Path) -> Any:
     return json.loads(path.read_text())
 
 
-def start_integration(
-    session_dir: Path,
-    client: Client,
-    crm_id: str,
-    enable_autolinking: bool = True,
-) -> dict:
-    """Phase 1: create the integration, discover origin, optionally enable autolinking.
+def discover_integration(client: Client, session_dir: Path) -> dict:
+    """Detect the pre-existing SLIS integration; persist metadata; return it.
 
-    Persists integration.json and returns the state dict.
+    The integration is configured by the workspace admin in the LeanIX UI —
+    Archimedes only *reads* it. Raises IntegrationNotFoundError with a
+    user-facing message if none is active.
     """
-    integration = client.create_integration(crm_id=crm_id)
-    origin = client.discover_origin()
-
-    if enable_autolinking:
-        client.set_autolinking(origin=origin, enabled=True)
-
-    state = {
-        "integration_id": integration.get("id"),
-        "crm_id": crm_id,
-        "origin": origin,
-        "autolinking_enabled": bool(enable_autolinking),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": "pending",
-    }
-    _write_json(session_dir / "integration.json", state)
-    return state
+    integ = client.find_active_slis_integration()
+    _write_json(session_dir / "integration.json", integ)
+    return integ
 
 
-def poll_status(session_dir: Path, client: Client) -> dict:
-    """Phase 1b: check whether inbox has items yet."""
-    state = _read_json(session_dir / "integration.json")
-    origin = state["origin"]
-    items = client.list_inbox(origin=origin)
-    action_needed = sum(1 for i in items if i.status == "action_needed")
-    review_needed = sum(1 for i in items if i.status == "review_needed")
-    ready = len(items) > 0
+def poll_status(client: Client, session_dir: Path) -> dict:
+    """Report inbox readiness. Uses persisted integration.json only for metadata."""
+    items = client.list_inbox()
     return {
-        "status": "ready" if ready else "pending",
         "inbox_count": len(items),
-        "action_needed": action_needed,
-        "review_needed": review_needed,
+        "action_needed": sum(1 for i in items if i.review_status == "action_needed"),
+        "linked": sum(1 for i in items if i.linking_status == "linked"),
+        "not_linked": sum(1 for i in items if i.linking_status == "not_linked"),
     }
-
-
-_BULK_CHUNK_SIZE = 50
 
 
 def process_inbox(
-    session_dir: Path,
     client: Client,
-    catalog: dict,
-    create_factsheet,
+    session_dir: Path,
+    *,
+    create_factsheet: Callable[[dict], dict] | None = None,
+    dry_run: bool = False,
 ) -> dict:
-    """Phase 2: pull inbox, decide, execute link/create/reject.
+    """Pull inbox, decide, and (unless dry_run) apply the plan.
+
+    Flow:
+      1. list_inbox -> persist raw snapshot
+      2. decide for each item -> persist decisions.json
+      3. For each "link" decision: set_link_selection with links_per_node.
+         For each "create_and_link": create fact sheets first (create_factsheet
+         callable), substitute the new IDs into links_per_node, then
+         set_link_selection.
+      4. bulk_link on all "link" + "create_and_link" item ids.
+      5. bulk_reject on all "reject" item ids (skip HIGH "already linked" —
+         those don't need a re-reject).
+      6. Persist execution_log.json.
 
     Args:
-        session_dir: session working directory.
-        client: pipeline.sap_discovery.client.Client instance.
-        catalog: {product_name: metadata} lookup for the matcher.
-        create_factsheet: callable(payload_dict) -> {"id": str}. Injected so the
-            orchestrator does not import pipeline.write directly (keeps tests
-            hermetic and avoids circular imports).
-
-    Returns execution_log dict and persists snapshot/decisions/log.
+        client: sap_discovery.Client instance.
+        session_dir: where to persist snapshots and logs.
+        create_factsheet: callable(payload) -> {"id": str}. Required when any
+            decision.action == "create_and_link". Payload keys:
+            {"type": str, "name": str, "attributes": {...}}.
+        dry_run: if True, skip HTTP writes (no set_link_selection / bulk_*),
+            still persist snapshot + decisions.
     """
-    state = _read_json(session_dir / "integration.json")
-    origin = state["origin"]
+    items = client.list_inbox()
+    _write_json(session_dir / "inbox_snapshot.json", [i.raw for i in items])
 
-    items = client.list_inbox(origin=origin, status="action_needed,review_needed")
-    _write_json(
-        session_dir / "inbox_snapshot.json",
-        [i.raw for i in items],
-    )
-
-    decisions: list[MatchDecision] = [decide(i, catalog) for i in items]
+    decisions: list[MatchDecision] = [decide(i) for i in items]
     _write_json(session_dir / "decisions.json", [asdict(d) for d in decisions])
 
-    pending_review: list[str] = []
-    to_link: list[dict] = []
-    to_reject: list[str] = []
+    pending_review: list[str] = [d.item_id for d in decisions if d.action == "review"]
 
-    for d in decisions:
-        if d.action == "review":
-            pending_review.append(d.item_id)
-        elif d.action == "reject":
-            # includes "already linked" skips — do NOT re-reject those
-            if d.reason.lower().startswith("item already linked"):
-                continue
-            to_reject.append(d.item_id)
-        elif d.action == "link":
-            to_link.append({
-                "itemId": d.item_id,
-                "targetType": d.target_type,
-                "targetId": d.target_id,
-            })
-        elif d.action == "create_and_link":
-            created = create_factsheet(d.create_payload)
-            to_link.append({
-                "itemId": d.item_id,
-                "targetType": d.target_type,
-                "targetId": created["id"],
-            })
+    if dry_run:
+        log = {
+            "applied": [],
+            "failed": [],
+            "pending_review": pending_review,
+            "dry_run": True,
+        }
+        _write_json(session_dir / "execution_log.json", log)
+        return log
 
     applied: list[str] = []
     failed: list[dict] = []
 
-    for chunk_start in range(0, len(to_link), _BULK_CHUNK_SIZE):
-        chunk = to_link[chunk_start:chunk_start + _BULK_CHUNK_SIZE]
-        resp = client.bulk_link(origin=origin, decisions=chunk)
-        applied.extend(resp.get("applied", []))
-        failed.extend(resp.get("failed", []))
+    link_ids: list[str] = []
+    reject_ids: list[str] = []
 
-    if to_reject:
-        resp = client.bulk_reject(origin=origin, item_ids=to_reject)
-        applied.extend(resp.get("applied", []))
-        failed.extend(resp.get("failed", []))
+    for d in decisions:
+        if d.action == "review":
+            continue
+        if d.action == "reject":
+            if d.reason.lower().startswith("item already linked"):
+                # Nothing to do: LeanIX already has the link, and re-reject would 4xx.
+                continue
+            reject_ids.append(d.item_id)
+            continue
+
+        # link or create_and_link
+        try:
+            links_per_node = dict(d.links_per_node)
+            if d.action == "create_and_link":
+                if create_factsheet is None:
+                    raise RuntimeError(
+                        f"decision {d.item_id} needs create_and_link but no "
+                        "create_factsheet callable was provided"
+                    )
+                for create in d.creates:
+                    node_id = create["nodeId"]
+                    fs = create_factsheet({
+                        "type": create["factSheetType"],
+                        "name": create["factSheetName"],
+                        "attributes": {},
+                    })
+                    links_per_node[node_id] = {"factSheetId": fs["id"]}
+            client.set_link_selection(d.item_id, links_per_node=links_per_node)
+            link_ids.append(d.item_id)
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"itemId": d.item_id, "reason": str(exc)})
+
+    if link_ids:
+        try:
+            resp = client.bulk_link(link_ids)
+            applied.extend(resp.get("applied", link_ids))
+            failed.extend(resp.get("failed", []))
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"itemIds": link_ids, "reason": f"bulk_link: {exc}"})
+
+    if reject_ids:
+        try:
+            resp = client.bulk_reject(reject_ids)
+            applied.extend(resp.get("applied", reject_ids))
+            failed.extend(resp.get("failed", []))
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"itemIds": reject_ids, "reason": f"bulk_reject: {exc}"})
 
     log = {
         "applied": applied,
@@ -155,36 +161,57 @@ def process_inbox(
     return log
 
 
-def apply_review(session_dir: Path, client: Client, decisions: list[dict]) -> dict:
-    """Phase 3: apply human-confirmed decisions from the review report.
+def apply_review(
+    client: Client,
+    session_dir: Path,
+    decisions: list[dict],
+) -> dict:
+    """Apply user-confirmed decisions from the review report.
 
-    Each decision: {"item_id": str, "action": "link"|"reject", "target_type"?: str, "target_id"?: str}.
+    Each decision: {
+        "item_id": str,
+        "action": "link"|"reject",
+        "links_per_node"?: {nodeId: {"factSheetId": str}}  # required for link
+    }
     """
-    state = _read_json(session_dir / "integration.json")
-    origin = state["origin"]
-
-    to_link = [
-        {"itemId": d["item_id"], "targetType": d["target_type"], "targetId": d["target_id"]}
-        for d in decisions if d["action"] == "link"
-    ]
-    to_reject = [d["item_id"] for d in decisions if d["action"] == "reject"]
-
+    link_ids: list[str] = []
+    reject_ids: list[str] = []
     applied: list[str] = []
     failed: list[dict] = []
 
-    if to_link:
-        resp = client.bulk_link(origin=origin, decisions=to_link)
-        applied.extend(resp.get("applied", []))
-        failed.extend(resp.get("failed", []))
+    for d in decisions:
+        if d["action"] == "link":
+            try:
+                client.set_link_selection(
+                    d["item_id"], links_per_node=d.get("links_per_node", {})
+                )
+                link_ids.append(d["item_id"])
+            except Exception as exc:  # noqa: BLE001
+                failed.append({"itemId": d["item_id"], "reason": str(exc)})
+        elif d["action"] == "reject":
+            reject_ids.append(d["item_id"])
 
-    if to_reject:
-        resp = client.bulk_reject(origin=origin, item_ids=to_reject)
-        applied.extend(resp.get("applied", []))
-        failed.extend(resp.get("failed", []))
+    if link_ids:
+        try:
+            resp = client.bulk_link(link_ids)
+            applied.extend(resp.get("applied", link_ids))
+            failed.extend(resp.get("failed", []))
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"itemIds": link_ids, "reason": f"bulk_link: {exc}"})
+
+    if reject_ids:
+        try:
+            resp = client.bulk_reject(reject_ids)
+            applied.extend(resp.get("applied", reject_ids))
+            failed.extend(resp.get("failed", []))
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"itemIds": reject_ids, "reason": f"bulk_reject: {exc}"})
 
     log_path = session_dir / "execution_log.json"
-    existing = _read_json(log_path) if log_path.exists() else {"applied": [], "failed": [], "pending_review": []}
-    existing["applied"] = list(set(existing.get("applied", [])) | set(applied))
+    existing = _read_json(log_path) if log_path.exists() else {
+        "applied": [], "failed": [], "pending_review": []
+    }
+    existing["applied"] = sorted(set(existing.get("applied", [])) | set(applied))
     existing["failed"] = existing.get("failed", []) + failed
     processed_ids = {d["item_id"] for d in decisions}
     existing["pending_review"] = [

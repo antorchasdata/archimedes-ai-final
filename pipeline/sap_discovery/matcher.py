@@ -1,17 +1,17 @@
-"""pipeline.sap_discovery.matcher — pure decision logic for the inbox.
+"""pipeline.sap_discovery.matcher — pure decision logic (no I/O).
 
-Consumes a DiscoveryItem plus a lookup catalog (dict[product_name -> metadata]) and
-produces a MatchDecision. No I/O.
+Consumes a DiscoveryItem whose nodes carry pre-computed suggestions from the
+LeanIX reference catalog. Produces a MatchDecision that the orchestrator
+turns into set_link_selection + bulk_link/reject calls.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
-from pipeline.sap_discovery.client import DiscoveryItem
+from pipeline.sap_discovery.client import DiscoveryItem, Node
 
 Action = Literal["link", "create_and_link", "reject", "review"]
-TargetType = Literal["Application", "ITComponent", "Provider"]
 Confidence = Literal["HIGH", "MEDIUM", "LOW"]
 
 
@@ -19,101 +19,125 @@ Confidence = Literal["HIGH", "MEDIUM", "LOW"]
 class MatchDecision:
     item_id: str
     action: Action
-    target_type: TargetType | None
-    target_id: str | None
-    create_payload: dict | None
-    confidence: Confidence
-    reason: str
+    links_per_node: dict[str, dict]      # {nodeId: {"factSheetId":...} | {"factSheetName":..., "factSheetType":...}}
+    creates: list[dict] = field(default_factory=list)   # [{nodeId, factSheetType, factSheetName}]
+    confidence: Confidence = "LOW"
+    reason: str = ""
 
 
-_TARGET_ORDER: list[tuple[str, TargetType]] = [
-    ("application", "Application"),
-    ("itcomponent", "ITComponent"),
-    ("provider", "Provider"),
-]
+def _editable_nodes(item: DiscoveryItem) -> list[Node]:
+    return [n for n in item.nodes if n.can_be_edited and not n.is_selection_locked]
 
 
-def _first_target_with_candidates(item: DiscoveryItem) -> tuple[TargetType, list[dict]] | None:
-    for key, target_type in _TARGET_ORDER:
-        entries = item.suggested_links.get(key) or []
-        if entries:
-            return target_type, entries
-    return None
-
-
-def decide(item: DiscoveryItem, catalog: dict) -> MatchDecision:
-    if item.status == "linked":
+def decide(item: DiscoveryItem) -> MatchDecision:
+    # Branch 1: already linked → reject HIGH
+    if item.linking_status == "linked":
         return MatchDecision(
             item_id=item.id,
             action="reject",
-            target_type=None,
-            target_id=None,
-            create_payload=None,
+            links_per_node={},
+            creates=[],
             confidence="HIGH",
-            reason="Item already linked by LeanIX autolinking",
+            reason="Item already linked in LeanIX",
         )
 
-    hit = _first_target_with_candidates(item)
-    if hit is None:
+    # Branch 2: committed and no review needed → reject HIGH
+    if item.linking_status_committed and item.review_status is None:
+        return MatchDecision(
+            item_id=item.id,
+            action="reject",
+            links_per_node={},
+            creates=[],
+            confidence="HIGH",
+            reason="Committed and no review needed",
+        )
+
+    editable = _editable_nodes(item)
+
+    # Branch 3: no editable nodes → review LOW
+    if not editable:
         return MatchDecision(
             item_id=item.id,
             action="review",
-            target_type=None,
-            target_id=None,
-            create_payload=None,
+            links_per_node={},
+            creates=[],
             confidence="LOW",
-            reason="No suggested links from LeanIX",
+            reason="No editable nodes",
         )
 
-    target_type, entries = hit
-    existing = [e for e in entries if e.get("label") == "existing"]
-    creates = [e for e in entries if e.get("label") == "create_and_link"]
+    # Branch 5 (early check): any editable node with >1 suggestion having an id
+    # → ambiguous review MEDIUM. We check this before branch 4 because it
+    # implies the item is not homogeneously "1 with id".
+    ambiguous = [
+        n for n in editable
+        if len([s for s in n.suggestions if s.factsheet_id]) > 1
+    ]
+    if ambiguous:
+        ambiguous_ids = ", ".join(n.node_id for n in ambiguous)
+        return MatchDecision(
+            item_id=item.id,
+            action="review",
+            links_per_node={},
+            creates=[],
+            confidence="MEDIUM",
+            reason=f"Ambiguous nodes: {ambiguous_ids}",
+        )
 
-    if len(existing) == 1:
+    # Branch 4: every editable node has exactly 1 suggestion with a factsheet_id
+    all_single_with_id = all(
+        len(n.suggestions) == 1 and n.suggestions[0].factsheet_id
+        for n in editable
+    )
+    if all_single_with_id:
+        links_per_node = {
+            n.node_id: {"factSheetId": n.suggestions[0].factsheet_id}
+            for n in editable
+        }
         return MatchDecision(
             item_id=item.id,
             action="link",
-            target_type=target_type,
-            target_id=existing[0]["factsheet_id"],
-            create_payload=None,
+            links_per_node=links_per_node,
+            creates=[],
             confidence="HIGH",
-            reason=f"Single existing {target_type} match: {existing[0]['name']}",
+            reason="All editable nodes have a single existing candidate",
         )
 
-    if len(existing) > 1:
-        return MatchDecision(
-            item_id=item.id,
-            action="review",
-            target_type=target_type,
-            target_id=None,
-            create_payload=None,
-            confidence="LOW",
-            reason=f"{len(existing)} candidate {target_type} fact sheets — manual review",
-        )
-
-    if creates and item.product in catalog:
-        create = creates[0]
+    # Branch 6: every editable node has exactly 1 suggestion with no factsheet_id
+    all_single_no_id = all(
+        len(n.suggestions) == 1 and n.suggestions[0].factsheet_id is None
+        for n in editable
+    )
+    if all_single_no_id:
+        links_per_node = {
+            n.node_id: {
+                "factSheetName": n.suggestions[0].factsheet_name,
+                "factSheetType": n.suggestions[0].factsheet_type,
+            }
+            for n in editable
+        }
+        creates = [
+            {
+                "nodeId": n.node_id,
+                "factSheetType": n.suggestions[0].factsheet_type,
+                "factSheetName": n.suggestions[0].factsheet_name,
+            }
+            for n in editable
+        ]
         return MatchDecision(
             item_id=item.id,
             action="create_and_link",
-            target_type=target_type,
-            target_id=None,
-            create_payload={
-                "type": target_type,
-                "name": create.get("name") or item.product,
-                "product": item.product,
-                "classification": item.classification,
-            },
+            links_per_node=links_per_node,
+            creates=creates,
             confidence="MEDIUM",
-            reason=f"Create & Link {target_type} for known product '{item.product}'",
+            reason="All editable nodes require create-and-link",
         )
 
+    # Branch 7: heterogeneous / missing suggestions
     return MatchDecision(
         item_id=item.id,
         action="review",
-        target_type=target_type,
-        target_id=None,
-        create_payload=None,
+        links_per_node={},
+        creates=[],
         confidence="LOW",
-        reason=f"Ambiguous or unknown product '{item.product}' — manual review",
+        reason="Missing or heterogeneous suggestions across editable nodes",
     )
