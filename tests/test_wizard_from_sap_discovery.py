@@ -78,3 +78,61 @@ def test_sap_discovery_status_returns_orchestrator_result():
     assert r.status_code == 200
     assert r.json()["status"] == "ready"
     assert r.json()["inbox_count"] == 5
+
+
+def test_sap_discovery_process_runs_orchestrator_and_returns_summary():
+    sid, session_dir = _make_session()
+    (session_dir / "sap_discovery").mkdir(parents=True, exist_ok=True)
+    (session_dir / "sap_discovery" / "integration.json").write_text(
+        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
+    )
+    tc = TestClient(app)
+
+    with patch("archimedes_wizard.sap_discovery") as sd_mod:
+        sd_mod.Client.return_value = MagicMock()
+        sd_mod.make_create_factsheet_bridge.return_value = lambda p: {"id": "fs-x"}
+        sd_mod.process_inbox.return_value = {
+            "applied": ["d-high"], "failed": [], "pending_review": ["d-low"],
+        }
+        sd_mod.build.return_value = {
+            "html": session_dir / "sap_discovery" / "report.html",
+            "json": session_dir / "sap_discovery" / "report.json",
+        }
+        r = tc.post(f"/api/session/{sid}/baseline/sap-discovery/process",
+                    json={"catalog": {"SAP S/4HANA Cloud": {}}})
+
+    body = r.json()
+    assert body["applied"] == 1
+    assert body["pending_review"] == 1
+    assert body["report_url"].endswith("/sap-discovery/report")
+
+
+def test_sap_discovery_apply_review_forwards_decisions():
+    sid, session_dir = _make_session()
+    (session_dir / "sap_discovery").mkdir(parents=True, exist_ok=True)
+    (session_dir / "sap_discovery" / "integration.json").write_text(
+        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
+    )
+    tc = TestClient(app)
+
+    with patch("archimedes_wizard.sap_discovery") as sd_mod:
+        sd_mod.Client.return_value = MagicMock()
+        sd_mod.apply_review.return_value = {
+            "applied": ["d-low"], "failed": [], "pending_review": [],
+        }
+        sd_mod.build.return_value = {
+            "html": session_dir / "sap_discovery" / "report.html",
+            "json": session_dir / "sap_discovery" / "report.json",
+        }
+        decisions = [
+            {"item_id": "d-low", "action": "link",
+             "target_type": "Application", "target_id": "fs-1"},
+        ]
+        r = tc.post(
+            f"/api/session/{sid}/baseline/sap-discovery/apply-review",
+            json={"decisions": decisions},
+        )
+
+    assert r.status_code == 200
+    call = sd_mod.apply_review.call_args
+    assert call.kwargs["decisions"] == decisions

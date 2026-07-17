@@ -592,6 +592,59 @@ async def sap_discovery_status(session_id: str):
     )
 
 
+@app.post("/api/session/{session_id}/baseline/sap-discovery/process")
+async def sap_discovery_process(session_id: str, body: dict):
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    catalog = (body or {}).get("catalog", {})
+    session_dir = _sap_discovery_dir(session_id)
+    client = _sap_discovery_client(session_id)
+    create_fs = sap_discovery.make_create_factsheet_bridge()
+
+    log = sap_discovery.process_inbox(
+        session_dir=session_dir,
+        client=client,
+        catalog=catalog,
+        create_factsheet=create_fs,
+    )
+    sap_discovery.build(session_dir=session_dir)
+    return {
+        "applied": len(log.get("applied", [])),
+        "failed": len(log.get("failed", [])),
+        "pending_review": len(log.get("pending_review", [])),
+        "report_url": f"/api/session/{session_id}/baseline/sap-discovery/report",
+    }
+
+
+@app.post("/api/session/{session_id}/baseline/sap-discovery/apply-review")
+async def sap_discovery_apply_review(session_id: str, body: dict):
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    decisions = (body or {}).get("decisions") or []
+    session_dir = _sap_discovery_dir(session_id)
+    client = _sap_discovery_client(session_id)
+    log = sap_discovery.apply_review(
+        session_dir=session_dir, client=client, decisions=decisions
+    )
+    sap_discovery.build(session_dir=session_dir)
+    return {
+        "applied": len(log.get("applied", [])),
+        "failed": len(log.get("failed", [])),
+        "pending_review": len(log.get("pending_review", [])),
+    }
+
+
+@app.get("/api/session/{session_id}/baseline/sap-discovery/report",
+         response_class=HTMLResponse)
+async def sap_discovery_report(session_id: str):
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    path = _sap_discovery_dir(session_id) / "report.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report not generated yet")
+    return HTMLResponse(path.read_text())
+
+
 # ── Step 2b — Lift & Shift: Resolve ───────────────────────────────────────────
 
 @app.post("/api/session/{session_id}/lift-shift/resolve")
