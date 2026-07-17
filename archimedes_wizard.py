@@ -556,8 +556,13 @@ def _sap_discovery_dir(session_id: str) -> Path:
 
 def _sap_discovery_client(session_id: str) -> sap_discovery.Client:
     session = _sessions[session_id]
-    ws = session["workspace"]
-    return sap_discovery.Client(base_url=ws["base_url"], api_token=ws["api_token"])
+    base_url, api_token = _leanix_creds(session)
+    if not base_url or not api_token:
+        raise HTTPException(
+            status_code=400,
+            detail="No hay workspace LeanIX configurado. Selecciona uno en el Step 0.",
+        )
+    return sap_discovery.Client(base_url=base_url, api_token=api_token)
 
 
 @app.post("/api/session/{session_id}/baseline/from-sap-discovery")
