@@ -188,3 +188,37 @@ def test_process_inbox_records_partial_bulk_link_failures(tmp_path):
     )
     assert log["applied"] == []
     assert log["failed"][0]["itemId"] == "d1"
+
+
+def test_apply_review_dispatches_link_and_reject(tmp_path):
+    session_dir = _session_dir(tmp_path)
+    (session_dir / "integration.json").write_text(
+        json.dumps({"integration_id": "int-42", "origin": "sap-extension"})
+    )
+    (session_dir / "execution_log.json").write_text(
+        json.dumps({"applied": [], "failed": [], "pending_review": ["d-a", "d-b"]})
+    )
+
+    fake_client = MagicMock()
+    fake_client.bulk_link.return_value = {"applied": ["d-a"], "failed": []}
+    fake_client.bulk_reject.return_value = {"applied": ["d-b"], "failed": []}
+
+    log = orchestrator.apply_review(
+        session_dir=session_dir,
+        client=fake_client,
+        decisions=[
+            {"item_id": "d-a", "action": "link", "target_type": "Application", "target_id": "fs-1"},
+            {"item_id": "d-b", "action": "reject"},
+        ],
+    )
+    assert set(log["applied"]) == {"d-a", "d-b"}
+
+    args, kwargs = fake_client.bulk_link.call_args
+    assert kwargs["decisions"] == [
+        {"itemId": "d-a", "targetType": "Application", "targetId": "fs-1"}
+    ]
+    fake_client.bulk_reject.assert_called_once_with(origin="sap-extension", item_ids=["d-b"])
+
+    log_persisted = json.loads((session_dir / "execution_log.json").read_text())
+    assert set(log_persisted["applied"]) == {"d-a", "d-b"}
+    assert log_persisted["pending_review"] == []

@@ -153,3 +153,42 @@ def process_inbox(
     }
     _write_json(session_dir / "execution_log.json", log)
     return log
+
+
+def apply_review(session_dir: Path, client: Client, decisions: list[dict]) -> dict:
+    """Phase 3: apply human-confirmed decisions from the review report.
+
+    Each decision: {"item_id": str, "action": "link"|"reject", "target_type"?: str, "target_id"?: str}.
+    """
+    state = _read_json(session_dir / "integration.json")
+    origin = state["origin"]
+
+    to_link = [
+        {"itemId": d["item_id"], "targetType": d["target_type"], "targetId": d["target_id"]}
+        for d in decisions if d["action"] == "link"
+    ]
+    to_reject = [d["item_id"] for d in decisions if d["action"] == "reject"]
+
+    applied: list[str] = []
+    failed: list[dict] = []
+
+    if to_link:
+        resp = client.bulk_link(origin=origin, decisions=to_link)
+        applied.extend(resp.get("applied", []))
+        failed.extend(resp.get("failed", []))
+
+    if to_reject:
+        resp = client.bulk_reject(origin=origin, item_ids=to_reject)
+        applied.extend(resp.get("applied", []))
+        failed.extend(resp.get("failed", []))
+
+    log_path = session_dir / "execution_log.json"
+    existing = _read_json(log_path) if log_path.exists() else {"applied": [], "failed": [], "pending_review": []}
+    existing["applied"] = list(set(existing.get("applied", [])) | set(applied))
+    existing["failed"] = existing.get("failed", []) + failed
+    processed_ids = {d["item_id"] for d in decisions}
+    existing["pending_review"] = [
+        i for i in existing.get("pending_review", []) if i not in processed_ids
+    ]
+    _write_json(log_path, existing)
+    return existing
