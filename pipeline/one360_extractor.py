@@ -23,7 +23,7 @@ _SINGLE_CUSTOMER = f"{ONE360_BASE_URL}/experiences/1csw/pages/single-customer"
 FILENAME_PATTERNS: dict[str, str] = {
     "cloud": "Cloud-Systems-Table-*.xlsx",
     "onprem": "System-Landscape-Details-Table-*.xlsx",
-    "contracts": "Purchased-Solutions-Table*LPR-*.xlsx",
+    "contracts": "Purchased-Solutions-Table*.xlsx",
 }
 
 _ACCOUNT_ID_RE = re.compile(r"accountId=([^&]+)")
