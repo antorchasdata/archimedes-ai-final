@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -70,3 +71,85 @@ def poll_status(session_dir: Path, client: Client) -> dict:
         "action_needed": action_needed,
         "review_needed": review_needed,
     }
+
+
+_BULK_CHUNK_SIZE = 50
+
+
+def process_inbox(
+    session_dir: Path,
+    client: Client,
+    catalog: dict,
+    create_factsheet,
+) -> dict:
+    """Phase 2: pull inbox, decide, execute link/create/reject.
+
+    Args:
+        session_dir: session working directory.
+        client: pipeline.sap_discovery.client.Client instance.
+        catalog: {product_name: metadata} lookup for the matcher.
+        create_factsheet: callable(payload_dict) -> {"id": str}. Injected so the
+            orchestrator does not import pipeline.write directly (keeps tests
+            hermetic and avoids circular imports).
+
+    Returns execution_log dict and persists snapshot/decisions/log.
+    """
+    state = _read_json(session_dir / "integration.json")
+    origin = state["origin"]
+
+    items = client.list_inbox(origin=origin, status="action_needed,review_needed")
+    _write_json(
+        session_dir / "inbox_snapshot.json",
+        [i.raw for i in items],
+    )
+
+    decisions: list[MatchDecision] = [decide(i, catalog) for i in items]
+    _write_json(session_dir / "decisions.json", [asdict(d) for d in decisions])
+
+    pending_review: list[str] = []
+    to_link: list[dict] = []
+    to_reject: list[str] = []
+
+    for d in decisions:
+        if d.action == "review":
+            pending_review.append(d.item_id)
+        elif d.action == "reject":
+            # includes "already linked" skips — do NOT re-reject those
+            if d.reason.lower().startswith("item already linked"):
+                continue
+            to_reject.append(d.item_id)
+        elif d.action == "link":
+            to_link.append({
+                "itemId": d.item_id,
+                "targetType": d.target_type,
+                "targetId": d.target_id,
+            })
+        elif d.action == "create_and_link":
+            created = create_factsheet(d.create_payload)
+            to_link.append({
+                "itemId": d.item_id,
+                "targetType": d.target_type,
+                "targetId": created["id"],
+            })
+
+    applied: list[str] = []
+    failed: list[dict] = []
+
+    for chunk_start in range(0, len(to_link), _BULK_CHUNK_SIZE):
+        chunk = to_link[chunk_start:chunk_start + _BULK_CHUNK_SIZE]
+        resp = client.bulk_link(origin=origin, decisions=chunk)
+        applied.extend(resp.get("applied", []))
+        failed.extend(resp.get("failed", []))
+
+    if to_reject:
+        resp = client.bulk_reject(origin=origin, item_ids=to_reject)
+        applied.extend(resp.get("applied", []))
+        failed.extend(resp.get("failed", []))
+
+    log = {
+        "applied": applied,
+        "failed": failed,
+        "pending_review": pending_review,
+    }
+    _write_json(session_dir / "execution_log.json", log)
+    return log
