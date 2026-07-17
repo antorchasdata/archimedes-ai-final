@@ -185,3 +185,31 @@ def test_bulk_reject_puts_item_ids():
     )
     assert kwargs["json"] == {"itemIds": ["d3"]}
     assert result == {"applied": ["d3"], "failed": []}
+
+
+def test_list_inbox_falls_back_to_v1_when_v2_404(monkeypatch):
+    """If v2 returns 404, client should retry against discovery-linking v1."""
+    client = _mk_client()
+
+    call_log: list[str] = []
+
+    def _fake_get(url, **_kw):
+        call_log.append(url)
+        m = MagicMock()
+        if "/v2/" in url:
+            m.status_code = 404
+            import requests as _rq
+            m.raise_for_status.side_effect = _rq.HTTPError("404")
+        else:
+            m.status_code = 200
+            m.json.return_value = {"items": []}
+            m.raise_for_status.return_value = None
+        return m
+
+    with patch("pipeline.sap_discovery.client.get_bearer", return_value="BEARER"), \
+         patch("pipeline.sap_discovery.client.requests.get", side_effect=_fake_get):
+        items = client.list_inbox(origin="sap-extension")
+
+    assert items == []
+    assert any("/v2/" in u for u in call_log)
+    assert any("/v1/" in u for u in call_log)

@@ -114,12 +114,11 @@ class Client:
         params: dict[str, str] = {}
         if status:
             params["status"] = status
-        resp = requests.get(
-            f"{self.base_url}/services/discovery-linking/v2/{origin}/discoveryItems",
-            params=params,
-            headers=self._auth_header(),
-            timeout=60,
-        )
+        v2_url = f"{self.base_url}/services/discovery-linking/v2/{origin}/discoveryItems"
+        resp = requests.get(v2_url, params=params, headers=self._auth_header(), timeout=60)
+        if resp.status_code == 404:
+            v1_url = f"{self.base_url}/services/discovery-linking/v1/discovery-items"
+            resp = requests.get(v1_url, params=params, headers=self._auth_header(), timeout=60)
         resp.raise_for_status()
         data = resp.json() or {}
         return [DiscoveryItem.from_api(x) for x in data.get("items", [])]
